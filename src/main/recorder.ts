@@ -360,6 +360,12 @@ class Recorder {
 
       // 2. choose the capture engine: GPU desktop duplication when possible, GDI as the fallback
       this.engine = await this.pickEngine(monitors)
+      // GDI can't keep up with 60 fps on big screens (it drops frames and runs out of memory), so it records at 30
+      if (this.engine.kind === 'gdi' && opts.fps > 30 && this.rect.width * this.rect.height > 2_100_000) {
+        console.log('[rec] compatibility capture on a large screen: recording at 30 fps')
+        opts = { ...opts, fps: 30 }
+        this.opts = opts
+      }
       console.log('[rec] start', JSON.stringify({ kind: opts.kind, source: opts.sourceId, rect: this.rect, engine: this.engine, fps: opts.fps }))
 
       const { id, dir } = await newProjectDir()

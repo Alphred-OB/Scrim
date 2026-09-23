@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { copyFileSync, existsSync, mkdirSync, promises as fs, readFileSync } from 'fs'
+import { writeFileSync, copyFileSync, existsSync, mkdirSync, promises as fs, readFileSync } from 'fs'
 import { join } from 'path'
 import type { AppSettings } from '@shared/types'
 import { defaultSettings } from '@shared/defaults'
@@ -32,6 +32,17 @@ export function getSettings(): AppSettings {
       ...s,
       shortcuts: { ...d.shortcuts, ...(s.shortcuts ?? {}) },
       exportSound: { ...d.exportSound, ...(s.exportSound ?? {}) }
+    }
+    // Compatibility capture was often left on from older versions, where it was the fallback. It hides the record bar
+    // and is heavy, so everyone goes back to Automatic once (it still falls back by itself when GPU capture can't work).
+    if (!(s as { engineReset?: boolean }).engineReset) {
+      cache.captureEngine = 'auto'
+      ;(cache as { engineReset?: boolean }).engineReset = true
+      try {
+        writeFileSync(file(), JSON.stringify(cache, null, 2))
+      } catch {
+        /* next start tries again */
+      }
     }
   } catch {
     cache = d

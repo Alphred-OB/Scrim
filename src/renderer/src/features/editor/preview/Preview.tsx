@@ -170,8 +170,12 @@ export default function Preview() {
     if (!c || !v) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
     // while playing, render at a size this PC can keep up with (adaptive, see below); paused is always sharp
-    const q = useEditor.getState().playing ? quality.current : 1
-    const W = Math.max(320, Math.round((Math.min(ow, box.w * dpr) * q) / 16) * 16)
+    const isPlaying = useEditor.getState().playing
+    const q = isPlaying ? quality.current : 1
+    // playing: never more than 1600 px wide and no retina doubling (a big high DPI screen would otherwise draw
+    // 4x the pixels every frame). Paused frames are drawn at full sharpness.
+    const target = isPlaying ? Math.min(ow, box.w * Math.min(dpr, 1.25), 1600) : Math.min(ow, box.w * dpr)
+    const W = Math.max(320, Math.round((target * q) / 16) * 16)
     const H = Math.round((W * oh) / ow)
     if (c.width !== W || c.height !== H) {
       c.width = W
@@ -362,6 +366,7 @@ export default function Preview() {
       vfc = v.requestVideoFrameCallback(onFrame)
     }
     if ('requestVideoFrameCallback' in v) vfc = v.requestVideoFrameCallback(onFrame)
+    let lastDraw = 0
     const loop = () => {
       if (intro) {
         const it = intro.from + (performance.now() - intro.wall) / 1000
@@ -423,8 +428,13 @@ export default function Preview() {
         clickFrom = at
       }
       logical.current = at
-      draw.current(at)
-      timeBus.emit(at)
+      // draw at most about 60 times a second (a 120 or 144 Hz screen would otherwise redraw the same frame twice)
+      const nowDraw = performance.now()
+      if (nowDraw - lastDraw >= 15) {
+        lastDraw = nowDraw
+        draw.current(at)
+        timeBus.emit(at)
+      }
       syncFollowers(true)
       raf = requestAnimationFrame(loop)
     }

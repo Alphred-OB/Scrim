@@ -212,8 +212,14 @@ let tickRaf = 0
 function subscribeTick(fn: (now: number) => void) {
   tickListeners.add(fn)
   if (tickListeners.size === 1) {
+    // the previews run at about 20 fps and rest while the video plays or the window is hidden,
+    // so a panel full of moving tiles never slows down playback
+    let last = 0
     const loop = (now: number) => {
-      tickListeners.forEach((cb) => cb(now))
+      if (now - last >= 50 && !document.hidden && !useEditor.getState().playing) {
+        last = now
+        tickListeners.forEach((cb) => cb(now))
+      }
       tickRaf = requestAnimationFrame(loop)
     }
     tickRaf = requestAnimationFrame(loop)

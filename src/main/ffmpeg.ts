@@ -74,7 +74,7 @@ export function encoderPixFmt(enc: string): string {
  * done in one place so colors don't shift or wash out.
  */
 export function colorFilter(enc: string): string {
-  return `scale=out_color_matrix=bt709:out_range=tv:flags=lanczos+accurate_rnd+full_chroma_int,format=${encoderPixFmt(enc)}`
+  return `scale=out_color_matrix=bt709:out_range=tv:flags=bicubic+full_chroma_int,format=${encoderPixFmt(enc)}`
 }
 
 /** Tags the video as BT.709 so the editor, browsers and YouTube show the right colors. */
@@ -90,7 +90,7 @@ export function encoderArgs(enc: string, fps: number): string[] {
     case 'h264_nvenc':
       return ['-c:v', enc, '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', '16', '-b:v', '0', '-maxrate', '80M', '-bufsize', '160M', '-spatial-aq', '1', '-aq-strength', '8', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
     case 'h264_qsv':
-      return ['-c:v', enc, '-preset', 'medium', '-global_quality', '17', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
+      return ['-c:v', enc, '-preset', 'veryfast', '-async_depth', '4', '-global_quality', '19', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
     case 'h264_amf':
       return ['-c:v', enc, '-quality', 'balanced', '-rc', 'cqp', '-qp_i', '16', '-qp_p', '18', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
     default:

@@ -66,8 +66,14 @@ let fxTickRaf = 0
 function subscribeFxTick(fn: (now: number) => void) {
   fxTickListeners.add(fn)
   if (fxTickListeners.size === 1) {
+    // the previews run at about 20 fps and rest while the video plays or the window is hidden,
+    // so a panel full of moving tiles never slows down playback
+    let last = 0
     const loop = (now: number) => {
-      fxTickListeners.forEach((cb) => cb(now))
+      if (now - last >= 50 && !document.hidden && !useEditor.getState().playing) {
+        last = now
+        fxTickListeners.forEach((cb) => cb(now))
+      }
       fxTickRaf = requestAnimationFrame(loop)
     }
     fxTickRaf = requestAnimationFrame(loop)
