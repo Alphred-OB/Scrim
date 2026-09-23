@@ -389,7 +389,9 @@ export class Renderer {
     const z = zoomAt(edit.zoom, t, inp.camera, toContent)
     const vp = viewport(z)
     // media set to play "inside the frame" replaces the recording for its duration
-    const inFrame = edit.overlays.find((o) => o.mode === 'frame' && t >= o.start && t <= o.end && inp.overlays?.has(o.id))
+    // layers: higher lanes draw on top; hidden tracks are skipped entirely
+    const overlays = edit.tracks.media ? [...edit.overlays].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0)) : []
+    const inFrame = [...overlays].reverse().find((o) => o.mode === 'frame' && t >= o.start && t <= o.end && inp.overlays?.has(o.id))
     const look = effectFilter(edit.effects)
     if (look) ctx.filter = look
     if (inFrame) {
@@ -442,7 +444,7 @@ export class Renderer {
     }
 
     // 6. imported media (picture in picture, logos, b-roll)
-    for (const o of edit.overlays) {
+    for (const o of overlays) {
       if (t < o.start || t > o.end || o.mode === 'frame') continue
       const src = inp.overlays?.get(o.id)
       if (!src) continue
@@ -480,7 +482,10 @@ export class Renderer {
     if (edit.webcam.show && inp.webcam) drawWebcam(ctx, edit, inp.webcam, W, H, L.k)
 
     // 8. text
-    for (const tx of edit.texts) if (t >= tx.start && t <= tx.end) drawText(ctx, tx, t, W, H, L.k)
+    if (edit.tracks.text) {
+      const texts = [...edit.texts].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0))
+      for (const tx of texts) if (t >= tx.start && t <= tx.end) drawText(ctx, tx, t, W, H, L.k)
+    }
 
     // 9. transitions at the start, the end and around cuts
     this.applyTransition(ctx, W, H, t, edit, L.k)

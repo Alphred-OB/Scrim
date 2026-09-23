@@ -103,9 +103,9 @@ export default function Preview() {
     for (const o of e.overlays) {
       const as = L.assets.get(o.assetId)
       if (as?.kind !== 'video') continue
-      add('ov:' + o.id, t >= o.start && t <= o.end ? o.trimStart + (t - o.start) : null, o.volume, o.muted || !as.hasAudio)
+      add('ov:' + o.id, t >= o.start && t <= o.end ? o.trimStart + (t - o.start) : null, o.volume, o.muted || !as.hasAudio || !e.tracks.media)
     }
-    for (const c of e.audioClips) add('ac:' + c.id, t >= c.start && t <= c.end ? c.trimStart + (t - c.start) : null, c.volume, c.muted)
+    for (const c of e.audioClips) add('ac:' + c.id, t >= c.start && t <= c.end ? c.trimStart + (t - c.start) : null, c.volume, c.muted || !e.tracks.audio)
     return out
   }
 
@@ -196,12 +196,13 @@ export default function Preview() {
     const sy = box.h / H
     const k = Math.min(W, H) / 1080
     const hs: Handle[] = []
-    for (const tx of L.edit.texts) {
+    const byLane = <T extends { lane?: number }>(list: T[]) => [...list].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0))
+    for (const tx of L.edit.tracks.text ? byLane(L.edit.texts) : []) {
       if (t < tx.start || t > tx.end) continue
       const b = measureText(ctx, tx, W, H, k)
       hs.push({ kind: 'text', id: tx.id, box: { x: b.x * sx, y: b.y * sy, w: b.w * sx, h: b.h * sy } })
     }
-    for (const o of L.edit.overlays) {
+    for (const o of L.edit.tracks.media ? byLane(L.edit.overlays) : []) {
       if (t < o.start || t > o.end || o.mode !== 'pip') continue
       const as = L.assets.get(o.assetId)
       if (!as) continue

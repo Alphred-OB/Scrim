@@ -79,8 +79,10 @@ export async function startMedia(opts: MediaStartOptions): Promise<Partial<Recor
     const cam = opts.webcam
     jobs.push(
       (async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: webcamConstraints(cam.deviceId, cam.quality), audio: false })
-        const bps = cam.quality >= 1080 ? 5_000_000 : cam.quality >= 720 ? 2_500_000 : 1_200_000
+        // ask for the best the camera can do; it answers with what it really supports
+        const stream = await navigator.mediaDevices.getUserMedia({ video: webcamConstraints(cam.deviceId, 1080), audio: false })
+        const h = stream.getVideoTracks()[0]?.getSettings().height ?? 720
+        const bps = h >= 1000 ? 5_000_000 : h >= 700 ? 2_500_000 : 1_200_000
         out.webcam = await startTrack('webcam', stream, { videoBitsPerSecond: bps })
       })().catch((e) => console.warn('webcam failed', e))
     )

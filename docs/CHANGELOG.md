@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- New: layers for Text, Media and Audio. Items that play at the same time sit on their own layer instead of stacking. Drag an item up or down to change its layer; higher layers draw on top. Text always has an empty layer ready.
+- New: eye button on Media and Text, speaker button on Audio, to hide or mute a whole track
+- Changed: the recording outline shows during the countdown, the first few seconds and while paused, then fades away
+- Removed: the webcam 480p/720p/1080p choice, which didn't change anything. Scrim now asks the camera for its best quality.
 - New: transitions for the start, the end and every cut (fade through black or white, blur, zoom, whip pan, flash), with a dot on each cut in the Video track to set its own
 - New: effects panel with 10 looks (vivid, punchy, warm, cool, matte, vintage, sepia, black & white, noir) plus brightness, contrast, saturation, vignette and film grain
 - New: media placement: play a video inside your recording's frame (default for videos), on top as picture in picture, or full screen, with fit or fill

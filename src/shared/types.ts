@@ -160,6 +160,8 @@ export interface TextItem {
   id: string
   start: number
   end: number
+  /** timeline layer; items on different layers can overlap in time. Higher layers draw on top. */
+  lane?: number
   text: string
   x: number // 0..1 center, relative to output canvas
   y: number
@@ -198,6 +200,7 @@ export interface OverlayClip {
   assetId: string
   start: number // timeline (source) seconds
   end: number
+  lane?: number
   trimStart: number // seconds into the asset
   x: number // center, 0..1 of output
   y: number
@@ -240,6 +243,7 @@ export interface AudioClip {
   assetId: string
   start: number
   end: number
+  lane?: number
   trimStart: number
   volume: number
   muted: boolean
@@ -296,6 +300,8 @@ export interface EditState {
   export: ExportSettings
   transitions: TransitionSettings
   effects: EffectSettings
+  /** eye / speaker buttons on the timeline tracks */
+  tracks: { media: boolean; text: boolean; audio: boolean }
 }
 
 export interface Project {

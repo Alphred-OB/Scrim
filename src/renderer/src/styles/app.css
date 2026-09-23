@@ -326,3 +326,5 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .tl-trans.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 .transport-side { width: 230px; flex-shrink: 0; }
+.tl-sublabel { font-size: 10.5px; font-weight: 500; color: var(--faint); }
+.tl-row.lane { background: var(--hover); }

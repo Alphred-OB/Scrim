@@ -118,6 +118,16 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         if (Math.abs(t - 2) > 0.1) throw new Error(`playhead went to ${t.toFixed(2)}s instead of 2s`)
       })
 
+      await step('two texts at the same time get their own layers', async () => {
+        await js('window.__scrim.addText(1)')
+        await js('window.__scrim.addText(1.5)')
+        await wait(400)
+        const lanes = await js<number[]>('window.__scrim.lanes()')
+        log('text layers', JSON.stringify(lanes))
+        if (new Set(lanes).size < 3) throw new Error('texts share a layer: ' + lanes.join(','))
+        await shot('text-layers.png')
+      })
+
       await step('zoom eye toggle', async () => {
         const before = (await state()).zoomEnabled
         await js(`document.querySelectorAll('.tl-head').forEach((h) => h.textContent.includes('Zoom') && h.querySelector('.tl-eye')?.setAttribute('id', 'eye-zoom'))`)

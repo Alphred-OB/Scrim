@@ -1,6 +1,6 @@
 // Editing actions shared by the timeline, panels, context menus and keyboard shortcuts.
 import type { Asset, AudioClip, OverlayClip } from '@shared/types'
-import { newText, newZoom, uid } from '@shared/defaults'
+import { freeLane, newText, newZoom, uid } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { api } from '@/lib/api'
 import { flushSave, useEditor } from './store'
@@ -29,9 +29,11 @@ export function addZoomAt(t: number, len = 2.5): string | null {
   return z.id
 }
 
-export function addTextAt(t: number): void {
+export function addTextAt(t: number, lane = 0): void {
   const tx = newText(t)
   tx.end = Math.min(dur(), t + 3)
+  // overlapping text goes on the next free layer instead of stacking on top of another one
+  tx.lane = freeLane(st().project!.edit.texts, tx.start, tx.end, lane)
   st().update((e) => e.texts.push(tx))
   st().select({ kind: 'text', id: tx.id })
 }
@@ -48,28 +50,22 @@ export function regenerateAutoZooms(): void {
 }
 
 /** First time at or after t where nothing on that track is playing. */
-function freeSpot(list: { start: number; end: number }[], t: number): number {
-  let at = t
-  for (const c of list.slice().sort((a, b) => a.start - b.start)) if (at >= c.start - 0.01 && at < c.end) at = c.end
-  return at
-}
 
-export function addAssetAt(asset: Asset, t0: number): void {
+export function addAssetAt(asset: Asset, t0: number, lane = 0): void {
   const s = st()
   const e0 = s.project!.edit
-  // prefer the next free gap on the track; if the track is full, layer it on top at the drop point
-  let t = freeSpot(asset.kind === 'audio' ? e0.audioClips : e0.overlays, t0)
-  if (t >= dur() - 0.2) t = Math.min(t0, dur() - 0.5)
-  if (t < 0) return
+  // it lands exactly where it was dropped; if that spot is taken it goes on the next free layer
+  const t = Math.max(0, Math.min(t0, dur() - 0.5))
   const end = Math.min(dur(), t + (asset.kind === 'image' ? 4 : Math.max(0.5, asset.duration)))
   if (end - t < 0.2) return
+  const layer = freeLane(asset.kind === 'audio' ? e0.audioClips : e0.overlays, t, end, lane)
   if (asset.kind === 'audio') {
-    const c: AudioClip = { id: uid('ac'), assetId: asset.id, start: t, end, trimStart: 0, volume: 0.8, muted: false, fadeIn: 0.3, fadeOut: 0.5 }
+    const c: AudioClip = { id: uid('ac'), assetId: asset.id, start: t, end, lane: layer, trimStart: 0, volume: 0.8, muted: false, fadeIn: 0.3, fadeOut: 0.5 }
     s.update((e) => e.audioClips.push(c))
     s.select({ kind: 'audioClip', id: c.id })
   } else {
     const o: OverlayClip = {
-      id: uid('ov'), assetId: asset.id, start: t, end, trimStart: 0, x: 0.78, y: 0.28, w: asset.kind === 'image' ? 0.18 : 0.32, radius: 16, shadow: true,
+      id: uid('ov'), assetId: asset.id, start: t, end, lane: layer, trimStart: 0, x: 0.78, y: 0.28, w: asset.kind === 'image' ? 0.18 : 0.32, radius: 16, shadow: true,
       opacity: 1, volume: 1, muted: !asset.hasAudio,
       // videos play inside the recording's frame by default, images float on top
       mode: asset.kind === 'video' ? 'frame' : 'pip',
@@ -147,7 +143,8 @@ export function duplicateSelection(): void {
     const it = arr.find((x) => x.id === sel.id)
     if (!it) return
     const len = it.end - it.start
-    const copy = { ...structuredClone(it), id: uid('d'), start: it.end, end: Math.min(dur(), it.end + len) }
+    const copy = { ...structuredClone(it), id: uid('d'), start: it.end, end: Math.min(dur(), it.end + len) } as typeof it & { lane?: number }
+    if ('lane' in it || sel.kind !== 'zoom') copy.lane = freeLane(arr, copy.start, copy.end, (it as { lane?: number }).lane ?? 0)
     if (copy.end - copy.start > 0.2) arr.push(copy)
   })
 }

@@ -291,12 +291,12 @@ export async function exportProject(
   if (media.system && !a.systemMuted && a.systemVolume > 0) tracks.push({ path: media.system.path, offset: media.system.offset + a.syncOffset, volume: a.systemVolume })
   for (const c of edit.audioClips) {
     const as = assets.get(c.assetId)
-    if (!as || c.muted || c.volume <= 0) continue
+    if (!as || c.muted || c.volume <= 0 || !edit.tracks.audio) continue
     tracks.push({ path: as.path, offset: c.start - c.trimStart, volume: c.volume, window: [c.start, c.end], fadeIn: c.fadeIn, fadeOut: c.fadeOut })
   }
   for (const o of edit.overlays) {
     const as = assets.get(o.assetId)
-    if (!as || as.kind !== 'video' || !as.hasAudio || o.muted || o.volume <= 0) continue
+    if (!as || as.kind !== 'video' || !as.hasAudio || o.muted || o.volume <= 0 || !edit.tracks.media) continue
     tracks.push({ path: as.path, offset: o.start - o.trimStart, volume: o.volume, window: [o.start, o.end], fadeIn: 0.05, fadeOut: 0.05 })
   }
   const off = api.on('export:progress', (p: number) => onProgress({ phase: 'audio', progress: p }))

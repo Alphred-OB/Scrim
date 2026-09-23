@@ -3,14 +3,27 @@ import type { RecorderStatus } from '@shared/types'
 import { api } from '@/lib/api'
 
 /**
- * Full size, click-through window around the recorded area. A soft blue frame with a bright
- * line that keeps travelling around it, so it's always clear what's being recorded.
- * Turns amber and stops moving while paused.
+ * Full size, click-through window around the recorded area: a blue frame with a bright line
+ * travelling around it. It shows during the countdown and the first seconds of recording (and
+ * again briefly after resuming), then fades away so it never gets in the way. While paused it
+ * stays on in amber so it's obvious nothing is being recorded.
  */
 export default function RecordBorder() {
   const [state, setState] = useState<RecorderStatus['state']>('countdown')
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const runner = useRef<SVGRectElement>(null)
+  const [visible, setVisible] = useState(true)
+  const prev = useRef<RecorderStatus['state']>('countdown')
+
+  // decide when to show: countdown and paused stay on; recording shows for a moment then fades
+  useEffect(() => {
+    const was = prev.current
+    prev.current = state
+    if (state !== 'recording') return setVisible(state === 'countdown' || state === 'paused')
+    setVisible(true)
+    const id = setTimeout(() => setVisible(false), was === 'paused' ? 2000 : 3500)
+    return () => clearTimeout(id)
+  }, [state])
 
   useEffect(() => {
     document.documentElement.style.background = 'transparent'
@@ -36,7 +49,7 @@ export default function RecordBorder() {
 
   // move the bright segment with rAF: steady speed in px/s whatever the window size
   useEffect(() => {
-    if (paused) return
+    if (paused || !visible) return
     let raf = 0
     let off = 0
     let last = performance.now()
@@ -49,10 +62,10 @@ export default function RecordBorder() {
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [paused, perimeter])
+  }, [paused, perimeter, visible])
 
   return (
-    <svg width={size.w} height={size.h} style={{ position: 'fixed', inset: 0, pointerEvents: 'none' }}>
+    <svg width={size.w} height={size.h} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', opacity: visible ? 1 : 0, transition: `opacity ${visible ? 0.2 : 0.8}s ease` }}>
       <rect x={inset} y={inset} width={w} height={h} rx={r} fill="none" stroke={color} strokeOpacity={0.45} strokeWidth={3} />
       {!paused && (
         <rect

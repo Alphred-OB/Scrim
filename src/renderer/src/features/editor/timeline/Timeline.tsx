@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import type { OverlayMode, Transition } from '@shared/types'
 import { Icon, fmtTime, openContextMenu, MenuItem } from '@/ui'
 import { mediaUrl } from '@/lib/api'
+import { freeLane } from '@shared/defaults'
 import { useEditor, Selection } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
@@ -34,9 +35,14 @@ export const useTimelineView = create<{ zoom: number; height: number; setZoom(z:
   }
 }))
 
-type Item = { id: string; start: number; end: number }
+type Item = { id: string; start: number; end: number; lane?: number }
+
+// layer helpers: row keys are "text", "text#1", "text#2"...
+const laneKey = (base: string, lane = 0) => (lane ? `${base}#${lane}` : base)
+const laneOf = (key: string) => Number(key.split('#')[1] ?? 0)
+const laneCount = (list: { lane?: number }[], spare = false) => (list.length ? Math.max(...list.map((x) => x.lane ?? 0)) + 1 + (spare ? 1 : 0) : 1)
 type Kind = 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip'
-interface Row { key: string; label: string; icon: string; color: string; kind?: Kind; hint?: string; toggle?: { on: boolean; set: () => void; icon: [string, string]; title: string } }
+interface Row { key: string; label: string; sub?: string; icon: string; color: string; kind?: Kind; hint?: string; toggle?: { on: boolean; set: () => void; icon: [string, string]; title: string } }
 
 export default function Timeline() {
   const project = useEditor((s) => s.project)!
@@ -170,6 +176,11 @@ export default function Timeline() {
     e.stopPropagation()
     select({ kind, id: item.id })
     const x0 = e.clientX
+    const y0 = e.clientY
+    const layered = kind === 'text' || kind === 'overlay' || kind === 'audioClip'
+    const lane0 = item.lane ?? 0
+    const lanes = laneCount(listFor(kind), kind === 'text')
+    let lane = lane0
     const s0 = item.start
     const e0 = item.end
     const others = listFor(kind).filter((o) => o.id !== item.id)
@@ -182,8 +193,10 @@ export default function Timeline() {
     const key = `drag-${kind}-${item.id}-${Date.now()}`
     let moved = false
     const mv = (ev: PointerEvent) => {
-      if (Math.abs(ev.clientX - x0) > 2) moved = true
+      if (Math.abs(ev.clientX - x0) > 2 || (layered && mode === 'move' && Math.abs(ev.clientY - y0) > 6)) moved = true
       if (!moved) return
+      // dragging up or down moves the item to another layer (one past the last makes a new layer)
+      if (layered && mode === 'move') lane = Math.max(0, Math.min(lanes, lane0 + Math.round((ev.clientY - y0) / TRACK_H)))
       const dt = (ev.clientX - x0) / pps
       let ns = s0
       let ne = e0
@@ -207,12 +220,20 @@ export default function Timeline() {
         if (!it) return
         it.start = +ns.toFixed(3)
         it.end = +ne.toFixed(3)
+        if (layered) it.lane = lane
         if (it.trimStart !== undefined) it.trimStart = +trim.toFixed(3)
       }, key)
     }
     const up = () => {
       window.removeEventListener('pointermove', mv)
       window.removeEventListener('pointerup', up)
+      // never leave two items on top of each other on one layer: bump to the next free one
+      if (moved && layered)
+        update((ed) => {
+          const list = listFor(kind, ed)
+          const it = list.find((o) => o.id === item.id)
+          if (it) it.lane = freeLane(list, it.start, it.end, it.lane ?? 0, it.id)
+        }, key)
       if (!moved && mode === 'move') {
         const t = timeAt(x0)
         setTime(t)
@@ -285,7 +306,7 @@ export default function Timeline() {
           select({ kind, id: it.id })
           openContextMenu(e, itemMenu(kind, it))
         }}
-        style={{ left: X(it.start), width: w, top: top + 4, height: TRACK_H - 8, background: color, cursor: kind === 'clip' ? 'pointer' : 'grab', opacity: kind === 'zoom' && !edit.zoom.enabled ? 0.35 : undefined }}
+        style={{ left: X(it.start), width: w, top: top + 4, height: TRACK_H - 8, background: color, cursor: kind === 'clip' ? 'pointer' : 'grab', opacity: (kind === 'zoom' && !edit.zoom.enabled) || (kind === 'overlay' && !edit.tracks.media) || (kind === 'text' && !edit.tracks.text) || (kind === 'audioClip' && !edit.tracks.audio) ? 0.35 : undefined }}
       >
         {extra}
         <div className="tl-edge l" onPointerDown={(e) => startDrag(e, kind, it, 'l')} />
@@ -311,7 +332,9 @@ export default function Timeline() {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
       const onVideo = a.kind === 'video' && rowAt(e.clientY) === 'video'
-      setDropRow(onVideo ? 'video' : a.kind === 'audio' ? 'audio' : 'overlay')
+      const base = a.kind === 'audio' ? 'audio' : 'overlay'
+      const under = rowAt(e.clientY) ?? ''
+      setDropRow(onVideo ? 'video' : under.split('#')[0] === base ? under : base)
       setJoinHint(onVideo ? joinSide(e.clientX) : null)
       setGhost(null)
     } else if (e.dataTransfer.types.includes('Files')) {
@@ -326,19 +349,27 @@ export default function Timeline() {
     e.preventDefault()
     e.stopPropagation()
     dragAsset.set(null)
-    if (a.kind === 'video' && rowAt(e.clientY) === 'video') return void joinVideoAt(joinSide(e.clientX), a.path)
+    const row = rowAt(e.clientY) ?? ''
+    if (a.kind === 'video' && row === 'video') return void joinVideoAt(joinSide(e.clientX), a.path)
+    const base = a.kind === 'audio' ? 'audio' : 'overlay'
     const live = useEditor.getState().project!.edit.assets.find((x) => x.id === a.id)
-    if (live) addAssetAt(live, timeAt(e.clientX))
+    if (live) addAssetAt(live, timeAt(e.clientX), row.split('#')[0] === base ? laneOf(row) : 0)
   }
 
   // ---- rows ----
+  // Media, Text and Audio have layers: items on different layers can play at the same time.
+  function pushLanes(base: string, n: number, first: Omit<Row, 'key'>): void {
+    for (let l = 0; l < n; l++)
+      rows.push(l === 0 ? { key: base, ...first } : { key: laneKey(base, l), label: '', sub: `Layer ${l + 1}`, icon: first.icon, color: first.color, kind: first.kind })
+  }
   const rows: Row[] = [{ key: 'video', label: 'Video', icon: 'film', color: '#2b4fb8', kind: 'clip' }]
   if (media.webcam)
     rows.push({
       key: 'webcam', label: 'Webcam', icon: 'webcam', color: '#b85d2b',
       toggle: { on: edit.webcam.show, set: () => update((e) => (e.webcam.show = !e.webcam.show)), icon: ['eye', 'eyeOff'], title: 'Show or hide the webcam' }
     })
-  rows.push({ key: 'overlay', label: 'Media', icon: 'image', color: '#1f7a8c', kind: 'overlay', hint: 'Drop videos or images here' })
+  const mediaToggle = { on: edit.tracks.media, set: () => update((e) => (e.tracks.media = !e.tracks.media)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Show or hide all media' }
+  pushLanes('overlay', laneCount(edit.overlays), { label: 'Media', icon: 'image', color: '#1f7a8c', kind: 'overlay', hint: 'Drop videos or images here', toggle: mediaToggle })
   rows.push({
     key: 'zoom', label: 'Zoom', icon: 'zoom', color: '#6a47c9', kind: 'zoom', hint: 'Click to add a zoom',
     toggle: { on: edit.zoom.enabled, set: () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), icon: ['eye', 'eyeOff'], title: 'Turn all zooms on or off' }
@@ -348,19 +379,23 @@ export default function Timeline() {
       key: 'clicks', label: 'Clicks', icon: 'click', color: '#0a84ff', hint: 'Click a marker to turn its effect off',
       toggle: { on: edit.cursor.clickEffect !== 'none', set: () => update((e) => (e.cursor.clickEffect = e.cursor.clickEffect === 'none' ? 'ripple' : 'none')), icon: ['eye', 'eyeOff'], title: 'Click effects on or off' }
     })
-  rows.push({ key: 'text', label: 'Text', icon: 'text', color: '#11806a', kind: 'text', hint: 'Click to add text' })
+  const textToggle = { on: edit.tracks.text, set: () => update((e) => (e.tracks.text = !e.tracks.text)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Show or hide all text' }
+  // text always has one empty layer at the bottom, so two texts at the same time never have to overlap
+  pushLanes('text', laneCount(edit.texts, true), { label: 'Text', icon: 'text', color: '#11806a', kind: 'text', hint: 'Click to add text', toggle: textToggle })
   if (media.mic)
     rows.push({ key: 'mic', label: 'Microphone', icon: 'mic', color: '#2f9e5b', toggle: { on: !edit.audio.micMuted, set: () => update((e) => (e.audio.micMuted = !e.audio.micMuted)), icon: ['volume', 'mute'], title: 'Mute microphone' } })
   if (media.system)
     rows.push({ key: 'system', label: 'System audio', icon: 'audio', color: '#9e7a2f', toggle: { on: !edit.audio.systemMuted, set: () => update((e) => (e.audio.systemMuted = !e.audio.systemMuted)), icon: ['volume', 'mute'], title: 'Mute system audio' } })
-  rows.push({ key: 'audio', label: 'Audio', icon: 'music', color: '#a2427a', kind: 'audioClip', hint: 'Drop music or sound here' })
-  const top = (key: string) => RULER_H + rows.findIndex((r) => r.key === key) * TRACK_H
+  const audioToggle = { on: edit.tracks.audio, set: () => update((e) => (e.tracks.audio = !e.tracks.audio)), icon: ['volume', 'mute'] as [string, string], title: 'Mute or unmute all added audio' }
+  pushLanes('audio', laneCount(edit.audioClips), { label: 'Audio', icon: 'music', color: '#a2427a', kind: 'audioClip', hint: 'Drop music or sound here', toggle: audioToggle })
+  const top = (key: string) => RULER_H + Math.max(0, rows.findIndex((r) => r.key === key)) * TRACK_H
+  const laneTop = (base: string, lane = 0) => top(laneKey(base, lane))
 
   const onRowPointerDown = (e: React.PointerEvent, row: Row) => {
     if (e.button !== 0 || e.target !== e.currentTarget) return
     const t = timeAt(e.clientX)
     if (row.key === 'zoom') addZoomAt(t)
-    else if (row.key === 'text') addTextAt(t)
+    else if (row.kind === 'text') addTextAt(t, laneOf(row.key))
     else {
       select(null)
       scrub(e.clientX)
@@ -413,8 +448,8 @@ export default function Timeline() {
             <div style={{ height: RULER_H }} />
             {rows.map((r) => (
               <div key={r.key} className={`tl-head ${r.toggle && !r.toggle.on ? 'off' : ''}`} style={{ height: TRACK_H }}>
-                <span style={{ color: r.color, display: 'inline-flex' }}><Icon name={r.icon} size={14} /></span>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                <span style={{ color: r.color, display: 'inline-flex', visibility: r.label ? 'visible' : 'hidden' }}><Icon name={r.icon} size={14} /></span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label || <span className="tl-sublabel">{r.sub}</span>}</span>
                 {r.toggle && (
                   <button className={`icon-btn tl-eye ${r.toggle.on ? '' : 'off'}`} title={r.toggle.title} aria-pressed={!r.toggle.on} onPointerDown={(e) => e.stopPropagation()} onClick={r.toggle.set}>
                     <Icon name={r.toggle.on ? r.toggle.icon[0] : r.toggle.icon[1]} size={14} />
@@ -439,10 +474,10 @@ export default function Timeline() {
             {rows.map((r, i) => (
               <div
                 key={r.key}
-                className={`tl-row ${r.kind === 'zoom' || r.kind === 'text' ? 'addable' : ''} ${dropRow === r.key ? 'tl-drop' : ''}`}
+                className={`tl-row ${r.kind === 'zoom' || r.kind === 'text' ? 'addable' : ''} ${r.sub ? 'lane' : ''} ${dropRow === r.key ? 'tl-drop' : ''}`}
                 style={{ top: RULER_H + i * TRACK_H, height: TRACK_H, width: total + tail }}
                 onPointerDown={(e) => onRowPointerDown(e, r)}
-                onPointerMove={(e) => (r.key === 'zoom' || r.key === 'text') && e.target === e.currentTarget ? setGhost({ row: r.key, t: timeAt(e.clientX) }) : ghost && setGhost(null)}
+                onPointerMove={(e) => (r.key === 'zoom' || r.kind === 'text') && e.target === e.currentTarget ? setGhost({ row: r.key, t: timeAt(e.clientX) }) : ghost && setGhost(null)}
                 onPointerLeave={() => setGhost(null)}
                 onContextMenu={(e) =>
                   openContextMenu(e, [
@@ -532,7 +567,7 @@ export default function Timeline() {
             {/* overlays */}
             {edit.overlays.map((o) => {
               const a = edit.assets.find((x) => x.id === o.assetId)
-              return block('overlay', o, top('overlay'), 'linear-gradient(180deg,#23879b,#17606f)', a?.name ?? 'Media',
+              return block('overlay', o, laneTop('overlay', o.lane), 'linear-gradient(180deg,#23879b,#17606f)', a?.name ?? 'Media',
                 a?.kind === 'image' ? <div className="tl-thumb" style={{ backgroundImage: `url(${mediaUrl(a.path)})` }} /> : undefined)
             })}
 
@@ -564,7 +599,7 @@ export default function Timeline() {
               })}
 
             {/* text */}
-            {edit.texts.map((t) => block('text', t, top('text'), 'linear-gradient(180deg,#17a086,#0f7462)', t.text.split('\n')[0] || 'Text'))}
+            {edit.texts.map((t) => block('text', t, laneTop('text', t.lane), 'linear-gradient(180deg,#17a086,#0f7462)', t.text.split('\n')[0] || 'Text'))}
 
             {/* recorded audio with waveforms */}
             {media.mic && (
@@ -581,7 +616,7 @@ export default function Timeline() {
             {/* imported audio */}
             {edit.audioClips.map((c) => {
               const a = edit.assets.find((x) => x.id === c.assetId)
-              return block('audioClip', c, top('audio'), 'linear-gradient(180deg,#a2427a,#7a2e5b)', a?.name ?? 'Audio',
+              return block('audioClip', c, laneTop('audio', c.lane), 'linear-gradient(180deg,#a2427a,#7a2e5b)', a?.name ?? 'Audio',
                 a ? <div style={{ position: 'absolute', inset: 0, opacity: c.muted ? 0.3 : 0.9 }}><Waveform path={a.path} from={c.trimStart} to={c.trimStart + (c.end - c.start)} width={(c.end - c.start) * pps} height={TRACK_H - 8} color="rgba(255,255,255,.55)" /></div> : undefined)
             })}
 

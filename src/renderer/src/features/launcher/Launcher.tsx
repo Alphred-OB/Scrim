@@ -312,7 +312,6 @@ export default function Launcher() {
                       </button>
                     ))}
                   </div>
-                  <Seg options={[{ v: 480, l: '480p' }, { v: 720, l: '720p' }, { v: 1080, l: '1080p' }]} value={cam.quality} onChange={(v) => setCam({ quality: v as 480 | 720 | 1080 })} />
                   <Toggle label="Show bubble while recording" value={cam.showBubble} onChange={(v) => setCam({ showBubble: v })} />
                   <span className="hint">The camera is saved as its own file, so you can move, resize, reshape or hide it later in the editor.</span>
                 </>

@@ -67,7 +67,8 @@ export function defaultEdit(duration: number): EditState {
       cut: { type: 'none', duration: 0.5 },
       perCut: {}
     },
-    effects: { look: 'none', brightness: 1, contrast: 1, saturation: 1, vignette: 0, grain: 0 }
+    effects: { look: 'none', brightness: 1, contrast: 1, saturation: 1, vignette: 0, grain: 0 },
+    tracks: { media: true, text: true, audio: true }
   }
 }
 
@@ -126,10 +127,29 @@ export function migrateProject(p: Project): Project {
     export: { ...d.export, ...e.export },
     transitions: { ...d.transitions, ...e.transitions, perCut: { ...(e.transitions?.perCut ?? {}) } },
     effects: { ...d.effects, ...e.effects },
+    tracks: { ...d.tracks, ...e.tracks },
     clips: e.clips?.length ? e.clips : d.clips,
     texts: e.texts ?? []
   }
+  // projects from before layers: spread overlapping items over layers so nothing is stacked
+  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips] as { start: number; end: number; lane?: number }[][]) {
+    if (list.every((x) => x.lane !== undefined)) continue
+    const ends: number[] = []
+    for (const it of [...list].sort((a, b) => a.start - b.start)) {
+      let l = ends.findIndex((end) => end <= it.start + 1e-3)
+      if (l < 0) l = ends.length
+      ends[l] = it.end
+      it.lane = l
+    }
+  }
   return p
+}
+
+/** First layer where [start, end] doesn't overlap anything, starting from `from`. */
+export function freeLane(list: { start: number; end: number; lane?: number; id?: string }[], start: number, end: number, from = 0, skipId?: string): number {
+  for (let l = from; ; l++) {
+    if (!list.some((x) => x.id !== skipId && (x.lane ?? 0) === l && x.start < end - 1e-3 && x.end > start + 1e-3)) return l
+  }
 }
 
 export const FONTS = [

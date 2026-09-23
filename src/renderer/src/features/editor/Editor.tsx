@@ -104,6 +104,8 @@ function EditorView() {
       exportDialog: () => setExporting(true),
       patchCursor: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.cursor, patch)),
       seek: (t: number) => useEditor.getState().setTime(t),
+      addText: (t: number) => addTextAt(t),
+      lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
       patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
       import: (paths: string[]) => importMedia(useEditor.getState().project!.dir, paths, timeBus.get()),
       estimate: () => {
