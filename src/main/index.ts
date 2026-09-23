@@ -254,7 +254,7 @@ function registerIpc(): void {
   ipcMain.handle('shell:open', (_e, p: string) => shell.openPath(p))
   ipcMain.handle('app:tmp', () => tmpdir())
 
-  ipcMain.handle('sample:getDir', () => getSampleDir())
+  ipcMain.handle('sample:getDir', (_e, reset?: boolean) => getSampleDir(!!reset))
   ipcMain.handle('sample:begin', () => sampleBegin())
   ipcMain.handle('sample:finish', (_e, dir: string, cursor: CursorData, duration: number) => sampleFinish(dir, cursor, duration))
   ipcMain.handle('file:open', (_e, p: string) => openWrite(p))

@@ -43,7 +43,7 @@ export interface Api {
   tmpDir(): Promise<string>
   fileOpen(p: string): Promise<void>
   /** Returns the preloaded practice project folder if it already exists, or null. */
-  sampleGetDir(): Promise<string | null>
+  sampleGetDir(reset?: boolean): Promise<string | null>
   /** Practice project for the guided tour: makes its folder, then saves it once the video is written. */
   sampleBegin(): Promise<{ dir: string; video: string }>
   sampleFinish(dir: string, cursor: CursorData, duration: number): Promise<string>

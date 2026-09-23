@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- New timeline. It shows the video the way it will export: cut parts disappear and everything after slides left, faster clips are shorter. Pull a clip's edge to trim, pull it back out to restore.
+- The video track comes first and shows thumbnails; voice and PC sound show waveforms per clip.
+- Only tracks with something on them are shown. Drag media, text, transitions or effects anywhere on the timeline and the right track appears.
+- A toolbar above the tracks: undo, redo, split, delete, duplicate, quick add for text, zoom, media and effects, snapping on or off, zoom and Fit.
+- Transitions sit right on the video: a round button at the start, the end and every cut. Click it to pick one.
+- Yellow guide line when something snaps, red playhead, double click an empty spot on the Text or Zoom track to add one.
+- Practice always starts from a clean copy of the sample.
 - New: text animations. Pick how text comes in and goes out (16 each: fade, pop, rise, slide, zoom, drop, blur, wipe, spin, flip, typewriter, letter by letter, word by word) and a loop while it's on screen (pulse, float, wiggle, shake, blink, wave, glow), with speed control. Tiles play a preview on hover. Ramps on the Text track show the in and out.
 - New: 9 text styles to start from (Caption, Title, Label, Accent, Poster, Code, Callout, Neon, Lower third), each with its own animation.
 - New: no gradients anywhere in the interface. New solid red logo and app icon, new animated splash screen, bolder home screen with a changing headline word.

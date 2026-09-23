@@ -241,7 +241,7 @@ export async function audioPeaks(file: string): Promise<number[]> {
 }
 
 /** Returns the sample project directory if it already exists, is complete, and contains the rich showcase configuration. */
-export async function getSampleDir(): Promise<string | null> {
+export async function getSampleDir(reset = false): Promise<string | null> {
   const dir = join(await ensureRoot(), 'sample-project')
   try {
     const projPath = join(dir, 'project.json')
@@ -249,6 +249,12 @@ export async function getSampleDir(): Promise<string | null> {
     if (existsSync(projPath) && existsSync(videoPath)) {
       const p = await loadProject(dir)
       if (p.edit?.texts?.length && p.edit?.transitions?.items?.length) {
+        // practice always starts from the untouched sample
+        const original = join(dir, 'project.original.json')
+        if (reset) {
+          if (!existsSync(original)) return null // an old sample without a clean copy: make a new one
+          await fs.copyFile(original, projPath)
+        }
         return dir
       }
     }
@@ -434,5 +440,6 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
     edit
   }
   await saveProject(p)
+  await fs.copyFile(join(dir, 'project.json'), join(dir, 'project.original.json'))
   return dir
 }

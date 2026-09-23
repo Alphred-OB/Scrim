@@ -30,7 +30,7 @@ export async function startPractice(): Promise<void> {
 
   // 1. If already preloaded and ready on disk, open immediately (0ms!)
   try {
-    const readyDir = await api.sampleGetDir()
+    const readyDir = await api.sampleGetDir(true)
     if (readyDir) {
       const s = useSettings.getState()
       if (!s.settings.onboarded) await s.save({ onboarded: true })

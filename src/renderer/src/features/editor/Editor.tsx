@@ -11,7 +11,8 @@ import { useEditor, flushSave, Panel } from './state/store'
 import { timeBus } from './state/timeBus'
 import { dragAsset } from './state/dragAsset'
 import Preview, { togglePreviewFullscreen } from './preview/Preview'
-import Timeline, { ZOOM_MAX, ZOOM_MIN, useTimelineView } from './timeline/Timeline'
+import Timeline, { useTimelineView } from './timeline/Timeline'
+import { outputDuration, sourceToOutput } from './engine/timeMap'
 import ExportDialog from './export/ExportDialog'
 import { exportProject, estimateExportSeconds } from './export/exporter'
 import BackgroundPanel from './panels/BackgroundPanel'
@@ -85,7 +86,6 @@ function EditorView() {
   const future = useEditor((s) => s.future.length)
   const update = useEditor((s) => s.update)
   const shortcuts = useSettings((s) => s.settings.shortcuts)
-  const tlZoom = useTimelineView((s) => s.zoom)
   const [exporting, setExporting] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
@@ -356,28 +356,15 @@ function EditorView() {
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4 }}>
             <div className="transport-side" />
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
-              <TimeLabel lead={project.edit.leadIn ?? 0} />
+              <TimeLabel />
               <button className="icon-btn" onClick={() => jump(-1)} title="Go to start"><Icon name="prev" /></button>
               <button data-tour="play" className="play-btn" onClick={() => useEditor.getState().setPlaying(!playing)} title={`Play / pause (${kb('playPause')})`}>
                 <Icon name={playing ? 'pause' : 'play'} size={19} />
               </button>
               <button className="icon-btn" onClick={() => jump(1)} title="Go to end"><Icon name="next" /></button>
-              <span className="hint" style={{ minWidth: 56 }}>{fmtTime(project.media.screen.duration + (project.edit.leadIn ?? 0))}</span>
+              <span className="hint" style={{ minWidth: 56 }}>{fmtTime(outputDuration(project.edit.clips, project.edit.leadIn ?? 0))}</span>
             </div>
-            <div data-tour="tl-zoom" className="transport-side" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <div className="tl-zoom" title="Timeline zoom">
-              <button className="icon-btn sm" title="Zoom timeline out" onClick={() => useTimelineView.getState().setZoom((z) => z / 1.5)}><Icon name="minus" size={14} /></button>
-              <input
-                className="range"
-                type="range"
-                min={0}
-                max={100}
-                value={Math.round((Math.log(tlZoom / ZOOM_MIN) / Math.log(ZOOM_MAX / ZOOM_MIN)) * 100)}
-                onChange={(e) => useTimelineView.getState().setZoom(ZOOM_MIN * Math.pow(ZOOM_MAX / ZOOM_MIN, +e.target.value / 100))}
-              />
-              <button className="icon-btn sm" title="Zoom timeline in" onClick={() => useTimelineView.getState().setZoom((z) => z * 1.5)}><Icon name="plus" size={14} /></button>
-            </div>
-            </div>
+            <div className="transport-side" />
           </div>
         </main>
       </div>
@@ -421,7 +408,8 @@ function AiPanel() {
   )
 }
 
-function TimeLabel({ lead }: { lead: number }) {
+/** Shows the time as it will be in the exported video (after cuts, speed and intro space). */
+function TimeLabel() {
   const [t, setT] = useState(timeBus.get())
   useEffect(() => {
     let last = 0
@@ -433,5 +421,5 @@ function TimeLabel({ lead }: { lead: number }) {
       }
     })
   }, [])
-  return <span className="hint" style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(Math.max(0, t + lead), true)}</span>
+  return <span className="hint" style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(sourceToOutput(useEditor.getState().project!.edit.clips, t, useEditor.getState().project!.edit.leadIn ?? 0), true)}</span>
 }

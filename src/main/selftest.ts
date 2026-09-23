@@ -266,8 +266,8 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         const before = await state()
         const r = await js<string>(`(() => {
           const tile = document.querySelector('[draggable="true"]')
-          const heads = [...document.querySelectorAll('.tl-head')]
-          const rows = document.querySelectorAll('.tl-row')[heads.findIndex((h) => h.textContent.includes('Media'))]
+          // drop anywhere on the timeline: the right track appears by itself
+          const rows = document.querySelector('.tl-ruler')
           if (!tile || !rows) return 'missing'
           const dt = new DataTransfer()
           const b = rows.getBoundingClientRect()
@@ -287,7 +287,7 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         const before = await state()
         await js(`(() => {
           const tile = [...document.querySelectorAll('[draggable="true"]')].find((t) => t.textContent.includes('.mp4'))
-          const row = document.querySelector('.tl-row')
+          const row = document.querySelector('.tl-row[data-row="video"]')
           const b = row.getBoundingClientRect()
           const at = { bubbles: true, cancelable: true, dataTransfer: new DataTransfer(), clientX: b.right - 60, clientY: b.y + 10 }
           tile.dispatchEvent(new DragEvent('dragstart', at))
@@ -372,9 +372,8 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         // drag a transition tile and a look onto the timeline
         const dropOn = (tile: string, row: string, frac: number) => `(() => {
           const t = [...document.querySelectorAll('.fx-tile')].find((x) => x.textContent.trim() === ${JSON.stringify(tile)})
-          const heads = [...document.querySelectorAll('.tl-head')]
-          const r = document.querySelectorAll('.tl-row')[heads.findIndex((h) => h.textContent.trim().startsWith(${JSON.stringify(row)}))]
-          if (!t || !r) return 'missing'
+          const r = document.querySelector('.tl-ruler')
+          if (!t || !r || !${JSON.stringify(row)}) return 'missing'
           const b = r.getBoundingClientRect()
           const at = { bubbles: true, cancelable: true, dataTransfer: new DataTransfer(), clientX: b.x + 12 + (b.width - 24) * ${frac} * 0.8, clientY: b.y + 10 }
           t.dispatchEvent(new DragEvent('dragstart', at)); r.dispatchEvent(new DragEvent('dragover', at)); r.dispatchEvent(new DragEvent('drop', at)); t.dispatchEvent(new DragEvent('dragend', at))
@@ -422,7 +421,7 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
       await step('drag the video right to make intro space', async () => {
         await js('window.__scrim.seek(0)')
         await wait(300)
-        const b = await js<{ x: number; y: number }>(`(() => { const top = [...document.querySelectorAll('.tl-block')].sort((a, b) => a.getBoundingClientRect().y - b.getBoundingClientRect().y)[0].getBoundingClientRect(); return { x: Math.round(top.x + 40), y: Math.round(top.y + top.height / 2) } })()`)
+        const b = await js<{ x: number; y: number }>(`(() => { const top = document.querySelector('.tl-block[data-kind="clip"]').getBoundingClientRect(); return { x: Math.round(top.x + 40), y: Math.round(top.y + top.height / 2) } })()`)
         win.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 })
         for (let i = 1; i <= 8; i++) {
           win.webContents.sendInputEvent({ type: 'mouseMove', x: b.x + i * 20, y: b.y, button: 'left' } as Electron.MouseInputEvent)

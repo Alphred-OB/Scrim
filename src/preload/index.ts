@@ -31,7 +31,7 @@ const api = {
   tmpDir: () => invoke('app:tmp'),
 
   fileOpen: (p: string) => invoke('file:open', p),
-  sampleGetDir: () => invoke('sample:getDir'),
+  sampleGetDir: (reset?: boolean) => invoke('sample:getDir', reset),
   sampleBegin: () => invoke('sample:begin'),
   sampleFinish: (dir: string, cursor: unknown, duration: number) => invoke('sample:finish', dir, cursor, duration),
   fileWrite: (p: string, d: Uint8Array, pos: number) => invoke('file:write', p, d, pos),

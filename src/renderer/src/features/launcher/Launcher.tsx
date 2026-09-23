@@ -270,20 +270,6 @@ export default function Launcher() {
 
       {tab === 'home' && (
         <div className="home">
-          <div className="home-hero">
-            <div className="home-stats">
-              <span><i className="rec-dot" /> Ready to record</span>
-              {projects.length > 0 && (
-                <>
-                  <span><b>{projects.length}</b> {projects.length === 1 ? 'project' : 'projects'}</span>
-                  <span><b>{fmtTime(projects.reduce((a, p) => a + p.duration, 0))}</b> of video made</span>
-                </>
-              )}
-            </div>
-            <h1>Turn your screen into a<br /><WordSwap /></h1>
-            <p>Record once. Scrim adds the zooms, the smooth cursor and the polish, so it looks like you spent hours on it.</p>
-          </div>
-          <HomeReel />
           <div className="home-choices">
             <button data-tour="home-record" className="home-card rec" onMouseMove={spot} onClick={() => setTab('record')}>
               <div className="hc-art rec-art" aria-hidden>
@@ -562,35 +548,6 @@ function spot(e: React.MouseEvent<HTMLElement>) {
   e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
 }
 
-const WORDS = ['product demo', 'tutorial', 'launch video', 'bug report', 'walkthrough', 'story']
-
-/** The last word of the headline keeps changing, sliding up in a solid block. */
-function WordSwap() {
-  const [i, setI] = useState(0)
-  useEffect(() => {
-    const id = setInterval(() => setI((x) => (x + 1) % WORDS.length), 2200)
-    return () => clearInterval(id)
-  }, [])
-  return (
-    <span className="word-swap">
-      <span key={i}>{WORDS[i]}.</span>
-    </span>
-  )
-}
-
-const REEL = ['#3563d6', '#ff3b30', '#7a5af0', '#1aa37a', '#ffd60a', '#d9772b', '#23879b', '#3563d6', '#a2427a', '#1aa37a']
-/** Two rows of timeline clips drifting along the bottom of the home screen. */
-function HomeReel() {
-  const row = (seed: number) => {
-    const items = Array.from({ length: 22 }, (_, k) => ({ c: REEL[(k * 3 + seed) % REEL.length], w: 60 + ((k * 37 + seed * 13) % 140) }))
-    return [...items, ...items].map((it, k) => <i key={k} style={{ width: it.w, background: it.c }} />)
-  }
-  return (
-    <div className="home-reel" aria-hidden>
-      <div>{row(1)}</div>
-    </div>
-  )
-}
 
 /** "just now", "5 min ago", "yesterday", then a date. */
 function ago(ms: number): string {

@@ -63,6 +63,7 @@ const ICONS: Record<string, ReactNode> = {
   click: <><circle cx="12" cy="12" r="3" />{P('M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1')}</>,
   target: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></>,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>,
+  magnet: <><path d="M6 4v7a6 6 0 0 0 12 0V4" /><path d="M6 8h4M14 8h4" /><path d="M10 4v7a2 2 0 0 0 4 0V4" /></>,
   more: <><circle cx="6" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="18" cy="12" r="1.4" fill="currentColor" /></>,
   pin: P('M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10zM12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'),
   keyframe: P('M12 2L2 12l10 10 10-10z'),
