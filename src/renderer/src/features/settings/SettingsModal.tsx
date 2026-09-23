@@ -83,7 +83,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               />
               <span className="hint">
                 GPU capture (Desktop Duplication) is smooth and light on low end PCs, and keeps the record bar and webcam bubble out of your video.
-                Compatibility mode works everywhere but uses more CPU. {dda === null ? 'Checking your PC…' : dda ? 'GPU capture is available on this PC.' : 'GPU capture is not available on this PC, so Compatibility mode is used.'}
+                Compatibility mode works everywhere but uses more CPU, and hides the record bar while recording (it would show up in your video), so you stop with Alt+Shift+S or the tray icon. {dda === null ? 'Checking your PC…' : dda ? 'GPU capture is available on this PC.' : 'GPU capture is not available on this PC, so Compatibility mode is used.'}
               </span>
             </div>
           )}

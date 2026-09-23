@@ -439,6 +439,7 @@ class Recorder {
   private async pickEngine(monitors: Rect[]): Promise<Engine> {
     if (process.platform !== 'win32') return { kind: 'x11' }
     const pref = getSettings().captureEngine
+    console.log('[rec] capture engine setting:', pref)
     if (pref === 'gdi') return { kind: 'gdi' }
     const outputs = await probeDdaOutputs()
     const mon = monitorFor(this.rect, monitors)
