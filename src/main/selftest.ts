@@ -66,8 +66,24 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         log('sources', srcs.length, scr?.name)
         await recorder.start({ sourceId: scr?.id ?? 'screen:0:0', sourceName: 'Self test', kind: 'screen', fps: 30, mic: true, systemAudio: true, countdown: 1 })
         await wait(3000)
+        const winShot = async (route: string, name: string) => {
+          let w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('#' + route) && x.isVisible())
+          if (!w && route === '/toolbar') {
+            // the bar hides itself with this capture engine; open a copy just for the screenshot
+            w = new BrowserWindow({ width: 290, height: 64, show: false, webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false } })
+            await w.loadURL(win.webContents.getURL().split('#')[0] + '#/toolbar')
+            await wait(800)
+          }
+          if (w) await fs.writeFile(join(out, name), (await w.webContents.capturePage()).toPNG())
+          else log('no visible window', route)
+        }
+        await winShot('/border', 'border-recording.png')
+        await winShot('/toolbar', 'toolbar-recording.png')
         await recorder.pause()
         log('paused', JSON.stringify(recorder.getStatus()))
+        await wait(400)
+        await winShot('/border', 'border-paused.png')
+        await winShot('/toolbar', 'toolbar-paused.png')
         await wait(3000)
         await recorder.resume()
         log('resumed', JSON.stringify(recorder.getStatus()))
@@ -87,6 +103,20 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         log('import errors', JSON.stringify(await js(`window.__scrim.import(${JSON.stringify(env.SCRIM_TEST_IMPORT.split(','))})`)))
         await wait(1500)
       }
+
+      await step('timeline click lands under the mouse', async () => {
+        await js('window.__scrim.seek(2)')
+        await wait(300)
+        const pos = await js<{ x: number; y: number }>(`(() => { const p = document.querySelector('.tl-playhead').getBoundingClientRect(); const r = document.querySelector('.tl-ruler').getBoundingClientRect(); return { x: Math.round(p.x), y: Math.round(r.y + r.height / 2) } })()`)
+        await js('window.__scrim.seek(0)')
+        await wait(300)
+        win.webContents.sendInputEvent({ type: 'mouseDown', x: pos.x, y: pos.y, button: 'left', clickCount: 1 })
+        win.webContents.sendInputEvent({ type: 'mouseUp', x: pos.x, y: pos.y, button: 'left', clickCount: 1 })
+        await wait(300)
+        const t = (await state()).time as number
+        log('clicked at x', pos.x, 'time', t)
+        if (Math.abs(t - 2) > 0.1) throw new Error(`playhead went to ${t.toFixed(2)}s instead of 2s`)
+      })
 
       await step('zoom eye toggle', async () => {
         const before = (await state()).zoomEnabled

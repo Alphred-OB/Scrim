@@ -4,10 +4,12 @@ import { api } from '@/lib/api'
 import { Icon, fmtTime } from '@/ui'
 import { useSettings } from '@/lib/settings'
 
+/** The floating record bar: timer, pause/resume and stop. Nothing on it can delete a recording. */
 export default function Toolbar() {
   const [s, setS] = useState<RecorderStatus>({ state: 'idle', elapsed: 0 })
-  const stopKey = useSettings((x) => x.settings.shortcuts.stopRecording)
-  const pauseKey = useSettings((x) => x.settings.shortcuts.pauseRecording ?? 'Alt+Shift+P')
+  const keys = useSettings((x) => x.settings.shortcuts)
+  const stopKey = keys.stopRecording || 'Alt+Shift+S'
+  const pauseKey = keys.pauseRecording || 'Alt+Shift+P'
   useEffect(() => {
     document.body.style.background = 'transparent'
     document.documentElement.style.background = 'transparent'
@@ -15,28 +17,13 @@ export default function Toolbar() {
     return api.on('recorder:status', setS)
   }, [])
 
-  const bar: React.CSSProperties = {
-    height: 56,
-    margin: 4,
-    borderRadius: 18,
-    background: 'rgba(22,23,28,.92)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid #2c2d34',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '0 10px 0 16px',
-    boxShadow: '0 8px 24px rgba(0,0,0,.35)',
-    WebkitAppRegion: 'drag'
-  } as React.CSSProperties
-  const noDrag = { WebkitAppRegion: 'no-drag' } as React.CSSProperties
-
   if (s.state === 'countdown') {
     return (
-      <div style={{ ...bar, justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 700 }}>Recording in</span>
-        <span style={{ fontSize: 26, fontWeight: 800, color: '#ff4d5e', fontVariantNumeric: 'tabular-nums' }}>{s.countdown}</span>
-        <button className="btn sm" style={noDrag} onClick={() => api.cancelRecording()}>Cancel</button>
+      <div className="recbar">
+        <span className="recbar-grip" />
+        <span className="recbar-count" key={s.countdown}>{s.countdown}</span>
+        <span className="recbar-label">Recording starts…</span>
+        <button className="recbar-text" onClick={() => api.cancelRecording()}>Cancel</button>
       </div>
     )
   }
@@ -44,23 +31,25 @@ export default function Toolbar() {
   const stopping = s.state === 'stopping'
   const paused = s.state === 'paused'
   return (
-    <div style={bar}>
-      <span style={{ width: 10, height: 10, borderRadius: 5, background: stopping || paused ? '#8b8f9c' : '#ff4d5e', animation: stopping || paused ? '' : 'blink 1.2s infinite' }} />
-      <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 52 }}>{stopping ? 'Saving' : fmtTime(s.elapsed)}</span>
-      <span style={{ flex: 1, fontSize: 11, color: paused ? '#ffd60a' : '#8b8f9c', fontWeight: paused ? 600 : 400 }}>{stopping ? '' : paused ? 'Paused' : stopKey}</span>
+    <div className={`recbar ${paused ? 'paused' : ''}`}>
+      <span className="recbar-grip" title="Drag to move" />
+      <span className={`recbar-dot ${stopping ? 'idle' : ''}`} />
+      <div className="recbar-time">
+        <b>{stopping ? 'Saving…' : fmtTime(s.elapsed)}</b>
+        <small>{stopping ? 'Opening the editor' : paused ? 'Paused' : 'Recording'}</small>
+      </div>
+      <div className="recbar-sep" />
       <button
-        className="icon-btn"
-        style={noDrag}
-        title={paused ? `Resume (${pauseKey})` : `Pause (${pauseKey})`}
+        className="recbar-btn"
+        title={`${paused ? 'Resume' : 'Pause'} (${pauseKey})`}
         disabled={stopping}
         onClick={() => (paused ? api.resumeRecording() : api.pauseRecording())}
       >
-        <Icon name={paused ? 'record' : 'pause'} />
+        <Icon name={paused ? 'play' : 'pause'} size={16} />
       </button>
-      <button className="btn danger sm" style={{ ...noDrag, height: 36 }} disabled={stopping} onClick={() => api.stopRecording()}>
-        {stopping ? <span className="spin" /> : <Icon name="stop" size={14} />} Stop
+      <button className="recbar-stop" title={`Stop and edit (${stopKey})`} disabled={stopping} onClick={() => api.stopRecording()}>
+        {stopping ? <span className="spin" /> : <span className="recbar-square" />}
       </button>
-      <style>{'@keyframes blink{50%{opacity:.25}}'}</style>
     </div>
   )
 }

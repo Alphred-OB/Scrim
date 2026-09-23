@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- New: a moving blue border around what's being recorded (amber while paused). It never shows up in the video. Turn it off in Settings, General.
+- New: redesigned floating record bar: timer, status, pause/resume and stop
+- New: media library tabs for Videos, Audio and Pictures
+- New: the timeline has open space after the end, can zoom out past the video length, and zooming keeps the playhead (or the point under the mouse) in place
+- Fixed: clicking the timeline put the playhead about 150 pixels away from the mouse
+- Fixed: live and video backgrounds stood still while the editor was paused. Live tiles now play when hovered or selected, and unplayable background videos (mov, hevc) are converted.
+- Fixed: the webcam preview on the record screen was squashed to nothing
 - New: arrow keys move the playhead 0.5 seconds by default (pick one frame up to 5 seconds in Settings, General). Shift moves 5 times further, comma and period step one frame, Home and End jump to the start and end. The timeline scrolls to follow.
 - New: 12 themes (including Black & white and White & black) plus a fully custom theme (accent, background, panels, text, dark or light base), a choice of interface font, and interface size
 - New: animated export progress with 6 styles (wavy ring like the Play Store, clean ring, liquid fill, orbit, dots, wavy bar), a check mark that draws itself when done, and optional confetti

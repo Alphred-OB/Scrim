@@ -6,6 +6,7 @@ import { applyTheme } from '@/lib/theme'
 import Launcher from '@/features/launcher/Launcher'
 import Toolbar from '@/features/recording/Toolbar'
 import Bubble from '@/features/recording/Bubble'
+import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost } from '@/ui'
 
@@ -49,7 +50,7 @@ export default function App() {
   }, [reduce])
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const main = !location.hash.includes('toolbar') && !location.hash.includes('bubble')
+    const main = !/toolbar|bubble|border/.test(location.hash)
     const apply = () => applyTheme(settings, mq.matches, main)
     apply()
     mq.addEventListener('change', apply)
@@ -57,6 +58,7 @@ export default function App() {
   }, [settings.theme, settings.customTheme, settings.uiFont, settings.uiScale])
 
   if (route.startsWith('/toolbar')) return <Toolbar />
+  if (route.startsWith('/border')) return <RecordBorder />
   if (route.startsWith('/bubble')) return <Bubble query={route.split('?')[1] ?? ''} />
   registerRpc()
   return (

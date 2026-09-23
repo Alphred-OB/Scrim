@@ -116,10 +116,25 @@ export async function importVideo(file: string): Promise<Project> {
   return p
 }
 
+/** Copies a background image/video into the project. Videos Chromium can't play (mov, hevc...) are converted. */
 export async function copyAsset(dir: string, file: string): Promise<string> {
   const assets = join(dir, 'assets')
   await fs.mkdir(assets, { recursive: true })
-  const target = join(assets, uid('a') + extname(file).toLowerCase())
+  const ext = extname(file).toLowerCase()
+  if (!IMAGE_OK.includes(ext)) {
+    const probe = (await runFfmpeg(['-i', file])).stderr
+    const playable = VIDEO_OK.includes(ext) && (/Video: h264/.test(probe) || /Video: vp[89]/.test(probe))
+    if (/Stream #.*Video:/.test(probe) && !playable) {
+      const target = join(assets, uid('a') + '.mp4')
+      const r = await runFfmpeg([
+        '-i', file, '-map', '0:v:0', '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-g', '30',
+        '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-movflags', '+faststart', target
+      ])
+      if (r.code !== 0) throw new Error('Could not convert that video.')
+      return target
+    }
+  }
+  const target = join(assets, uid('a') + ext)
   await fs.copyFile(file, target)
   return target
 }

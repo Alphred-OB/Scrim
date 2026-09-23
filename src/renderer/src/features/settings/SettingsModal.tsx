@@ -89,7 +89,10 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
           {tab === 'general' && (
             <div className="section">
-              <span className="section-title">Arrow keys in the editor</span>
+              <span className="section-title">While recording</span>
+              <Toggle label="Show a moving border around what's being recorded" value={settings.recordBorder ?? true} onChange={(v) => save({ recordBorder: v })} />
+              <span className="hint">The border never appears in your video. With Compatibility capture it's shown for windows only.</span>
+              <span className="section-title" style={{ marginTop: 10 }}>Arrow keys in the editor</span>
               <Select
                 value={settings.arrowStep ?? 0.5}
                 options={[

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { defaultEdit } from '@shared/defaults'
 import type { BackgroundType, GradientDef } from '@shared/types'
 import { api, mediaUrl } from '@/lib/api'
 import { ColorRow, Icon, Section, Seg, Slider, Toggle } from '@/ui'
 import { useEditor } from '../state/store'
-import { LIVE, WALLPAPERS } from '../engine/backgrounds'
-import { liveThumb, wallpaperThumb } from '../engine/thumbnails'
+import { LIVE, WALLPAPERS, drawLive } from '../engine/backgrounds'
+import { wallpaperThumb } from '../engine/thumbnails'
 
 type Tab = 'wallpaper' | 'live' | 'image' | 'video' | 'color' | 'gradient'
 const TABS: { v: Tab; l: string }[] = [
@@ -99,7 +99,7 @@ export default function BackgroundPanel() {
                       className={`pick-tile wide ${b.type === 'live' && b.live.id === l.id ? 'on' : ''}`}
                       onClick={() => update((e) => { e.background.type = 'live'; e.background.live = { id: l.id, speed: e.background.live.speed || 1, colors: [...l.colors] } })}
                     >
-                      <img src={liveThumb(l.id)} alt="" />
+                      <LiveTile id={l.id} colors={b.type === 'live' && b.live.id === l.id ? b.live.colors : l.colors} active={b.type === 'live' && b.live.id === l.id} />
                       <span>{l.name}</span>
                     </button>
                   ))}
@@ -129,6 +129,17 @@ export default function BackgroundPanel() {
         {tab === 'video' && (
           <>
             <button className="btn" onClick={() => upload('video')}><Icon name="upload" size={16} /> {b.videoPath ? 'Replace video' : 'Upload video'}</button>
+            {b.videoPath && (
+              <video
+                src={mediaUrl(b.videoPath)}
+                autoPlay
+                muted
+                loop
+                playsInline
+                onClick={() => choose('video')}
+                style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 10, cursor: 'pointer', border: `2px solid ${b.type === 'video' ? 'var(--accent)' : 'var(--line)'}` }}
+              />
+            )}
             {b.videoPath && (
               <button className={`btn ${b.type === 'video' ? 'primary' : ''}`} onClick={() => choose('video')}>{b.type === 'video' ? 'Using this video' : 'Use this video'}</button>
             )}
@@ -215,5 +226,42 @@ function GradientEditor() {
         <button className="btn sm" onClick={() => set((gg) => gg.stops.push({ pos: 0.5, color: '#ffffff' }))}><Icon name="plus" size={14} /> Add color stop</button>
       )}
     </>
+  )
+}
+
+/** Live background tile that plays while hovered or selected, and rests on a still frame otherwise. */
+function LiveTile({ id, colors, active }: { id: string; colors: [string, string, string]; active: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const [hover, setHover] = useState(false)
+  useEffect(() => {
+    const c = ref.current!
+    const ctx = c.getContext('2d')!
+    const t0 = performance.now()
+    const paint = (t: number) => drawLive(ctx, c.width, c.height, t, { id, speed: 1, colors })
+    if (!hover && !active) {
+      paint(2.5)
+      return
+    }
+    let raf = 0
+    let last = 0
+    const loop = (now: number) => {
+      if (now - last > 33) {
+        last = now
+        paint(2.5 + (now - t0) / 1000)
+      }
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [id, colors.join(), hover, active])
+  return (
+    <canvas
+      ref={ref}
+      width={160}
+      height={96}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ width: '100%', aspectRatio: '5 / 3', borderRadius: 8, display: 'block' }}
+    />
   )
 }

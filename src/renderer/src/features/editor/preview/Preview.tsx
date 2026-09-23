@@ -133,15 +133,12 @@ export default function Preview() {
       if (el.paused) el.play().catch(() => {})
     }
     const bgv = pool.current.get('bg') as HTMLVideoElement | undefined
-    if (bgv) {
-      if (isPlaying && bgv.paused) bgv.play().catch(() => {})
-      if (!isPlaying) {
-        if (!bgv.paused) bgv.pause()
-        if (bgv.duration) bgv.currentTime = v.currentTime % bgv.duration
-      }
-    }
+    // background videos loop on their own, even while the editor is paused, so they always look alive
+    if (bgv && bgv.paused) bgv.play().catch(() => {})
   }
 
+  // extra seconds added to the background clock while paused, so live backgrounds keep moving
+  const ambient = useRef(0)
   const draw = useRef<(at?: number) => void>(() => {})
   draw.current = (at?: number) => {
     const c = canvasRef.current
@@ -178,6 +175,7 @@ export default function Preview() {
       srcW,
       srcH,
       t,
+      bgTime: t + ambient.current,
       drawFrame: v.readyState >= 2 ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(v, sx, sy, sw, sh, dx, dy, dw, dh) : null,
       cursor: L.track,
       camera: L.camera,
@@ -233,6 +231,28 @@ export default function Preview() {
     timeBus.emit(time)
     requestAnimationFrame(() => draw.current())
   }, [time, playing])
+
+  // keep live and video backgrounds moving while paused (about 30 fps, stops when not needed)
+  const bgType = edit.background.type
+  useEffect(() => {
+    if (playing || (bgType !== 'live' && bgType !== 'video')) return
+    let raf = 0
+    let last = performance.now()
+    let acc = 0
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000
+      last = now
+      ambient.current += dt
+      acc += dt
+      if (acc >= 1 / 30 && !document.hidden) {
+        acc = 0
+        draw.current()
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [playing, bgType])
 
   // playback loop
   useEffect(() => {

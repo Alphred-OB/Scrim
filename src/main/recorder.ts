@@ -17,6 +17,8 @@ export interface RecorderHooks {
   hideToolbar: () => void
   showBubble: (displayRect: Rect, cam: WebcamRecordOptions) => void
   hideBubble: () => void
+  showBorder: (rect: Rect, protect: boolean, outside: boolean) => void
+  hideBorder: () => void
   iconPath: string
   openEditor: (dir: string) => void
   broadcast: (channel: string, payload: unknown) => void
@@ -347,6 +349,7 @@ class Recorder {
       this.hooks.mainWindow()?.hide()
       this.hooks.showToolbar(displayRect, protect)
       if (opts.webcam?.enabled && opts.webcam.showBubble && protect) this.hooks.showBubble(displayRect, opts.webcam)
+      this.updateBorder()
       for (let c = opts.countdown; c > 0; c--) {
         if (this.cancelled) return
         this.set({ state: 'countdown', countdown: c, elapsed: 0, error: undefined, engine: this.engine.kind })
@@ -397,6 +400,14 @@ class Recorder {
     } catch (e) {
       this.fail(e instanceof Error ? e.message : String(e))
     }
+  }
+
+  /** Shows the recording border where it can't end up in the video (see showBorder in index.ts). */
+  private updateBorder(): void {
+    if (getSettings().recordBorder === false) return this.hooks.hideBorder()
+    if (this.engine.kind === 'dda' || this.engine.kind === 'x11') this.hooks.showBorder(this.rect, true, false)
+    else if (this.opts?.kind === 'window') this.hooks.showBorder(this.rect, false, true)
+    else this.hooks.hideBorder() // GDI full screen: a border would be recorded, the tray shows status instead
   }
 
   private async pickEngine(monitors: Rect[]): Promise<Engine> {
@@ -580,6 +591,7 @@ class Recorder {
         this.engine = { kind: 'gdi' }
         this.hooks.hideToolbar()
         this.hooks.hideBubble()
+        this.updateBorder()
         continue
       }
       throw new Error('Could not start screen capture.\n' + this.stderr.split('\n').filter((x) => x.trim()).slice(-4).join('\n'))
@@ -596,6 +608,7 @@ class Recorder {
     if (this.dir && !existsSync(join(this.dir, 'project.json'))) await fs.rm(this.dir, { recursive: true, force: true }).catch(() => {})
     this.hooks.hideToolbar()
     this.hooks.hideBubble()
+    this.hooks.hideBorder()
     const win = this.hooks.mainWindow()
     if (win) {
       callRenderer(win.webContents, 'media:cancel').catch(() => {})
@@ -626,6 +639,7 @@ class Recorder {
     if (win) await callRenderer(win.webContents, 'media:cancel').catch(() => {})
     this.hooks.hideToolbar()
     this.hooks.hideBubble()
+    this.hooks.hideBorder()
     if (this.dir) await fs.rm(this.dir, { recursive: true, force: true }).catch(() => {})
     this.set({ state: 'idle', elapsed: 0, countdown: undefined })
     win?.show()
@@ -650,6 +664,7 @@ class Recorder {
     this.tracker = null
     if (cursor) cursor = removePaused(cursor, this.gaps, videoStart, endedAt)
     this.hooks.hideBubble()
+    this.hooks.hideBorder()
     const ending = this.endSegment()
 
     const win = this.hooks.mainWindow()

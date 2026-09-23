@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, ReactNode } from 'react'
 import { create } from 'zustand'
 import { Icon, fmtTime, openContextMenu, MenuItem } from '@/ui'
 import { mediaUrl } from '@/lib/api'
@@ -12,11 +12,15 @@ import Waveform from './Waveform'
 const TRACK_H = 36
 const RULER_H = 28
 const HEAD_W = 150
+export const ZOOM_MIN = 0.25 // 1 = whole video fits the view; below that the video gets shorter than the view
+export const ZOOM_MAX = 60
+/** Screen point to keep still during the next zoom change (set by Ctrl+wheel). */
+let zoomAnchor: { time: number; screenX: number } | null = null
 
 export const useTimelineView = create<{ zoom: number; height: number; setZoom(z: number | ((z: number) => number)): void; setHeight(h: number): void }>((set, get) => ({
   zoom: 1,
   height: Number(localStorage.getItem('df.tlh')) || 330,
-  setZoom: (z) => set({ zoom: Math.min(60, Math.max(1, typeof z === 'function' ? z(get().zoom) : z)) }),
+  setZoom: (z) => set({ zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, typeof z === 'function' ? z(get().zoom) : z)) }),
   setHeight: (h) => {
     const v = Math.min(620, Math.max(150, h))
     try {
@@ -52,14 +56,50 @@ export default function Timeline() {
   const [joinHint, setJoinHint] = useState<'start' | 'end' | null>(null)
   const pps = (width / Math.max(0.5, duration)) * zoom
   const total = duration * pps
+  // open space after the end so the timeline never feels boxed in and can be zoomed freely
+  const tail = Math.max(240, width * 0.5)
   const X = (t: number) => 12 + t * pps
 
   useEffect(() => {
     const el = scrollRef.current!
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth - 30))
+    const ro = new ResizeObserver(() => setWidth(Math.max(200, el.clientWidth - HEAD_W - 30)))
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+
+  // Ctrl + wheel zooms around the mouse (native listener so the page itself never zooms)
+  useEffect(() => {
+    const sc = scrollRef.current!
+    const on = (e: WheelEvent) => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      const r = sc.getBoundingClientRect()
+      const screenX = Math.max(HEAD_W, e.clientX - r.left)
+      zoomAnchor = { time: (sc.scrollLeft + screenX - HEAD_W - 12) / prevPps.current, screenX }
+      useTimelineView.getState().setZoom((z) => z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))
+    }
+    sc.addEventListener('wheel', on, { passive: false })
+    return () => sc.removeEventListener('wheel', on)
+  }, [])
+
+  // zooming keeps what you're looking at in place: the point under the mouse (Ctrl+wheel),
+  // otherwise the playhead if it's on screen, otherwise the middle of the view
+  const prevPps = useRef(pps)
+  useLayoutEffect(() => {
+    const sc = scrollRef.current
+    const before = prevPps.current
+    prevPps.current = pps
+    if (!sc || before === pps) return
+    const Xb = (t: number) => HEAD_W + 12 + t * before
+    let a = zoomAnchor
+    zoomAnchor = null
+    if (!a) {
+      const ph = timeBus.get()
+      const phX = Xb(ph) - sc.scrollLeft
+      a = phX >= HEAD_W && phX <= sc.clientWidth ? { time: ph, screenX: phX } : { time: (sc.scrollLeft + (sc.clientWidth + HEAD_W) / 2 - HEAD_W - 12) / before, screenX: (sc.clientWidth + HEAD_W) / 2 }
+    }
+    sc.scrollLeft = Math.max(0, HEAD_W + 12 + a.time * pps - a.screenX)
+  }, [pps])
 
   useEffect(() => {
     const move = (t: number) => {
@@ -78,7 +118,7 @@ export default function Timeline() {
   const timeAt = (clientX: number) => {
     const sc = scrollRef.current!
     const r = sc.getBoundingClientRect()
-    return Math.min(duration, Math.max(0, (clientX - r.left + sc.scrollLeft - 12) / pps))
+    return Math.min(duration, Math.max(0, (clientX - r.left + sc.scrollLeft - HEAD_W - 12) / pps))
   }
 
   // edges things snap to while dragging
@@ -323,7 +363,7 @@ export default function Timeline() {
 
   const step = niceStep(90 / pps)
   const ticks: number[] = []
-  for (let t = 0; t <= duration + 1e-6; t += step) ticks.push(t)
+  for (let t = 0; t <= duration + tail / pps + 1e-6; t += step) ticks.push(t)
   const clips = sortedClips(edit.clips)
   const gaps: [number, number][] = []
   let last = 0
@@ -360,13 +400,8 @@ export default function Timeline() {
           setJoinHint(null)
         }}
         onDrop={onDrop}
-        onWheel={(e) => {
-        if (e.ctrlKey) {
-          e.preventDefault()
-          setZoom((z) => z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))
-        }
-      }}>
-        <div style={{ position: 'relative', width: total + HEAD_W + 30, height: contentH }}>
+>
+        <div style={{ position: 'relative', width: total + HEAD_W + tail, height: contentH }}>
           {/* sticky track headers */}
           <div className="tl-heads" style={{ height: contentH }}>
             <div style={{ height: RULER_H }} />
@@ -383,11 +418,11 @@ export default function Timeline() {
             ))}
           </div>
 
-          <div style={{ position: 'absolute', left: HEAD_W, top: 0, width: total + 30, height: contentH }}>
+          <div style={{ position: 'absolute', left: HEAD_W, top: 0, width: total + tail, height: contentH }}>
             {/* ruler */}
             <div className="tl-ruler" onPointerDown={(e) => scrub(e.clientX)} style={{ height: RULER_H }}>
               {ticks.map((t) => (
-                <div key={t} style={{ position: 'absolute', left: X(t), top: 5, fontSize: 10, color: 'var(--faint)', transform: 'translateX(-50%)', whiteSpace: 'nowrap' }}>
+                <div key={t} style={{ position: 'absolute', left: X(t), top: 5, fontSize: 10, color: 'var(--faint)', transform: 'translateX(-50%)', whiteSpace: 'nowrap', opacity: t > duration + 1e-6 ? 0.4 : 1 }}>
                   {fmtRuler(t, step)}
                   <div style={{ width: 1, height: 5, background: 'var(--line-2)', margin: '3px auto 0' }} />
                 </div>
@@ -399,7 +434,7 @@ export default function Timeline() {
               <div
                 key={r.key}
                 className={`tl-row ${r.kind === 'zoom' || r.kind === 'text' ? 'addable' : ''} ${dropRow === r.key ? 'tl-drop' : ''}`}
-                style={{ top: RULER_H + i * TRACK_H, height: TRACK_H, width: total + 24 }}
+                style={{ top: RULER_H + i * TRACK_H, height: TRACK_H, width: total + tail }}
                 onPointerDown={(e) => onRowPointerDown(e, r)}
                 onPointerMove={(e) => (r.key === 'zoom' || r.key === 'text') && e.target === e.currentTarget ? setGhost({ row: r.key, t: timeAt(e.clientX) }) : ghost && setGhost(null)}
                 onPointerLeave={() => setGhost(null)}
@@ -509,6 +544,9 @@ export default function Timeline() {
               return block('audioClip', c, top('audio'), 'linear-gradient(180deg,#a2427a,#7a2e5b)', a?.name ?? 'Audio',
                 a ? <div style={{ position: 'absolute', inset: 0, opacity: c.muted ? 0.3 : 0.9 }}><Waveform path={a.path} from={c.trimStart} to={c.trimStart + (c.end - c.start)} width={(c.end - c.start) * pps} height={TRACK_H - 8} color="rgba(255,255,255,.55)" /></div> : undefined)
             })}
+
+            {/* end of the video */}
+            <div className="tl-end" style={{ left: X(duration), top: RULER_H, height: rows.length * TRACK_H }} title="End of the video" />
 
             {/* removed parts of the video, shown across every track */}
             {gaps.map(([a, b], i) => (

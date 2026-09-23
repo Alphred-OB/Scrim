@@ -258,7 +258,7 @@ export default function Launcher() {
           </div>
 
           <aside className="surface" style={{ width: 350, borderLeft: '1px solid var(--line)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="side-col" style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <span className="section-title">Audio</span>
               <Toggle label="Microphone" value={prefs.mic} onChange={(v) => setPrefs({ ...prefs, mic: v })} />
               {prefs.mic && (
@@ -296,7 +296,7 @@ export default function Launcher() {
                     >
                       <video ref={camVideo} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                     </div>
-                    {camError && <div className="hint" style={{ position: 'absolute', left: 10, top: 8, color: '#ff8a80' }}>{camError}</div>}
+                    {camError && <div className="hint" style={{ position: 'absolute', left: 10, top: 8, right: 10, color: '#fff', background: 'rgba(0,0,0,.6)', padding: '4px 8px', borderRadius: 6 }}>{camError}</div>}
                   </div>
                   <Select
                     value={cam.deviceId ?? ''}

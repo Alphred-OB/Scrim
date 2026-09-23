@@ -10,7 +10,7 @@ import { useEditor, flushSave, Panel } from './state/store'
 import { timeBus } from './state/timeBus'
 import { dragAsset } from './state/dragAsset'
 import Preview, { togglePreviewFullscreen } from './preview/Preview'
-import Timeline, { useTimelineView } from './timeline/Timeline'
+import Timeline, { ZOOM_MAX, ZOOM_MIN, useTimelineView } from './timeline/Timeline'
 import ExportDialog from './export/ExportDialog'
 import { exportProject, estimateExportSeconds } from './export/exporter'
 import BackgroundPanel from './panels/BackgroundPanel'
@@ -110,7 +110,7 @@ function EditorView() {
       state: () => {
         const e = useEditor.getState().project!.edit
         const st = useEditor.getState()
-        return { duration: st.project!.media.screen.duration, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
+        return { time: st.time, duration: st.project!.media.screen.duration, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
       },
       export: async (out: string, patch?: Partial<import('@shared/types').ExportSettings>) => {
         const st = useEditor.getState()
@@ -348,7 +348,14 @@ function EditorView() {
             </div>
             <div className="tl-zoom" title="Timeline zoom">
               <button className="icon-btn sm" title="Zoom timeline out" onClick={() => useTimelineView.getState().setZoom((z) => z / 1.5)}><Icon name="minus" size={14} /></button>
-              <input className="range" type="range" min={0} max={100} value={Math.round((Math.log(tlZoom) / Math.log(60)) * 100)} onChange={(e) => useTimelineView.getState().setZoom(Math.pow(60, +e.target.value / 100))} />
+              <input
+                className="range"
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round((Math.log(tlZoom / ZOOM_MIN) / Math.log(ZOOM_MAX / ZOOM_MIN)) * 100)}
+                onChange={(e) => useTimelineView.getState().setZoom(ZOOM_MIN * Math.pow(ZOOM_MAX / ZOOM_MIN, +e.target.value / 100))}
+              />
               <button className="icon-btn sm" title="Zoom timeline in" onClick={() => useTimelineView.getState().setZoom((z) => z * 1.5)}><Icon name="plus" size={14} /></button>
             </div>
           </div>

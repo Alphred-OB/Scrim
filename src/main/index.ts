@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, session, shell, desktopCapturer, Menu, globalShortcut, Notification } from 'electron'
+import { app, BrowserWindow, screen, dialog, ipcMain, session, shell, desktopCapturer, Menu, globalShortcut, Notification } from 'electron'
 import { basename, dirname, join } from 'path'
 import { tmpdir } from 'os'
 import { existsSync, promises as fs } from 'fs'
@@ -24,6 +24,7 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding')
 let mainWindow: BrowserWindow | null = null
 let toolbar: BrowserWindow | null = null
 let bubble: BrowserWindow | null = null
+let border: BrowserWindow | null = null
 const ICON = join(__dirname, '../../resources/icon.png')
 
 function loadRoute(win: BrowserWindow, route: string): void {
@@ -55,6 +56,7 @@ function createMainWindow(): void {
     mainWindow = null
     toolbar?.destroy()
     bubble?.destroy()
+    border?.destroy()
     app.quit()
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -66,7 +68,7 @@ function createMainWindow(): void {
 }
 
 function showToolbar(displayRect: Rect, protect: boolean): void {
-  const w = 360
+  const w = 290
   const h = 64
   if (!toolbar || toolbar.isDestroyed()) {
     toolbar = new BrowserWindow({
@@ -98,6 +100,42 @@ function showToolbar(displayRect: Rect, protect: boolean): void {
 
 function hideToolbar(): void {
   toolbar?.hide()
+}
+
+/**
+ * Animated line around what's being recorded. With GPU capture it sits on the edge and is kept out
+ * of the video; with GDI capture of a window it sits just outside the window so it's never captured.
+ */
+function showBorder(rect: Rect, protect: boolean, outside: boolean): void {
+  const pad = outside ? 4 : 0
+  const phys = { x: rect.x - pad, y: rect.y - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }
+  const b = process.platform === 'win32' ? screen.screenToDipRect(null, phys) : phys
+  if (!border || border.isDestroyed()) {
+    border = new BrowserWindow({
+      ...b,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      movable: false,
+      focusable: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      hasShadow: false,
+      show: false,
+      title: 'Scrim Border',
+      webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, backgroundThrottling: false }
+    })
+    border.setIgnoreMouseEvents(true)
+    border.setAlwaysOnTop(true, 'screen-saver')
+    loadRoute(border, '/border')
+  }
+  border.setContentProtection(protect)
+  border.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) })
+  border.showInactive()
+}
+
+function hideBorder(): void {
+  border?.hide()
 }
 
 /** Floating webcam preview while recording (kept out of the screen capture). */
@@ -293,7 +331,7 @@ app.whenReady().then(() => {
     cb({ video: first, audio: 'loopback' })
   })
 
-  recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, iconPath: ICON, openEditor, broadcast })
+  recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, showBorder, hideBorder, iconPath: ICON, openEditor, broadcast })
   registerIpc()
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast

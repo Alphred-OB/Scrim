@@ -173,6 +173,7 @@ export function defaultSettings(): AppSettings {
     theme: 'dark',
     captureEngine: 'auto',
     arrowStep: 0.5,
+    recordBorder: true,
     uiFont: 'Inter',
     uiScale: 1,
     exportProgress: 'wavy',

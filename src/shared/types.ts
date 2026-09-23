@@ -328,4 +328,6 @@ export interface AppSettings {
   captureEngine: 'auto' | 'dda' | 'gdi'
   /** seconds the arrow keys move the playhead (0 = one frame); Shift moves 5x */
   arrowStep: number
+  /** animated line around the area being recorded */
+  recordBorder: boolean
 }

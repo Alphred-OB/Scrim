@@ -23,12 +23,11 @@ export async function importMedia(dir: string, paths?: string[], at?: number): P
   return errors
 }
 
-type Filter = 'all' | Asset['kind']
-const KINDS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'video', label: 'Videos' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'image', label: 'Images' }
+type Filter = Asset['kind']
+const KINDS: { id: Filter; label: string; icon: string; empty: string }[] = [
+  { id: 'video', label: 'Videos', icon: 'film', empty: 'No videos yet. Import one, or drag it in from File Explorer.' },
+  { id: 'audio', label: 'Audio', icon: 'music', empty: 'No audio yet. Music and sound effects land here.' },
+  { id: 'image', label: 'Pictures', icon: 'image', empty: 'No pictures yet. Logos and screenshots land here.' }
 ]
 
 function AssetTile({ a }: { a: Asset }) {
@@ -82,7 +81,7 @@ export default function MediaPanel() {
   const select = useEditor((s) => s.select)
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>('video')
   const e = project.edit
   const ov = selection?.kind === 'overlay' ? e.overlays.find((o) => o.id === selection.id) : undefined
   const ac = selection?.kind === 'audioClip' ? e.audioClips.find((o) => o.id === selection.id) : undefined
@@ -100,33 +99,31 @@ export default function MediaPanel() {
     <div>
       <Section title="Media library">
         <button className="btn primary" onClick={doImport} disabled={busy}>{busy ? <span className="spin" /> : <Icon name="upload" size={15} />} Import video, audio or image</button>
-        <span className="hint">You can also drag files from File Explorer straight onto the editor. Drag items onto the timeline. Audio lands on the Audio track, videos and images on the Media track. Drop a video on the Video track to join it before or after your recording.</span>
+        <span className="hint">Drag files in from File Explorer, then drag them onto the timeline. Drop a video on the Video track to join it to your recording.</span>
         {errors.map((er) => <div key={er} className="hint" style={{ color: 'var(--danger)' }}>{er}</div>)}
-        {e.assets.length > 0 && (
-          <div className="tab-chips">
-            {KINDS.map((k) => {
-              const n = k.id === 'all' ? e.assets.length : e.assets.filter((a) => a.kind === k.id).length
-              return (
-                <button key={k.id} className={`tab-chip ${filter === k.id ? 'on' : ''}`} onClick={() => setFilter(k.id)}>
-                  {k.label} <span style={{ opacity: 0.6 }}>{n}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
       </Section>
 
-      {KINDS.filter((k) => k.id !== 'all' && (filter === 'all' || filter === k.id)).map((k) => {
-        const list = e.assets.filter((a) => a.kind === k.id)
-        if (!list.length) return filter === k.id ? <span key={k.id} className="hint">No {k.label.toLowerCase()} yet.</span> : null
+      <div className="media-tabs" role="tablist">
+        {KINDS.map((k) => {
+          const n = e.assets.filter((a) => a.kind === k.id).length
+          return (
+            <button key={k.id} role="tab" aria-selected={filter === k.id} className={filter === k.id ? 'on' : ''} onClick={() => setFilter(k.id)}>
+              <Icon name={k.icon} size={14} /> {k.label}
+              <span className="count">{n}</span>
+            </button>
+          )
+        })}
+      </div>
+      {(() => {
+        const k = KINDS.find((x) => x.id === filter)!
+        const list = e.assets.filter((a) => a.kind === filter)
+        if (!list.length) return <div className="media-empty hint">{k.empty}</div>
         return (
-          <Section key={k.id} title={`${k.label} · ${list.length}`}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {list.map((a) => <AssetTile key={a.id} a={a} />)}
-            </div>
-          </Section>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+            {list.map((a) => <AssetTile key={a.id} a={a} />)}
+          </div>
         )
-      })}
+      })()}
 
       {ov && asset && (
         <Section title="Selected media" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((ed) => (ed.overlays = ed.overlays.filter((x) => x.id !== ov.id))); select(null) }}>Delete</button>}>

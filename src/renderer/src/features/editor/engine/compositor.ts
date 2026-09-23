@@ -21,6 +21,8 @@ export interface RenderInputs {
   clicks: ClickEvent[]
   bgImage?: CanvasImageSource | null
   bgVideo?: CanvasImageSource | null
+  /** clock for animated backgrounds; defaults to t (the preview keeps them moving while paused) */
+  bgTime?: number
   bgVideoSize?: [number, number]
   webcam?: { src: CanvasImageSource; w: number; h: number } | null
   overlays?: Map<string, { src: CanvasImageSource; w: number; h: number }>
@@ -303,7 +305,7 @@ export class Renderer {
 
     // 1. background
     if (edit.background.type === 'live') {
-      this.drawLiveBg(ctx, W, H, t, edit)
+      this.drawLiveBg(ctx, W, H, inp.bgTime ?? t, edit)
     } else if (edit.background.type === 'video' && inp.bgVideo) {
       const [vw, vh] = inp.bgVideoSize ?? sizeOf(inp.bgVideo)
       drawBlurred(ctx, inp.bgVideo, vw, vh, W, H, edit.background.blur * L.k, true)
