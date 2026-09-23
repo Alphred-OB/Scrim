@@ -7,7 +7,7 @@ import SettingsModal from '@/features/settings/SettingsModal'
 import { matches, useSettings } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
 import { maybeAutoStart } from '@/features/onboarding/tours'
-import { startPractice } from '@/features/onboarding/practice'
+import { preloadSample, startPractice } from '@/features/onboarding/practice'
 
 const LS = 'df.recordPrefs'
 interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; webcam: WebcamRecordOptions }
@@ -55,6 +55,11 @@ export default function Launcher() {
   useEffect(() => {
     if (recBusy) setTab('record')
   }, [recBusy])
+  // get the practice project ready in the background, so opening it is instant
+  useEffect(() => {
+    const id = setTimeout(() => preloadSample(), 2500)
+    return () => clearTimeout(id)
+  }, [])
   const setCam = (p: Partial<WebcamRecordOptions>) => setPrefs((s) => ({ ...s, webcam: { ...s.webcam, ...p } }))
 
   const refresh = useCallback(async () => {

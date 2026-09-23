@@ -1,4 +1,4 @@
-import type { AppSettings, EditState, Project, TextItem, TextMotion, ZoomSegment, EffectSettings } from './types'
+import type { AppSettings, EditState, KeyframeEase, Project, TextItem, TextMotion, ZoomKeyframe, ZoomSegment, EffectSettings } from './types'
 
 export const uid = (p = ''): string => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -106,6 +106,10 @@ export function newText(t: number): TextItem {
     loop: 'none',
     letterSpacing: 0
   }
+}
+
+export function newZoomKeyframe(t: number, scale: number, x: number, y: number, ease: KeyframeEase = 'smooth'): ZoomKeyframe {
+  return { id: uid('kf'), t, scale, x, y, ease }
 }
 
 export function newZoom(t: number, x = 0.5, y = 0.5): ZoomSegment {

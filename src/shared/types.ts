@@ -142,7 +142,12 @@ export interface ZoomSegment {
   y: number
   follow: boolean // follow cursor inside the segment
   auto?: boolean // created by automatic click detection
+  /** optional points inside the zoom that change scale and focus over time */
+  keyframes?: ZoomKeyframe[]
 }
+
+export type KeyframeEase = 'smooth' | 'linear' | 'snappy'
+export interface ZoomKeyframe { id: string; t: number; scale: number; x: number; y: number; ease?: KeyframeEase }
 
 export interface ZoomSettings {
   enabled: boolean

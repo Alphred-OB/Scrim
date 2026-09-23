@@ -7,7 +7,7 @@ import { registerSchemes, handleMediaProtocol } from './protocol'
 import { recorder, listSources, probeDdaOutputs } from './recorder'
 import { stopHookOnQuit, Rect } from './cursorTracker'
 import {
-  audioPeaks, copyAsset, sampleBegin, sampleFinish, deleteProject, importAsset, importVideo, listProjects, loadPresets, loadProject, projectsRoot, savePresets, saveProject
+  audioPeaks, copyAsset, getSampleDir, sampleBegin, sampleFinish, deleteProject, importAsset, importVideo, listProjects, loadPresets, loadProject, projectsRoot, savePresets, saveProject
 } from './projects'
 import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
@@ -254,6 +254,7 @@ function registerIpc(): void {
   ipcMain.handle('shell:open', (_e, p: string) => shell.openPath(p))
   ipcMain.handle('app:tmp', () => tmpdir())
 
+  ipcMain.handle('sample:getDir', () => getSampleDir())
   ipcMain.handle('sample:begin', () => sampleBegin())
   ipcMain.handle('sample:finish', (_e, dir: string, cursor: CursorData, duration: number) => sampleFinish(dir, cursor, duration))
   ipcMain.handle('file:open', (_e, p: string) => openWrite(p))

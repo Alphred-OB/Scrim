@@ -325,6 +325,11 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
       align: 'center',
       shadow: true,
       anim: 'slide-up',
+      animIn: 'slide-up',
+      animOut: 'fade',
+      inDur: 0.45,
+      outDur: 0.35,
+      loop: 'none',
       letterSpacing: 0
     },
     {
@@ -348,6 +353,11 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
       align: 'center',
       shadow: true,
       anim: 'pop',
+      animIn: 'pop',
+      animOut: 'fade',
+      inDur: 0.45,
+      outDur: 0.35,
+      loop: 'none',
       letterSpacing: 0
     },
     {
@@ -371,6 +381,11 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
       align: 'center',
       shadow: true,
       anim: 'fade',
+      animIn: 'fade',
+      animOut: 'fade',
+      inDur: 0.45,
+      outDur: 0.35,
+      loop: 'none',
       letterSpacing: 0
     }
   ]
