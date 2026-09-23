@@ -1,6 +1,6 @@
 // Editing actions shared by the timeline, panels, context menus and keyboard shortcuts.
-import type { Asset, AudioClip, OverlayClip } from '@shared/types'
-import { freeLane, newText, newZoom, uid } from '@shared/defaults'
+import type { Asset, AudioClip, EffectClip, EffectLook, OverlayClip, TransitionType } from '@shared/types'
+import { defaultEffect, freeLane, newText, newZoom, uid } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { api } from '@/lib/api'
 import { flushSave, useEditor } from './store'
@@ -130,6 +130,8 @@ export function deleteSelection(): void {
     else if (sel.kind === 'text') e.texts = e.texts.filter((c) => c.id !== sel.id)
     else if (sel.kind === 'overlay') e.overlays = e.overlays.filter((c) => c.id !== sel.id)
     else if (sel.kind === 'audioClip') e.audioClips = e.audioClips.filter((c) => c.id !== sel.id)
+    else if (sel.kind === 'effect') e.effectClips = e.effectClips.filter((c) => c.id !== sel.id)
+    else if (sel.kind === 'transition') e.transitions.items = e.transitions.items.filter((c) => c.id !== sel.id)
   })
   s.select(null)
 }
@@ -139,7 +141,7 @@ export function duplicateSelection(): void {
   const sel = s.selection
   if (!sel || sel.kind === 'clip' || !s.project) return
   s.update((e) => {
-    const arr = (sel.kind === 'zoom' ? e.zoom.segments : sel.kind === 'text' ? e.texts : sel.kind === 'overlay' ? e.overlays : e.audioClips) as { id: string; start: number; end: number }[]
+    const arr = (sel.kind === 'zoom' ? e.zoom.segments : sel.kind === 'text' ? e.texts : sel.kind === 'overlay' ? e.overlays : sel.kind === 'effect' ? e.effectClips : sel.kind === 'transition' ? e.transitions.items : e.audioClips) as { id: string; start: number; end: number }[]
     const it = arr.find((x) => x.id === sel.id)
     if (!it) return
     const len = it.end - it.start
@@ -185,4 +187,21 @@ export async function joinVideoAt(where: 'start' | 'end', file?: string): Promis
     off()
     if (st().busy.startsWith('Joining')) st().setBusy('')
   }
+}
+
+/** Places a transition centered at `at` on the Transitions track. */
+export function addTransitionAt(type: TransitionType, at: number, length = 0.8): void {
+  const it = { id: uid('tr'), type, start: Math.max(0, at - length / 2), end: Math.min(dur(), at + length / 2) }
+  st().update((e) => e.transitions.items.push(it))
+  st().select({ kind: 'transition', id: it.id })
+}
+
+/** Adds an effect to part of the video on the Effects track (next free layer if something's there). */
+export function addEffectAt(look: EffectLook, name: string, t: number, length = 5, lane = 0): void {
+  const e0 = st().project!.edit
+  const start = Math.max(0, Math.min(t, dur() - 0.5))
+  const end = Math.min(dur(), start + length)
+  const clip: EffectClip = { ...defaultEffect(), look, name, id: uid('fx'), start, end, lane: freeLane(e0.effectClips, start, end, lane) }
+  st().update((e) => e.effectClips.push(clip))
+  st().select({ kind: 'effect', id: clip.id })
 }

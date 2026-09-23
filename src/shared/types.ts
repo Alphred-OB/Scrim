@@ -219,16 +219,24 @@ export interface OverlayClip {
 
 export type OverlayMode = 'pip' | 'frame' | 'full'
 
-export type TransitionType = 'none' | 'fade' | 'fade-white' | 'blur' | 'zoom' | 'whip' | 'flash'
+export type TransitionType =
+  | 'none' | 'fade' | 'fade-white' | 'flash' | 'blur' | 'morph' | 'zoom' | 'zoom-out' | 'spin'
+  | 'whip' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'iris' | 'wipe' | 'pixelate' | 'glitch'
 export interface Transition { type: TransitionType; duration: number }
 export interface TransitionSettings {
   intro: Transition // start of the video
   outro: Transition // end of the video
   cut: Transition // used at every cut unless the cut has its own
   perCut: Record<string, Transition> // key = id of the clip after the cut
+  /** transitions placed anywhere on the Transitions track (source seconds) */
+  items: TransitionItem[]
 }
+/** A transition placed on the Transitions track: it peaks in the middle of start..end. */
+export interface TransitionItem { id: string; type: TransitionType; start: number; end: number }
 
-export type EffectLook = 'none' | 'vivid' | 'warm' | 'cool' | 'mono' | 'noir' | 'sepia' | 'vintage' | 'matte' | 'punchy'
+export type EffectLook =
+  | 'none' | 'vivid' | 'punchy' | 'warm' | 'cool' | 'cinematic' | 'cyberpunk' | 'dreamy' | 'faded' | 'matte'
+  | 'vintage' | 'sepia' | 'high-key' | 'low-key' | 'mono' | 'noir' | 'invert'
 export interface EffectSettings {
   look: EffectLook
   brightness: number // 1 = unchanged
@@ -236,7 +244,14 @@ export interface EffectSettings {
   saturation: number
   vignette: number // 0..1
   grain: number // 0..1
+  bloom: number // 0..1 soft glow on bright parts
+  blur: number // 0..1 focus blur
+  pixelate: number // 0..1
+  scanlines: number // 0..1 old monitor lines
 }
+
+/** An effect on part of the video (Effects track). It replaces the whole-video effect while it plays. */
+export interface EffectClip extends EffectSettings { id: string; start: number; end: number; lane?: number; name: string }
 
 export interface AudioClip {
   id: string
@@ -300,8 +315,9 @@ export interface EditState {
   export: ExportSettings
   transitions: TransitionSettings
   effects: EffectSettings
+  effectClips: EffectClip[]
   /** eye / speaker buttons on the timeline tracks */
-  tracks: { media: boolean; text: boolean; audio: boolean }
+  tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean }
 }
 
 export interface Project {

@@ -118,6 +118,18 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         if (Math.abs(t - 2) > 0.1) throw new Error(`playhead went to ${t.toFixed(2)}s instead of 2s`)
       })
 
+      await step('pausing keeps the playhead where it stopped', async () => {
+        await js('window.__scrim.seek(1)')
+        await wait(300)
+        await js('window.__scrim.play(true)')
+        await wait(1500)
+        await js('window.__scrim.play(false)')
+        await wait(500)
+        const t = (await state()).time as number
+        log('paused at', t)
+        if (t < 1.8) throw new Error(`playhead went back to ${t.toFixed(2)}s`)
+      })
+
       await step('two texts at the same time get their own layers', async () => {
         await js('window.__scrim.addText(1)')
         await js('window.__scrim.addText(1.5)')
@@ -246,6 +258,27 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await wait(700)
         await shot('transition-cut.png')
         await js(`window.__scrim.patch('effects', { look: 'none', vignette: 0, grain: 0 })`)
+        await shot('tab-transitions.png')
+        // drag a transition tile and a look onto the timeline
+        const dropOn = (tile: string, row: string, frac: number) => `(() => {
+          const t = [...document.querySelectorAll('.fx-tile')].find((x) => x.textContent.trim() === ${JSON.stringify(tile)})
+          const heads = [...document.querySelectorAll('.tl-head')]
+          const r = document.querySelectorAll('.tl-row')[heads.findIndex((h) => h.textContent.trim().startsWith(${JSON.stringify(row)}))]
+          if (!t || !r) return 'missing'
+          const b = r.getBoundingClientRect()
+          const at = { bubbles: true, cancelable: true, dataTransfer: new DataTransfer(), clientX: b.x + 12 + (b.width - 24) * ${frac} * 0.8, clientY: b.y + 10 }
+          t.dispatchEvent(new DragEvent('dragstart', at)); r.dispatchEvent(new DragEvent('dragover', at)); r.dispatchEvent(new DragEvent('drop', at)); t.dispatchEvent(new DragEvent('dragend', at))
+          return 'ok'
+        })()`
+        log('drop transition', await js(dropOn('Glitch', 'Transitions', 0.15)))
+        await clickText('.fx-tabs button', 'Effects')
+        await wait(300)
+        log('drop effect', await js(dropOn('Cyberpunk', 'Effects', 0.3)))
+        await wait(500)
+        const st = await state()
+        log('items', JSON.stringify({ transitions: st.transitionItems, effects: st.effectClips }))
+        if (st.transitionItems !== 1 || st.effectClips !== 1) throw new Error('drops did not land')
+        await shot('tab-effects.png')
       })
 
       await step('live background', async () => {

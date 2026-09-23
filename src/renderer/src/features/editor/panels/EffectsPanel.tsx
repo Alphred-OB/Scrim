@@ -1,82 +1,291 @@
-import type { EffectLook, Transition, TransitionType } from '@shared/types'
-import { defaultEdit } from '@shared/defaults'
-import { Section, Select, Slider } from '@/ui'
+import { useEffect, useRef, useState } from 'react'
+import type { EffectLook, EffectSettings, Transition, TransitionType } from '@shared/types'
+import { defaultEdit, defaultEffect } from '@shared/defaults'
+import { Icon, Section, Select, Slider, openContextMenu } from '@/ui'
 import { useEditor } from '../state/store'
-import { effectFilter } from '../engine/compositor'
+import { timeBus } from '../state/timeBus'
+import { dragAsset } from '../state/dragAsset'
+import { addEffectAt, addTransitionAt } from '../state/actions'
+import { effectFilter, paintTransition, type TransitionBuffers } from '../engine/compositor'
 
 export const TRANSITIONS: { v: TransitionType; l: string }[] = [
   { v: 'none', l: 'None' },
-  { v: 'fade', l: 'Fade through black' },
-  { v: 'fade-white', l: 'Fade through white' },
+  { v: 'fade', l: 'Fade' },
+  { v: 'fade-white', l: 'Fade white' },
+  { v: 'flash', l: 'Flash' },
+  { v: 'morph', l: 'Morph' },
   { v: 'blur', l: 'Blur' },
-  { v: 'zoom', l: 'Zoom' },
+  { v: 'zoom', l: 'Zoom in' },
+  { v: 'zoom-out', l: 'Zoom out' },
+  { v: 'spin', l: 'Spin' },
   { v: 'whip', l: 'Whip pan' },
-  { v: 'flash', l: 'Flash' }
+  { v: 'slide-left', l: 'Slide left' },
+  { v: 'slide-right', l: 'Slide right' },
+  { v: 'slide-up', l: 'Slide up' },
+  { v: 'slide-down', l: 'Slide down' },
+  { v: 'iris', l: 'Iris' },
+  { v: 'wipe', l: 'Wipe' },
+  { v: 'pixelate', l: 'Pixelate' },
+  { v: 'glitch', l: 'Glitch' }
 ]
 
-const LOOKS: { v: EffectLook; l: string }[] = [
+export const LOOKS: { v: EffectLook; l: string }[] = [
   { v: 'none', l: 'Original' },
   { v: 'vivid', l: 'Vivid' },
   { v: 'punchy', l: 'Punchy' },
+  { v: 'cinematic', l: 'Cinematic' },
   { v: 'warm', l: 'Warm' },
   { v: 'cool', l: 'Cool' },
+  { v: 'cyberpunk', l: 'Cyberpunk' },
+  { v: 'dreamy', l: 'Dreamy' },
+  { v: 'faded', l: 'Faded' },
   { v: 'matte', l: 'Matte' },
   { v: 'vintage', l: 'Vintage' },
   { v: 'sepia', l: 'Sepia' },
+  { v: 'high-key', l: 'Bright' },
+  { v: 'low-key', l: 'Moody' },
   { v: 'mono', l: 'Black & white' },
-  { v: 'noir', l: 'Noir' }
+  { v: 'noir', l: 'Noir' },
+  { v: 'invert', l: 'Invert' }
 ]
 
-/** A little sample swatch so each look can be judged at a glance. */
-const SAMPLE = 'linear-gradient(135deg, #ff6b6b 0%, #ffd93d 30%, #6bcB77 55%, #4d96ff 80%, #9b5de5 100%)'
+// ---- small animated preview of a transition: shot A leaves, shot B arrives ----
+function paintShot(ctx: CanvasRenderingContext2D, W: number, H: number, b: boolean): void {
+  const g = ctx.createLinearGradient(0, 0, W, H)
+  g.addColorStop(0, b ? '#ff8a3d' : '#2f6bff')
+  g.addColorStop(1, b ? '#ffcf5a' : '#7b5cff')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = 'rgba(255,255,255,.9)'
+  if (b) {
+    ctx.beginPath()
+    ctx.arc(W * 0.5, H * 0.52, H * 0.22, 0, Math.PI * 2)
+    ctx.fill()
+  } else ctx.fillRect(W * 0.3, H * 0.3, W * 0.4, H * 0.42)
+}
 
-function TransitionRow({ label, value, onChange, max = 2 }: { label: string; value: Transition; onChange: (t: Transition) => void; max?: number }) {
+function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name: string; on: boolean; onPick: (e: React.MouseEvent) => void }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  const [hover, setHover] = useState(false)
+  useEffect(() => {
+    const c = ref.current!
+    const ctx = c.getContext('2d')!
+    const bufs: TransitionBuffers = { scratch: null, tiny: null }
+    const frame = (p: number, time: number) => {
+      // p: 0..1 across the whole loop; first half leaves A, second half brings in B
+      const outSide = p < 0.5
+      paintShot(ctx, c.width, c.height, !outSide)
+      const amount = outSide ? p * 2 : (1 - p) * 2
+      if (type !== 'none') paintTransition(ctx, c.width, c.height, type, amount, outSide ? 'out' : 'in', 0.35, time, bufs)
+    }
+    if (!hover) {
+      frame(0.38, 0)
+      return
+    }
+    let raf = 0
+    const t0 = performance.now()
+    const loop = (now: number) => {
+      const s = (now - t0) / 1000
+      const p = (s % 2.2) / 2.2
+      // hold each shot for a moment around the transition
+      const q = p < 0.2 ? 0 : p > 0.8 ? 1 : (p - 0.2) / 0.6
+      frame(q, s)
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [type, hover])
+  return (
+    <button
+      className={`fx-tile ${on ? 'on' : ''}`}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/x-scrim-fx', type)
+        e.dataTransfer.effectAllowed = 'copy'
+        dragAsset.setFx({ kind: 'transition', type, name })
+      }}
+      onDragEnd={() => dragAsset.setFx(null)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onPick}
+      title="Click for options, or drag onto the timeline"
+    >
+      <canvas ref={ref} width={128} height={80} />
+      <span>{name}</span>
+    </button>
+  )
+}
+
+function TransitionRow({ label, value, onChange }: { label: string; value: Transition; onChange: (t: Transition) => void }) {
   return (
     <>
       <div className="list-row" style={{ borderBottom: 'none', padding: '2px 0' }}>
         <span style={{ flex: 1 }}>{label}</span>
-        <Select width={190} value={value.type} options={TRANSITIONS} onChange={(v) => onChange({ ...value, type: v })} />
+        <Select width={170} value={value.type} options={TRANSITIONS} onChange={(v) => onChange({ ...value, type: v })} />
       </div>
       {value.type !== 'none' && (
-        <Slider label="Length" value={value.duration} min={0.2} max={max} step={0.05} def={0.5} format={(v) => `${v.toFixed(2)}s`} onChange={(v) => onChange({ ...value, duration: v })} />
+        <Slider label="Length" value={value.duration} min={0.2} max={2} step={0.05} def={0.6} format={(v) => `${v.toFixed(2)}s`} onChange={(v) => onChange({ ...value, duration: v })} />
       )}
     </>
   )
 }
 
-export default function EffectsPanel() {
+function TransitionsTab() {
   const project = useEditor((s) => s.project)!
+  const selection = useEditor((s) => s.selection)
   const update = useEditor((s) => s.update)
+  const select = useEditor((s) => s.select)
   const tr = project.edit.transitions
-  const fx = project.edit.effects
   const d = defaultEdit(0)
   const cuts = Math.max(0, project.edit.clips.length - 1)
-  const custom = Object.keys(tr.perCut).length
+  const sel = selection?.kind === 'transition' ? tr.items.find((x) => x.id === selection.id) : undefined
+
+  const pick = (e: React.MouseEvent, type: TransitionType, name: string) =>
+    openContextMenu(e, [
+      { label: 'Add at playhead', onClick: () => addTransitionAt(type, timeBus.get()) },
+      { label: 'Use at every cut', disabled: cuts === 0, onClick: () => update((ed) => (ed.transitions.cut = { type, duration: ed.transitions.cut.duration || 0.6 })) },
+      { label: 'Use at the start', onClick: () => update((ed) => (ed.transitions.intro = { type, duration: ed.transitions.intro.duration || 0.6 })) },
+      { label: 'Use at the end', onClick: () => update((ed) => (ed.transitions.outro = { type, duration: ed.transitions.outro.duration || 0.6 })) },
+      ...(sel ? [{ sep: true } as const, { label: `Change selected to ${name}`, onClick: () => update((ed) => { const x = ed.transitions.items.find((i) => i.id === sel.id); if (x) x.type = type }) }] : [])
+    ])
 
   return (
-    <div>
-      <Section title="Transitions" onReset={() => update((e) => (e.transitions = d.transitions))}>
+    <>
+      {sel && (
+        <Section title="Selected transition" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((ed) => (ed.transitions.items = ed.transitions.items.filter((x) => x.id !== sel.id))); select(null) }}>Delete</button>}>
+          <Select value={sel.type} options={TRANSITIONS.filter((x) => x.v !== 'none')} onChange={(v) => update((ed) => { const x = ed.transitions.items.find((i) => i.id === sel.id); if (x) x.type = v })} />
+          <Slider
+            label="Length"
+            value={sel.end - sel.start}
+            min={0.2}
+            max={3}
+            step={0.05}
+            format={(v) => `${v.toFixed(2)}s`}
+            onChange={(v) => update((ed) => { const x = ed.transitions.items.find((i) => i.id === sel.id); if (x) { const mid = (x.start + x.end) / 2; x.start = Math.max(0, mid - v / 2); x.end = mid + v / 2 } }, 'trlen')}
+          />
+          <span className="hint">Drag its edges on the timeline to change the length, or drag it to move it.</span>
+        </Section>
+      )}
+      <Section title="Transitions">
+        <span className="hint">Drag one onto a cut, or anywhere on the Transitions track. Hover to preview, click for more options.</span>
+        <div className="fx-grid">
+          {TRANSITIONS.filter((x) => x.v !== 'none').map((x) => (
+            <TransitionTile key={x.v} type={x.v} name={x.l} on={sel?.type === x.v} onPick={(e) => pick(e, x.v, x.l)} />
+          ))}
+        </div>
+      </Section>
+      <Section title="Start, end and cuts" onReset={() => update((e) => (e.transitions = { ...d.transitions, items: e.transitions.items }))}>
         <TransitionRow label="Start of video" value={tr.intro} onChange={(v) => update((e) => (e.transitions.intro = v), 'tri')} />
         <TransitionRow label="End of video" value={tr.outro} onChange={(v) => update((e) => (e.transitions.outro = v), 'tro')} />
         <TransitionRow label="Every cut" value={tr.cut} onChange={(v) => update((e) => (e.transitions.cut = v), 'trc')} />
         <span className="hint">
-          {cuts === 0
-            ? 'Split or join videos to create cuts. Each cut then gets this transition.'
-            : `${cuts} cut${cuts > 1 ? 's' : ''} in this video. Click the dot on a cut in the Video track to give it its own transition.`}
-          {custom > 0 && ` ${custom} cut${custom > 1 ? 's have' : ' has'} their own.`}
+          {cuts === 0 ? 'No cuts yet. Split the video (S) or join another video to make one.' : `${cuts} cut${cuts > 1 ? 's' : ''}. Click a cut's pill on the Transitions track to give it its own.`}
         </span>
-        {custom > 0 && (
-          <button className="btn sm" onClick={() => update((e) => (e.transitions.perCut = {}))}>
-            Use "Every cut" everywhere
-          </button>
-        )}
       </Section>
+    </>
+  )
+}
 
-      <Section title="Look" onReset={() => update((e) => (e.effects = d.effects))}>
-        <div className="look-grid">
+/**
+ * A still of the current preview frame, used as the swatch for every look. It's kept as a canvas
+ * (not an image URL) because frames from local media can't be exported as data.
+ */
+function usePreviewStill(): { still: HTMLCanvasElement | null; version: number } {
+  const [state, setState] = useState<{ still: HTMLCanvasElement | null; version: number }>({ still: null, version: 0 })
+  useEffect(() => {
+    const grab = () => {
+      try {
+        const c = document.querySelector('.preview-wrap canvas') as HTMLCanvasElement | null
+        if (!c || !c.width) return
+        const t = document.createElement('canvas')
+        t.width = 160
+        t.height = Math.round((160 * c.height) / c.width)
+        t.getContext('2d')!.drawImage(c, 0, 0, t.width, t.height)
+        setState((s) => ({ still: t, version: s.version + 1 }))
+      } catch {
+        /* keep the previous still */
+      }
+    }
+    grab()
+    const id = setInterval(grab, 2000)
+    return () => clearInterval(id)
+  }, [])
+  return state
+}
+
+function LookSwatch({ still, version, look }: { still: HTMLCanvasElement | null; version: number; look: EffectLook }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const c = ref.current!
+    const ctx = c.getContext('2d')!
+    ctx.filter = effectFilter({ ...defaultEffect(), look }) || 'none'
+    if (still) ctx.drawImage(still, 0, 0, c.width, c.height)
+    else {
+      const g = ctx.createLinearGradient(0, 0, c.width, c.height)
+      ;['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#9b5de5'].forEach((col, i) => g.addColorStop(i / 4, col))
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, c.width, c.height)
+    }
+  }, [version, look])
+  return <canvas ref={ref} width={128} height={80} />
+}
+
+function EffectsTab() {
+  const project = useEditor((s) => s.project)!
+  const selection = useEditor((s) => s.selection)
+  const update = useEditor((s) => s.update)
+  const select = useEditor((s) => s.select)
+  const { still, version } = usePreviewStill()
+  const clip = selection?.kind === 'effect' ? project.edit.effectClips.find((c) => c.id === selection.id) : undefined
+  const fx: EffectSettings = clip ?? project.edit.effects
+  const set = (patch: Partial<EffectSettings>, key?: string) =>
+    update((e) => {
+      const target = clip ? e.effectClips.find((c) => c.id === clip.id) : e.effects
+      if (target) Object.assign(target, patch)
+    }, key)
+
+  const pick = (e: React.MouseEvent, look: EffectLook, name: string) =>
+    openContextMenu(e, [
+      { label: clip ? `Use on the selected part` : 'Use on the whole video', onClick: () => set({ look, ...(clip ? { name } : {}) } as Partial<EffectSettings>) },
+      { label: 'Add to part of the video (at playhead)', onClick: () => addEffectAt(look, name, timeBus.get()) },
+      ...(clip ? [{ label: 'Use on the whole video', onClick: () => update((ed) => (ed.effects.look = look)) }] : [])
+    ])
+
+  return (
+    <>
+      <Section
+        title={clip ? `Effect: ${clip.name}` : 'Whole video'}
+        action={
+          clip ? (
+            <span style={{ display: 'flex', gap: 12 }}>
+              <button className="link" onClick={() => select(null)}>Whole video</button>
+              <button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((ed) => (ed.effectClips = ed.effectClips.filter((c) => c.id !== clip.id))); select(null) }}>Delete</button>
+            </span>
+          ) : (
+            <button className="link" onClick={() => update((e) => (e.effects = defaultEffect()))}>Reset</button>
+          )
+        }
+      >
+        <span className="hint">
+          {clip
+            ? 'This effect replaces the whole-video effect while it plays. Drag its edges on the Effects track to change when.'
+            : 'Changes here apply to the whole recording. Drag a look onto the Effects track to use it on just a part.'}
+        </span>
+        <div className="fx-grid">
           {LOOKS.map((l) => (
-            <button key={l.v} className={`pick-tile ${fx.look === l.v ? 'on' : ''}`} onClick={() => update((e) => (e.effects.look = l.v))}>
-              <div className="look-swatch" style={{ background: SAMPLE, filter: effectFilter({ ...d.effects, look: l.v }) || undefined }} />
+            <button
+              key={l.v}
+              className={`fx-tile ${fx.look === l.v ? 'on' : ''}`}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/x-scrim-fx', l.v)
+                e.dataTransfer.effectAllowed = 'copy'
+                dragAsset.setFx({ kind: 'effect', look: l.v, name: l.l })
+              }}
+              onDragEnd={() => dragAsset.setFx(null)}
+              onClick={(e) => pick(e, l.v, l.l)}
+            >
+              <LookSwatch still={still} version={version} look={l.v} />
               <span>{l.l}</span>
             </button>
           ))}
@@ -84,13 +293,39 @@ export default function EffectsPanel() {
       </Section>
 
       <Section title="Adjust">
-        <Slider label="Brightness" value={fx.brightness} min={0.5} max={1.5} step={0.01} def={1} format={(v) => `${Math.round((v - 1) * 100)}`} onChange={(v) => update((e) => (e.effects.brightness = v), 'fxb')} />
-        <Slider label="Contrast" value={fx.contrast} min={0.5} max={1.5} step={0.01} def={1} format={(v) => `${Math.round((v - 1) * 100)}`} onChange={(v) => update((e) => (e.effects.contrast = v), 'fxc')} />
-        <Slider label="Saturation" value={fx.saturation} min={0} max={2} step={0.01} def={1} format={(v) => `${Math.round((v - 1) * 100)}`} onChange={(v) => update((e) => (e.effects.saturation = v), 'fxs')} />
-        <Slider label="Vignette" value={fx.vignette} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.effects.vignette = v), 'fxv')} />
-        <Slider label="Film grain" value={fx.grain} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.effects.grain = v), 'fxg')} />
-        <span className="hint">These change your recording (and media playing in it). The background, text and webcam stay as they are.</span>
+        <Slider label="Brightness" value={fx.brightness} min={0.5} max={1.5} step={0.01} def={1} format={(v) => `${Math.round((v - 1) * 100)}`} onChange={(v) => set({ brightness: v }, 'fxb')} />
+        <Slider label="Contrast" value={fx.contrast} min={0.5} max={1.5} step={0.01} def={1} format={(v) => `${Math.round((v - 1) * 100)}`} onChange={(v) => set({ contrast: v }, 'fxc')} />
+        <Slider label="Saturation" value={fx.saturation} min={0} max={2} step={0.01} def={1} format={(v) => `${Math.round((v - 1) * 100)}`} onChange={(v) => set({ saturation: v }, 'fxs')} />
       </Section>
+
+      <Section title="Effects">
+        <Slider label="Glow" value={fx.bloom} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set({ bloom: v }, 'fxbl')} />
+        <Slider label="Blur" value={fx.blur} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set({ blur: v }, 'fxbu')} />
+        <Slider label="Pixelate" value={fx.pixelate} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set({ pixelate: v }, 'fxpx')} />
+        <Slider label="Vignette" value={fx.vignette} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set({ vignette: v }, 'fxv')} />
+        <Slider label="Film grain" value={fx.grain} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set({ grain: v }, 'fxg')} />
+        <Slider label="Scan lines" value={fx.scanlines} min={0} max={1} step={0.01} def={0} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set({ scanlines: v }, 'fxsl')} />
+        <span className="hint">Blur and pixelate are handy for hiding private info on part of the video.</span>
+      </Section>
+    </>
+  )
+}
+
+export default function EffectsPanel() {
+  const selection = useEditor((s) => s.selection)
+  const [tab, setTab] = useState<'transitions' | 'effects'>(selection?.kind === 'effect' ? 'effects' : 'transitions')
+  // selecting something on the timeline switches to its tab
+  useEffect(() => {
+    if (selection?.kind === 'effect') setTab('effects')
+    if (selection?.kind === 'transition') setTab('transitions')
+  }, [selection?.kind, selection?.id])
+  return (
+    <div>
+      <div className="fx-tabs" role="tablist">
+        <button className={tab === 'transitions' ? 'on' : ''} onClick={() => setTab('transitions')}><Icon name="transition" size={14} /> Transitions</button>
+        <button className={tab === 'effects' ? 'on' : ''} onClick={() => setTab('effects')}><Icon name="fx" size={14} /> Effects</button>
+      </div>
+      {tab === 'transitions' ? <TransitionsTab /> : <EffectsTab />}
     </div>
   )
 }

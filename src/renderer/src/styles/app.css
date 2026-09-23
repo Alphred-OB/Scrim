@@ -320,11 +320,21 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .look-grid .pick-tile { width: auto; padding: 6px 6px 8px; }
 .look-swatch { width: 100%; aspect-ratio: 16 / 10; border-radius: 7px; }
 /* transition dot on a cut in the Video track */
-.tl-trans { position: absolute; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; border: 1.5px solid var(--line-2); background: var(--bg-2); color: var(--dim);
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; padding: 0; transition: transform 0.1s, color 0.15s; }
-.tl-trans:hover { transform: scale(1.15); color: var(--text); }
-.tl-trans.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tl-trans { position: absolute; border-radius: 8px; border: 1.5px dashed var(--line-2); background: var(--bg-2); color: var(--dim); font-size: 10.5px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; padding: 0 6px; white-space: nowrap; overflow: hidden; transition: color 0.15s, border-color 0.15s; }
+.tl-trans:hover { color: var(--text); border-color: var(--text-2); }
+.tl-trans.on { background: linear-gradient(180deg, #e0873a, #b8611f); border: none; color: #fff; }
 
 .transport-side { width: 230px; flex-shrink: 0; }
 .tl-sublabel { font-size: 10.5px; font-weight: 500; color: var(--faint); }
 .tl-row.lane { background: var(--hover); }
+
+/* transitions & effects panel */
+.fx-tabs { display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--card); margin-bottom: 14px; }
+.fx-tabs button { flex: 1; height: 32px; border: none; border-radius: 8px; background: none; color: var(--dim); font-weight: 600; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.fx-tabs button.on { background: var(--seg-on); color: var(--text); }
+.fx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fx-tile { display: flex; flex-direction: column; gap: 5px; padding: 5px 5px 7px; border-radius: 11px; background: var(--card); border: 1.5px solid transparent; cursor: grab; color: var(--dim); font-size: 11px; text-align: center; }
+.fx-tile:hover { background: var(--card-hi); color: var(--text); }
+.fx-tile.on { border-color: var(--accent); color: var(--text); }
+.fx-tile canvas, .fx-tile .look-swatch { width: 100%; aspect-ratio: 16 / 10; border-radius: 7px; display: block; background-size: cover; background-position: center; }

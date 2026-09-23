@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Fixed: pausing jumped the playhead back to where playback started
+- New: Transitions and Effects tracks on the timeline. Drag a transition onto a cut or anywhere on its track (drag its edges for the length); drag a look onto the Effects track to use it on just part of the video. Start, end and cut transitions show as pills you can click.
+- New: Transitions and Effects are separate tabs, with animated previews of each transition (hover) and look swatches made from your own video
+- New: 17 transitions (fade, fade white, flash, morph, blur, zoom in, zoom out, spin, whip pan, slide left/right/up/down, iris, wipe, pixelate, glitch)
+- New: 16 looks (adds cinematic, cyberpunk, dreamy, faded, bright, moody, invert) and new effects: glow, blur, pixelate, scan lines. Blur and pixelate on part of the video are handy for hiding private info.
 - New: layers for Text, Media and Audio. Items that play at the same time sit on their own layer instead of stacking. Drag an item up or down to change its layer; higher layers draw on top. Text always has an empty layer ready.
 - New: eye button on Media and Text, speaker button on Audio, to hide or mute a whole track
 - Changed: the recording outline shows during the countdown, the first few seconds and while paused, then fades away

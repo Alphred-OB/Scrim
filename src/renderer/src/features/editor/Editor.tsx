@@ -94,6 +94,11 @@ function EditorView() {
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
   const busy = useEditor((s) => s.busy)
+  // picking a transition or effect on the timeline opens its settings
+  const selKind = useEditor((s) => s.selection?.kind)
+  useEffect(() => {
+    if (selKind === 'effect' || selKind === 'transition') useEditor.getState().setPanel('effects')
+  }, [selKind])
 
   useEffect(() => {
     api.loadPresets().then(setPresets)
@@ -104,6 +109,7 @@ function EditorView() {
       exportDialog: () => setExporting(true),
       patchCursor: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.cursor, patch)),
       seek: (t: number) => useEditor.getState().setTime(t),
+      play: (on: boolean) => useEditor.getState().setPlaying(on),
       addText: (t: number) => addTextAt(t),
       lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
       patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
@@ -115,7 +121,7 @@ function EditorView() {
       state: () => {
         const e = useEditor.getState().project!.edit
         const st = useEditor.getState()
-        return { time: st.time, duration: st.project!.media.screen.duration, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
+        return { transitionItems: e.transitions.items.length, effectClips: e.effectClips.length, time: st.time, duration: st.project!.media.screen.duration, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
       },
       export: async (out: string, patch?: Partial<import('@shared/types').ExportSettings>) => {
         const st = useEditor.getState()

@@ -7,7 +7,7 @@ import { freeLane } from '@shared/defaults'
 import { useEditor, Selection } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
-import { addAssetAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead, toggleClick } from '../state/actions'
+import { addAssetAt, addEffectAt, addTransitionAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead, toggleClick } from '../state/actions'
 import { sortedClips } from '../engine/timeMap'
 import Waveform from './Waveform'
 import { TRANSITIONS } from '../panels/EffectsPanel'
@@ -41,7 +41,7 @@ type Item = { id: string; start: number; end: number; lane?: number }
 const laneKey = (base: string, lane = 0) => (lane ? `${base}#${lane}` : base)
 const laneOf = (key: string) => Number(key.split('#')[1] ?? 0)
 const laneCount = (list: { lane?: number }[], spare = false) => (list.length ? Math.max(...list.map((x) => x.lane ?? 0)) + 1 + (spare ? 1 : 0) : 1)
-type Kind = 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip'
+type Kind = 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition'
 interface Row { key: string; label: string; sub?: string; icon: string; color: string; kind?: Kind; hint?: string; toggle?: { on: boolean; set: () => void; icon: [string, string]; title: string } }
 
 export default function Timeline() {
@@ -162,7 +162,7 @@ export default function Timeline() {
   }
 
   const listFor = (kind: Kind, ed = edit): Item[] =>
-    kind === 'clip' ? ed.clips : kind === 'zoom' ? ed.zoom.segments : kind === 'text' ? ed.texts : kind === 'overlay' ? ed.overlays : ed.audioClips
+    kind === 'clip' ? ed.clips : kind === 'zoom' ? ed.zoom.segments : kind === 'text' ? ed.texts : kind === 'overlay' ? ed.overlays : kind === 'effect' ? ed.effectClips : kind === 'transition' ? ed.transitions.items : ed.audioClips
 
   const assetLen = (it: Item, kind: Kind): number => {
     if (kind !== 'overlay' && kind !== 'audioClip') return Infinity
@@ -177,14 +177,14 @@ export default function Timeline() {
     select({ kind, id: item.id })
     const x0 = e.clientX
     const y0 = e.clientY
-    const layered = kind === 'text' || kind === 'overlay' || kind === 'audioClip'
+    const layered = kind === 'text' || kind === 'overlay' || kind === 'audioClip' || kind === 'effect'
     const lane0 = item.lane ?? 0
     const lanes = laneCount(listFor(kind), kind === 'text')
     let lane = lane0
     const s0 = item.start
     const e0 = item.end
     const others = listFor(kind).filter((o) => o.id !== item.id)
-    const stacks = kind === 'text' || kind === 'overlay' || kind === 'audioClip'
+    const stacks = kind === 'text' || kind === 'overlay' || kind === 'audioClip' || kind === 'effect' || kind === 'transition'
     const lo = stacks ? 0 : Math.max(0, ...others.filter((o) => o.end <= s0 + 1e-3).map((o) => o.end))
     const hi = stacks ? duration : Math.min(duration, ...others.filter((o) => o.start >= e0 - 1e-3).map((o) => o.start))
     const maxLen = assetLen(item, kind)
@@ -306,7 +306,7 @@ export default function Timeline() {
           select({ kind, id: it.id })
           openContextMenu(e, itemMenu(kind, it))
         }}
-        style={{ left: X(it.start), width: w, top: top + 4, height: TRACK_H - 8, background: color, cursor: kind === 'clip' ? 'pointer' : 'grab', opacity: (kind === 'zoom' && !edit.zoom.enabled) || (kind === 'overlay' && !edit.tracks.media) || (kind === 'text' && !edit.tracks.text) || (kind === 'audioClip' && !edit.tracks.audio) ? 0.35 : undefined }}
+        style={{ left: X(it.start), width: w, top: top + 4, height: TRACK_H - 8, background: color, cursor: kind === 'clip' ? 'pointer' : 'grab', opacity: (kind === 'zoom' && !edit.zoom.enabled) || (kind === 'overlay' && !edit.tracks.media) || (kind === 'text' && !edit.tracks.text) || (kind === 'audioClip' && !edit.tracks.audio) || (kind === 'effect' && !edit.tracks.effects) ? 0.35 : undefined }}
       >
         {extra}
         <div className="tl-edge l" onPointerDown={(e) => startDrag(e, kind, it, 'l')} />
@@ -328,6 +328,14 @@ export default function Timeline() {
 
   const onDragOver = (e: React.DragEvent) => {
     const a = dragAsset.get()
+    const fx = dragAsset.getFx()
+    if (fx) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+      const under = rowAt(e.clientY) ?? ''
+      setDropRow(fx.kind === 'transition' ? 'transitions' : under.split('#')[0] === 'effects' ? under : 'effects')
+      return
+    }
     if (a) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
@@ -344,6 +352,21 @@ export default function Timeline() {
   const onDrop = (e: React.DragEvent) => {
     setDropRow(null)
     setJoinHint(null)
+    const fx = dragAsset.getFx()
+    if (fx) {
+      e.preventDefault()
+      e.stopPropagation()
+      dragAsset.setFx(null)
+      const t = timeAt(e.clientX)
+      if (fx.kind === 'effect') {
+        const under = rowAt(e.clientY) ?? ''
+        return addEffectAt(fx.look, fx.name, t, 5, under.split('#')[0] === 'effects' ? laneOf(under) : 0)
+      }
+      // dropped near a cut: that cut gets it; anywhere else: a free-standing transition
+      const cut = cutNear(t)
+      if (cut) return update((ed) => (ed.transitions.perCut[cut.id] = { type: fx.type, duration: ed.transitions.perCut[cut.id]?.duration ?? ed.transitions.cut.duration ?? 0.6 }))
+      return addTransitionAt(fx.type, t)
+    }
     const a = dragAsset.get()
     if (!a) return
     e.preventDefault()
@@ -356,6 +379,16 @@ export default function Timeline() {
     if (live) addAssetAt(live, timeAt(e.clientX), row.split('#')[0] === base ? laneOf(row) : 0)
   }
 
+  // the clip right after a cut near time t (within about 14 pixels), for dropping transitions on cuts
+  const cutNear = (t: number) => {
+    const cs = sortedClips(edit.clips)
+    for (let i = 1; i < cs.length; i++) {
+      const at = (cs[i - 1].end + cs[i].start) / 2
+      if (Math.abs(at - t) * pps < 14 + Math.abs(cs[i].start - cs[i - 1].end) * pps / 2) return cs[i]
+    }
+    return null
+  }
+
   // ---- rows ----
   // Media, Text and Audio have layers: items on different layers can play at the same time.
   function pushLanes(base: string, n: number, first: Omit<Row, 'key'>): void {
@@ -363,6 +396,9 @@ export default function Timeline() {
       rows.push(l === 0 ? { key: base, ...first } : { key: laneKey(base, l), label: '', sub: `Layer ${l + 1}`, icon: first.icon, color: first.color, kind: first.kind })
   }
   const rows: Row[] = [{ key: 'video', label: 'Video', icon: 'film', color: '#2b4fb8', kind: 'clip' }]
+  rows.push({ key: 'transitions', label: 'Transitions', icon: 'transition', color: '#d9772b', kind: 'transition' })
+  const fxToggle = { on: edit.tracks.effects, set: () => update((e) => (e.tracks.effects = !e.tracks.effects)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Turn effects on this track on or off' }
+  pushLanes('effects', laneCount(edit.effectClips), { label: 'Effects', icon: 'fx', color: '#1aa3b8', kind: 'effect', hint: 'Drag an effect here to use it on part of the video', toggle: fxToggle })
   if (media.webcam)
     rows.push({
       key: 'webcam', label: 'Webcam', icon: 'webcam', color: '#b85d2b',
@@ -519,39 +555,56 @@ export default function Timeline() {
             <div className="tl-hatch" style={{ left: X(0), width: total, top: top('video') + 4, height: TRACK_H - 8 }} />
             {edit.clips.map((c) => block('clip', c, top('video'), 'linear-gradient(180deg,#3563d6,#2849a8)', <>Clip{c.speed !== 1 ? ` · ${c.speed}x` : ''}</>))}
 
-            {/* transition on each cut between clips (dot sits in the middle of the cut) */}
-            {clips.slice(1).map((c, i) => {
-              const prev = clips[i]
-              const own = edit.transitions.perCut[c.id]
-              const eff = own ?? edit.transitions.cut
-              const at = (prev.end + c.start) / 2
-              const pick = (t: Transition | null) =>
-                update((e) => {
-                  if (t) e.transitions.perCut[c.id] = t
-                  else delete e.transitions.perCut[c.id]
-                })
-              return (
-                <button
-                  key={'tr' + c.id}
-                  className={`tl-trans ${eff.type !== 'none' ? 'on' : ''}`}
-                  style={{ left: X(at), top: top('video') + TRACK_H / 2 - 10 }}
-                  title={`Transition: ${TRANSITIONS.find((x) => x.v === eff.type)?.l}${own ? '' : ' (from Every cut)'}`}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) =>
-                    openContextMenu(e, [
-                      ...TRANSITIONS.map((x) => ({ label: x.l, checked: eff.type === x.v, onClick: () => pick({ type: x.v, duration: eff.duration || 0.5 }) })),
-                      { sep: true },
-                      ...[0.3, 0.5, 0.8, 1.2].map((d) => ({ label: `${d}s long`, checked: Math.abs(eff.duration - d) < 0.01, disabled: eff.type === 'none', onClick: () => pick({ type: eff.type, duration: d }) })),
-                      { sep: true },
-                      { label: 'Same as every cut', checked: !own, onClick: () => pick(null) },
-                      { label: 'Transition settings…', onClick: () => useEditor.getState().setPanel('effects') }
-                    ])
-                  }
-                >
-                  <Icon name="transition" size={11} />
-                </button>
-              )
-            })}
+            {/* start, end and cut transitions, shown as pills on the Transitions track */}
+            {(() => {
+              const tr = edit.transitions
+              const name = (t: Transition) => TRANSITIONS.find((x) => x.v === t.type)?.l ?? ''
+              const menu = (cur: Transition, set: (t: Transition | null) => void, canInherit: boolean, own: boolean) =>
+                [
+                  ...TRANSITIONS.map((x) => ({ label: x.l, checked: cur.type === x.v, onClick: () => set({ type: x.v, duration: cur.duration || 0.6 }) })),
+                  { sep: true },
+                  ...[0.3, 0.5, 0.8, 1.2].map((d) => ({ label: `${d}s long`, checked: Math.abs(cur.duration - d) < 0.01, disabled: cur.type === 'none', onClick: () => set({ type: cur.type, duration: d }) })),
+                  ...(canInherit ? [{ sep: true }, { label: 'Same as every cut', checked: !own, onClick: () => set(null) }] : []),
+                  { sep: true },
+                  { label: 'Transitions panel…', onClick: () => useEditor.getState().setPanel('effects') }
+                ] as MenuItem[]
+              const pill = (key: string, at: number, cur: Transition, title: string, onMenu: (e: React.MouseEvent) => void) => {
+                const w = Math.max(20, cur.type === 'none' ? 20 : cur.duration * pps)
+                const left = Math.max(X(0), X(at) - w / 2)
+                return (
+                  <button
+                    key={key}
+                    className={`tl-trans ${cur.type !== 'none' ? 'on' : ''}`}
+                    style={{ left, width: w, top: top('transitions') + 7, height: TRACK_H - 14 }}
+                    title={title}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={onMenu}
+                  >
+                    {cur.type === 'none' ? <Icon name="plus" size={11} /> : w > 60 ? name(cur) : <Icon name="transition" size={11} />}
+                  </button>
+                )
+              }
+              const out = [
+                pill('intro', clips[0].start + tr.intro.duration / 2, tr.intro, `Start: ${name(tr.intro)}`, (e) => openContextMenu(e, menu(tr.intro, (v) => update((ed) => (ed.transitions.intro = v ?? ed.transitions.intro)), false, true))),
+                pill('outro', clips[clips.length - 1].end - tr.outro.duration / 2, tr.outro, `End: ${name(tr.outro)}`, (e) => openContextMenu(e, menu(tr.outro, (v) => update((ed) => (ed.transitions.outro = v ?? ed.transitions.outro)), false, true)))
+              ]
+              clips.slice(1).forEach((c, i) => {
+                const own = tr.perCut[c.id]
+                const cur = own ?? tr.cut
+                out.push(
+                  pill('cut' + c.id, (clips[i].end + c.start) / 2, cur, `Cut: ${name(cur)}${own ? '' : ' (from Every cut)'}`, (e) =>
+                    openContextMenu(e, menu(cur, (v) => update((ed) => { if (v) ed.transitions.perCut[c.id] = v; else delete ed.transitions.perCut[c.id] }), true, !!own))
+                  )
+                )
+              })
+              return out
+            })()}
+
+            {/* transitions placed anywhere */}
+            {edit.transitions.items.map((it) => block('transition', it, top('transitions'), 'linear-gradient(180deg,#e0873a,#b8611f)', TRANSITIONS.find((x) => x.v === it.type)?.l ?? 'Transition'))}
+
+            {/* effects on part of the video */}
+            {edit.effectClips.map((c) => block('effect', c, laneTop('effects', c.lane), 'linear-gradient(180deg,#22b3c9,#157f90)', c.name))}
 
             {/* webcam */}
             {media.webcam && (

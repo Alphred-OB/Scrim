@@ -1,4 +1,4 @@
-import type { AppSettings, EditState, Project, TextItem, ZoomSegment } from './types'
+import type { AppSettings, EditState, Project, TextItem, ZoomSegment, EffectSettings } from './types'
 
 export const uid = (p = ''): string => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -65,11 +65,17 @@ export function defaultEdit(duration: number): EditState {
       intro: { type: 'none', duration: 0.6 },
       outro: { type: 'none', duration: 0.6 },
       cut: { type: 'none', duration: 0.5 },
-      perCut: {}
+      perCut: {},
+      items: []
     },
-    effects: { look: 'none', brightness: 1, contrast: 1, saturation: 1, vignette: 0, grain: 0 },
-    tracks: { media: true, text: true, audio: true }
+    effects: defaultEffect(),
+    effectClips: [],
+    tracks: { media: true, text: true, audio: true, effects: true }
   }
+}
+
+export function defaultEffect(): EffectSettings {
+  return { look: 'none', brightness: 1, contrast: 1, saturation: 1, vignette: 0, grain: 0, bloom: 0, blur: 0, pixelate: 0, scanlines: 0 }
 }
 
 export function newText(t: number): TextItem {
@@ -125,14 +131,15 @@ export function migrateProject(p: Project): Project {
     overlays: (e.overlays ?? []).map((o) => ({ ...o, mode: o.mode ?? (o.fullscreen ? 'full' : 'pip'), fit: o.fit ?? 'contain' })),
     audioClips: e.audioClips ?? [],
     export: { ...d.export, ...e.export },
-    transitions: { ...d.transitions, ...e.transitions, perCut: { ...(e.transitions?.perCut ?? {}) } },
+    transitions: { ...d.transitions, ...e.transitions, perCut: { ...(e.transitions?.perCut ?? {}) }, items: e.transitions?.items ?? [] },
     effects: { ...d.effects, ...e.effects },
+    effectClips: (e.effectClips ?? []).map((c) => ({ ...defaultEffect(), ...c })),
     tracks: { ...d.tracks, ...e.tracks },
     clips: e.clips?.length ? e.clips : d.clips,
     texts: e.texts ?? []
   }
   // projects from before layers: spread overlapping items over layers so nothing is stacked
-  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips] as { start: number; end: number; lane?: number }[][]) {
+  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips, p.edit.effectClips] as { start: number; end: number; lane?: number }[][]) {
     if (list.every((x) => x.lane !== undefined)) continue
     const ends: number[] = []
     for (const it of [...list].sort((a, b) => a.start - b.start)) {

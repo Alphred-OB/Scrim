@@ -224,10 +224,16 @@ export default function Preview() {
     if (!playing) requestAnimationFrame(() => draw.current())
   }, [edit, track, bgImage, box, selection, playing])
 
+  // seek only when the time was changed on purpose (scrub, arrow keys...). Pausing must not
+  // jump back to the time playback started from, which the store still holds while playing.
+  const lastSeek = useRef(time)
   useEffect(() => {
     const v = videoRef.current
     if (!v || playing) return
-    if (Math.abs(v.currentTime - time) > 0.001) v.currentTime = time
+    if (time !== lastSeek.current) {
+      lastSeek.current = time
+      if (Math.abs(v.currentTime - time) > 0.001) v.currentTime = time
+    }
     syncFollowers(false)
     timeBus.emit(time)
     requestAnimationFrame(() => draw.current())
