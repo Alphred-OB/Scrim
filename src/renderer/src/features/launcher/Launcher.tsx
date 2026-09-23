@@ -265,13 +265,20 @@ export default function Launcher() {
 
       {tab === 'home' && (
         <div className="home">
-          <div className="home-aurora" aria-hidden><i /><i /><i /></div>
-          <div className="home-dots" aria-hidden />
           <div className="home-hero">
-            <span className="home-eyebrow"><span className="pulse-dot" /> {greeting()}</span>
-            <h1>Turn your screen into a <em>story</em>.</h1>
+            <div className="home-stats">
+              <span><i className="rec-dot" /> Ready to record</span>
+              {projects.length > 0 && (
+                <>
+                  <span><b>{projects.length}</b> {projects.length === 1 ? 'project' : 'projects'}</span>
+                  <span><b>{fmtTime(projects.reduce((a, p) => a + p.duration, 0))}</b> of video made</span>
+                </>
+              )}
+            </div>
+            <h1>Turn your screen into a<br /><WordSwap /></h1>
             <p>Record once. Scrim adds the zooms, the smooth cursor and the polish, so it looks like you spent hours on it.</p>
           </div>
+          <HomeReel />
           <div className="home-choices">
             <button data-tour="home-record" className="home-card rec" onMouseMove={spot} onClick={() => setTab('record')}>
               <div className="hc-art rec-art" aria-hidden>
@@ -396,7 +403,11 @@ export default function Launcher() {
                     options={[{ v: '', l: 'Default microphone' }, ...mics.map((m) => ({ v: m.deviceId, l: m.label || 'Microphone' }))]}
                     onChange={(v) => setPrefs({ ...prefs, micDeviceId: v || undefined })}
                   />
-                  <div className="progress" style={{ height: 5 }}><div style={{ width: `${level * 100}%`, background: level > 0.85 ? 'var(--danger)' : 'var(--ok)', transition: 'none' }} /></div>
+                  <div className="mic-meter" title="Speak to test your microphone">
+                    <Icon name="mic" size={14} />
+                    <div>{Array.from({ length: 16 }, (_, k) => <i key={k} className={level * 16 > k ? (k > 12 ? 'hot' : 'on') : ''} />)}</div>
+                    <span>{level > 0.03 ? 'Hearing you' : 'Say something'}</span>
+                  </div>
                 </>
               )}
               <Toggle label="System audio" value={prefs.systemAudio} onChange={(v) => setPrefs({ ...prefs, systemAudio: v })} />
@@ -546,9 +557,34 @@ function spot(e: React.MouseEvent<HTMLElement>) {
   e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
 }
 
-function greeting(): string {
-  const h = new Date().getHours()
-  return h < 5 ? 'Up late? Let\'s make something' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+const WORDS = ['product demo', 'tutorial', 'launch video', 'bug report', 'walkthrough', 'story']
+
+/** The last word of the headline keeps changing, sliding up in a solid block. */
+function WordSwap() {
+  const [i, setI] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setI((x) => (x + 1) % WORDS.length), 2200)
+    return () => clearInterval(id)
+  }, [])
+  return (
+    <span className="word-swap">
+      <span key={i}>{WORDS[i]}.</span>
+    </span>
+  )
+}
+
+const REEL = ['#3563d6', '#ff3b30', '#7a5af0', '#1aa37a', '#ffd60a', '#d9772b', '#23879b', '#3563d6', '#a2427a', '#1aa37a']
+/** Two rows of timeline clips drifting along the bottom of the home screen. */
+function HomeReel() {
+  const row = (seed: number) => {
+    const items = Array.from({ length: 22 }, (_, k) => ({ c: REEL[(k * 3 + seed) % REEL.length], w: 60 + ((k * 37 + seed * 13) % 140) }))
+    return [...items, ...items].map((it, k) => <i key={k} style={{ width: it.w, background: it.c }} />)
+  }
+  return (
+    <div className="home-reel" aria-hidden>
+      <div>{row(1)}</div>
+    </div>
+  )
 }
 
 /** "just now", "5 min ago", "yesterday", then a date. */

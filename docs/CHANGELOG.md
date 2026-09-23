@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- New: text animations. Pick how text comes in and goes out (16 each: fade, pop, rise, slide, zoom, drop, blur, wipe, spin, flip, typewriter, letter by letter, word by word) and a loop while it's on screen (pulse, float, wiggle, shake, blink, wave, glow), with speed control. Tiles play a preview on hover. Ramps on the Text track show the in and out.
+- New: 9 text styles to start from (Caption, Title, Label, Accent, Poster, Code, Callout, Neon, Lower third), each with its own animation.
+- New: no gradients anywhere in the interface. New solid red logo and app icon, new animated splash screen, bolder home screen with a changing headline word.
+- Improved: the tool rail shows names under the icons. Empty spare layers only appear while you drag something onto a track. New text no longer lands on top of other text. Cursor styles show as a grid. The mic meter says whether it can hear you. The timeline resize handle is visible.
 - New: home and projects screens redesigned. Animated cards, a live glow, R and E shortcuts, quick actions, sorting, relative dates and hover previews.
 - New: Practice on a sample. Scrim makes a short sample recording and walks you through a real edit with small hands on tasks (play, zooms, background, title, cut, transition, intro). Every step has a Show me button.
 - Fixed: the webcam flickered in the preview. Small drift is now corrected smoothly instead of seeking, and the last good frame is kept while it buffers.

@@ -155,7 +155,14 @@ export interface ZoomSettings {
 
 export interface Clip { id: string; start: number; end: number; speed: number } // kept ranges of source
 
+/** Old single animation (kept so old projects still load). */
 export type TextAnim = 'none' | 'fade' | 'slide-up' | 'pop' | 'typewriter'
+/** How text comes in or goes out. */
+export type TextMotion =
+  | 'none' | 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'pop' | 'zoom' | 'drop'
+  | 'blur' | 'wipe' | 'spin' | 'flip' | 'typewriter' | 'letters' | 'words'
+/** What text does while it's on screen. */
+export type TextLoop = 'none' | 'pulse' | 'float' | 'wiggle' | 'shake' | 'blink' | 'wave' | 'glow'
 export interface TextItem {
   id: string
   start: number
@@ -177,7 +184,13 @@ export interface TextItem {
   radius: number
   align: 'left' | 'center' | 'right'
   shadow: boolean
-  anim: TextAnim
+  /** @deprecated replaced by animIn / animOut */
+  anim?: TextAnim
+  animIn: TextMotion
+  animOut: TextMotion
+  inDur: number
+  outDur: number
+  loop: TextLoop
   letterSpacing: number
 }
 

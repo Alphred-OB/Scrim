@@ -52,7 +52,7 @@ function createMainWindow(): void {
       backgroundThrottling: false // audio keeps recording while hidden
     }
   })
-  mainWindow.on('ready-to-show', () => closeSplash(() => mainWindow?.show(), selfTestDir() ? 0 : 1200))
+  mainWindow.on('ready-to-show', () => closeSplash(() => mainWindow?.show(), selfTestDir() ? 0 : 1700))
   mainWindow.on('closed', () => {
     mainWindow = null
     toolbar?.destroy()

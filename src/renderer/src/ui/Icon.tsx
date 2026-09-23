@@ -64,7 +64,9 @@ const ICONS: Record<string, ReactNode> = {
   target: <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></>,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" /></>,
   more: <><circle cx="6" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="18" cy="12" r="1.4" fill="currentColor" /></>,
-  pin: P('M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10zM12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z')
+  pin: P('M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10zM12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z'),
+  keyframe: P('M12 2L2 12l10 10 10-10z'),
+  palette: <>{P('M12 2C6.5 2 2 6.5 2 12c0 3.6 2 6 5 6 .6 0 1-.4 1-1 0-.3-.1-.5-.2-.7-.3-.4-.5-.9-.5-1.5 0-1.7 1.3-3 3-3h1.8c3.4 0 6.2-2.8 6.2-6.2C22 5.6 17.5 2 12 2z')}<circle cx="7.5" cy="10.5" r="1.5" /><circle cx="12" cy="7.5" r="1.5" /><circle cx="16.5" cy="10.5" r="1.5" /></>
 }
 
 export function Icon({ name, size = 18, stroke = 1.8 }: { name: string; size?: number; stroke?: number }) {

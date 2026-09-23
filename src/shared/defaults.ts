@@ -1,4 +1,4 @@
-import type { AppSettings, EditState, Project, TextItem, ZoomSegment, EffectSettings } from './types'
+import type { AppSettings, EditState, Project, TextItem, TextMotion, ZoomSegment, EffectSettings } from './types'
 
 export const uid = (p = ''): string => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
@@ -99,7 +99,11 @@ export function newText(t: number): TextItem {
     radius: 14,
     align: 'center',
     shadow: true,
-    anim: 'pop',
+    animIn: 'pop',
+    animOut: 'fade',
+    inDur: 0.45,
+    outDur: 0.35,
+    loop: 'none',
     letterSpacing: 0
   }
 }
@@ -137,7 +141,7 @@ export function migrateProject(p: Project): Project {
     effectClips: (e.effectClips ?? []).map((c) => ({ ...defaultEffect(), ...c })),
     tracks: { ...d.tracks, ...e.tracks },
     clips: e.clips?.length ? e.clips : d.clips,
-    texts: e.texts ?? []
+    texts: (e.texts ?? []).map(migrateText)
   }
   // projects from before layers: spread overlapping items over layers so nothing is stacked
   for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips, p.edit.effectClips, p.edit.transitions.items] as { start: number; end: number; lane?: number }[][]) {
@@ -151,6 +155,15 @@ export function migrateProject(p: Project): Project {
     }
   }
   return p
+}
+
+/** Texts from before in/out animations: turn the single animation into an in and an out. */
+function migrateText(t: TextItem): TextItem {
+  if (t.animIn) return t
+  const a = t.anim ?? 'fade'
+  const animIn: TextMotion = a
+  const animOut: TextMotion = a === 'typewriter' || a === 'pop' ? 'fade' : a
+  return { ...t, animIn, animOut, inDur: a === 'typewriter' ? Math.max(0.4, t.text.length * 0.04) : 0.35, outDur: 0.35, loop: 'none' }
 }
 
 /** First layer where [start, end] doesn't overlap anything, starting from `from`. */

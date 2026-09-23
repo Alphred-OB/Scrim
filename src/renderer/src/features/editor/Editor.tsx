@@ -26,17 +26,17 @@ import WebcamPanel from './panels/WebcamPanel'
 import { addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
-const RAIL: { id: Panel; icon: string; title: string; soon?: boolean }[] = [
-  { id: 'background', icon: 'sparkles', title: 'Background & frame' },
-  { id: 'cursor', icon: 'cursor', title: 'Cursor & clicks' },
+const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boolean }[] = [
+  { id: 'background', icon: 'sparkles', title: 'Background & frame', label: 'Style' },
+  { id: 'cursor', icon: 'cursor', title: 'Cursor & clicks', label: 'Cursor' },
   { id: 'zoom', icon: 'zoom', title: 'Zoom' },
   { id: 'text', icon: 'text', title: 'Text' },
-  { id: 'media', icon: 'image', title: 'Media library' },
-  { id: 'effects', icon: 'fx', title: 'Transitions & effects' },
+  { id: 'media', icon: 'image', title: 'Media library', label: 'Media' },
+  { id: 'effects', icon: 'fx', title: 'Transitions & effects', label: 'Effects' },
   { id: 'webcam', icon: 'webcam', title: 'Webcam' },
   { id: 'audio', icon: 'audio', title: 'Audio' },
-  { id: 'settings', icon: 'scissors', title: 'Clips & speed' },
-  { id: 'ai', icon: 'cc', title: 'AI captions & annotations', soon: true }
+  { id: 'settings', icon: 'scissors', title: 'Clips & speed', label: 'Clips' },
+  { id: 'ai', icon: 'cc', title: 'AI captions & annotations', label: 'AI', soon: true }
 ]
 
 const ASPECTS: { v: Aspect; l: string }[] = [
@@ -122,6 +122,8 @@ function EditorView() {
       seek: (t: number) => useEditor.getState().setTime(t),
       play: (on: boolean) => useEditor.getState().setPlaying(on),
       addText: (t: number) => addTextAt(t),
+      lastText: () => { const ts = useEditor.getState().project!.edit.texts; return ts[ts.length - 1] },
+      patchText: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.texts[e.texts.length - 1], patch)),
       lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
       patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
       import: (paths: string[]) => importMedia(useEditor.getState().project!.dir, paths, timeBus.get()),
@@ -318,10 +320,11 @@ function EditorView() {
       </header>
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <nav data-tour="rail" className="surface" style={{ width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, borderRight: '1px solid var(--line)' }}>
+        <nav data-tour="rail" className="surface rail" style={{ width: 68, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 8, borderRight: '1px solid var(--line)', overflowY: 'auto' }}>
           {RAIL.map((r) => (
-            <button key={r.id} data-tour={`tool-${r.id}`} className={`icon-btn ${panel === r.id ? 'active' : ''}`} style={{ width: 40, height: 40, borderRadius: 11, position: 'relative' }} title={r.title} onClick={() => setPanel(r.id)}>
+            <button key={r.id} data-tour={`tool-${r.id}`} className={`rail-btn ${panel === r.id ? 'active' : ''}`} title={r.title} onClick={() => setPanel(r.id)}>
               <Icon name={r.icon} size={19} />
+              <span>{r.label ?? r.title}</span>
               {r.soon && <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, background: 'var(--warn)' }} />}
             </button>
           ))}

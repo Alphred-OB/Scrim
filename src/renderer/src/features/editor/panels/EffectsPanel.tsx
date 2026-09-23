@@ -51,10 +51,7 @@ export const LOOKS: { v: EffectLook; l: string }[] = [
 
 // ---- small animated preview of a transition: shot A leaves, shot B arrives ----
 function paintShot(ctx: CanvasRenderingContext2D, W: number, H: number, b: boolean): void {
-  const g = ctx.createLinearGradient(0, 0, W, H)
-  g.addColorStop(0, b ? '#ff8a3d' : '#2f6bff')
-  g.addColorStop(1, b ? '#ffcf5a' : '#7b5cff')
-  ctx.fillStyle = g
+  ctx.fillStyle = b ? '#ff8a3d' : '#2f6bff'
   ctx.fillRect(0, 0, W, H)
   ctx.fillStyle = 'rgba(255,255,255,.9)'
   if (b) {
@@ -272,10 +269,11 @@ function LookSwatch({ still, version, look }: { still: HTMLCanvasElement | null;
     ctx.filter = effectFilter({ ...defaultEffect(), look }) || 'none'
     if (still) ctx.drawImage(still, 0, 0, c.width, c.height)
     else {
-      const g = ctx.createLinearGradient(0, 0, c.width, c.height)
-      ;['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#9b5de5'].forEach((col, i) => g.addColorStop(i / 4, col))
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, c.width, c.height)
+      // color bars, so every look has something to change
+      ;['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#9b5de5'].forEach((col, i) => {
+        ctx.fillStyle = col
+        ctx.fillRect((i * c.width) / 5, 0, c.width / 5 + 1, c.height)
+      })
     }
   }, [version, look])
   return <canvas ref={ref} width={128} height={80} />

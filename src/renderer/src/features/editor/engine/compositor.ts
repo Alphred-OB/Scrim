@@ -1,3 +1,4 @@
+import { drawAnimatedText } from './textAnim'
 import type { ClickEvent, EditState, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
 import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
@@ -494,7 +495,7 @@ export class Renderer {
     // 8. text
     if (edit.tracks.text) {
       const texts = [...edit.texts].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0))
-      for (const tx of texts) if (t >= tx.start && t <= tx.end) drawText(ctx, tx, t, W, H, L.k)
+      for (const tx of texts) if (t >= tx.start && t <= tx.end) drawAnimatedText(ctx, tx, t, W, H, L.k)
     }
 
     // 9. transitions at the start, the end and around cuts
@@ -984,78 +985,4 @@ export function measureText(ctx: Ctx, tx: TextItem, W: number, H: number, k: num
   const bw = w + pad * 2
   const bh = lh * lines.length + pad * 2
   return { x: tx.x * W - bw / 2, y: tx.y * H - bh / 2, w: bw, h: bh }
-}
-
-function drawText(ctx: Ctx, tx: TextItem, t: number, W: number, H: number, k: number): void {
-  const inDur = 0.35
-  const since = t - tx.start
-  const until = tx.end - t
-  let alpha = 1
-  let dy = 0
-  let scale = 1
-  let chars = tx.text.length
-  const qin = Math.min(1, since / inDur)
-  const qout = Math.min(1, until / inDur)
-  switch (tx.anim) {
-    case 'fade':
-      alpha = Math.min(qin, qout)
-      break
-    case 'slide-up':
-      alpha = Math.min(qin, qout)
-      dy = (1 - Math.min(qin, 1)) * 40 * k + (1 - qout) * -20 * k
-      break
-    case 'pop': {
-      alpha = Math.min(qin * 1.5, qout, 1)
-      const q = qin
-      scale = q < 1 ? 0.8 + 0.2 * (1 - Math.pow(1 - q, 3)) + Math.sin(q * Math.PI) * 0.06 : 1
-      if (qout < 1) scale = 0.9 + 0.1 * qout
-      break
-    }
-    case 'typewriter':
-      chars = Math.floor(Math.min(1, since / Math.max(0.4, tx.text.length * 0.04)) * tx.text.length)
-      alpha = qout
-      break
-  }
-  if (alpha <= 0) return
-  const box = measureText(ctx, tx, W, H, k)
-  const cx = box.x + box.w / 2
-  const cy = box.y + box.h / 2 + dy
-  ctx.save()
-  ctx.globalAlpha = Math.max(0, Math.min(1, alpha))
-  ctx.translate(cx, cy)
-  ctx.scale(scale, scale)
-  ctx.translate(-box.w / 2, -box.h / 2)
-  if (tx.bg) {
-    ctx.fillStyle = hexA(tx.bg, tx.bgOpacity)
-    ctx.beginPath()
-    ctx.roundRect(0, 0, box.w, box.h, tx.radius * k)
-    ctx.fill()
-  }
-  ctx.font = textFont(tx, k)
-  ;(ctx as CanvasRenderingContext2D).letterSpacing = `${tx.letterSpacing * k}px`
-  ctx.textBaseline = 'middle'
-  ctx.fillStyle = tx.color
-  if (tx.shadow) {
-    ctx.shadowColor = 'rgba(0,0,0,.45)'
-    ctx.shadowBlur = 10 * k
-    ctx.shadowOffsetY = 2 * k
-  }
-  const pad = tx.bg ? tx.padding * k : 0
-  const lh = tx.size * k * 1.25
-  let remaining = chars
-  tx.text.split('\n').forEach((line, i) => {
-    const shown = line.slice(0, Math.max(0, remaining))
-    remaining -= line.length + 1
-    const fullW = ctx.measureText(line).width
-    const inner = box.w - pad * 2
-    const x = tx.align === 'left' ? pad : tx.align === 'right' ? pad + inner - fullW : pad + (inner - fullW) / 2
-    const y = pad + lh * i + lh / 2
-    ctx.fillText(shown, x, y)
-    if (tx.underline && shown) {
-      const sw = ctx.measureText(shown).width
-      ctx.shadowColor = 'transparent'
-      ctx.fillRect(x, y + tx.size * k * 0.45, sw, Math.max(1, tx.size * k * 0.06))
-    }
-  })
-  ctx.restore()
 }

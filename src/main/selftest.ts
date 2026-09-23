@@ -228,6 +228,28 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await shot('text-layers.png')
       })
 
+      await step('text animations: pick in, loop and out', async () => {
+        await js('window.__scrim.addText(0.5)')
+        await wait(300)
+        await click('[data-tour="tool-text"]')
+        await wait(500)
+        await shot('text-panel.png')
+        await js(`document.querySelector('.motion-grid').scrollIntoView({ block: 'center' })`)
+        await wait(300)
+        await shot('text-anim-panel.png')
+        await clickText('.motion-tile', 'Letters')
+        await wait(300)
+        await js('window.__scrim.patchText({ loop: "wave", animOut: "blur", text: "Animated title" })')
+        const tx = await js<Record<string, unknown>>('window.__scrim.lastText()')
+        log('text anim', JSON.stringify({ in: tx.animIn, loop: tx.loop, out: tx.animOut }))
+        if (tx.animIn !== 'letters') throw new Error('in animation not applied: ' + tx.animIn)
+        for (const [k, dt] of [[1, 0.12], [2, 0.3], [3, 1.4]] as const) {
+          await js(`window.__scrim.seek(${(tx.start as number) + dt})`)
+          await wait(350)
+          await shot(`text-anim-${k}.png`)
+        }
+      })
+
       await step('zoom eye toggle', async () => {
         const before = (await state()).zoomEnabled
         await js(`document.querySelectorAll('.tl-head').forEach((h) => h.textContent.includes('Zoom') && h.querySelector('.tl-eye')?.setAttribute('id', 'eye-zoom'))`)

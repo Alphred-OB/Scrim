@@ -117,11 +117,8 @@ function drawFrame(ctx: OffscreenCanvasRenderingContext2D, t: number) {
   ctx.fillRect(0, 0, 280, H)
   ctx.fillStyle = C.line
   ctx.fillRect(279, 0, 1.5, H)
-  const g = ctx.createLinearGradient(40, 40, 80, 80)
-  g.addColorStop(0, '#7c6cff')
-  g.addColorStop(1, '#4a36e0')
   rr(ctx, 40, 38, 40, 40, 12)
-  ctx.fillStyle = g
+  ctx.fillStyle = C.brand
   ctx.fill()
   text(ctx, 'Nimbus', 96, 59, 26, C.text, 700)
   // active item slides from Home to Team after the last click
@@ -202,11 +199,8 @@ function drawFrame(ctx: OffscreenCanvasRenderingContext2D, t: number) {
   DAILY.forEach((v, i) => {
     const h = lerp(v, WEEKLY[i], weekK) * 4.2 * grow
     const x = 380 + i * 72
-    const bg = ctx.createLinearGradient(0, base - h, 0, base)
-    bg.addColorStop(0, i === 11 ? '#7c6cff' : '#b9b1ff')
-    bg.addColorStop(1, i === 11 ? '#5b4cf0' : '#d9d4ff')
     rr(ctx, x, base - h, 44, h, 10)
-    ctx.fillStyle = bg
+    ctx.fillStyle = i === 11 ? C.brand : '#c9c3ff'
     ctx.fill()
     text(ctx, ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][i], x + 22, base + 26, 14, C.dim, 500, 'center')
   })

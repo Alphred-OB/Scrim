@@ -119,22 +119,10 @@ function runPowerShell(body: string): Promise<string> {
   })
 }
 
-/** Exact physical pixel bounds of every monitor (Electron's DIP to pixel math can be off by a pixel or two). */
-let monitorCache: { at: number; list: Rect[] } | null = null
-async function nativeMonitors(): Promise<Rect[]> {
+/** Exact physical pixel bounds of every monitor from Electron's native screen subsystem (instant 0ms). */
+function nativeMonitors(): Rect[] {
   if (process.platform !== 'win32') return []
-  if (monitorCache && Date.now() - monitorCache.at < 30000) return monitorCache.list
-  try {
-    const out = await runPowerShell(
-      `[System.Windows.Forms.Screen]::AllScreens | ForEach-Object { Write-Output ("M:" + $_.Bounds.X + "," + $_.Bounds.Y + "," + $_.Bounds.Width + "," + $_.Bounds.Height) }`
-    )
-    const list = [...out.matchAll(/M:(-?\d+),(-?\d+),(\d+),(\d+)/g)].map((m) => ({ x: +m[1], y: +m[2], width: +m[3], height: +m[4] }))
-    monitorCache = { at: Date.now(), list }
-    return list
-  } catch (e) {
-    console.warn('[rec] monitor query failed', e)
-    return []
-  }
+  return screen.getAllDisplays().map((d) => physRect(d.bounds))
 }
 
 function overlap(a: Rect, b: Rect): number {
@@ -182,19 +170,28 @@ Write-Output ("R:" + $r.L + "," + $r.T + "," + $r.R + "," + $r.B)
 interface DdaOutput { idx: number; width: number; height: number }
 let ddaCache: DdaOutput[] | null = null
 
+let ddaProbePromise: Promise<DdaOutput[]> | null = null
+
 /** Lists the monitors ffmpeg's ddagrab can see (index + size). Empty if DDA is unavailable. */
 export async function probeDdaOutputs(): Promise<DdaOutput[]> {
   if (process.platform !== 'win32') return []
   if (ddaCache) return ddaCache
-  const list: DdaOutput[] = []
-  for (let i = 0; i < 6; i++) {
-    const { stderr } = await runFfmpeg(['-v', 'verbose', '-f', 'lavfi', '-i', `ddagrab=output_idx=${i}:framerate=5:draw_mouse=0`, '-frames:v', '1', '-f', 'null', '-'])
-    const m = /Opened dxgi output (\d+) with dimensions (\d+)x(\d+)/.exec(stderr)
-    if (!m) break
-    list.push({ idx: +m[1], width: +m[2], height: +m[3] })
-  }
-  ddaCache = list
-  return list
+  if (ddaProbePromise) return ddaProbePromise
+  ddaProbePromise = (async () => {
+    const list: DdaOutput[] = []
+    const maxMonitors = Math.max(1, Math.min(screen.getAllDisplays().length, 3))
+    for (let i = 0; i < maxMonitors; i++) {
+      const { stderr } = await runFfmpeg(['-v', 'verbose', '-f', 'lavfi', '-i', `ddagrab=output_idx=${i}:framerate=5:draw_mouse=0`, '-frames:v', '1', '-f', 'null', '-'])
+      const m = /Opened dxgi output (\d+) with dimensions (\d+)x(\d+)/.exec(stderr)
+      if (!m) break
+      list.push({ idx: +m[1], width: +m[2], height: +m[3] })
+    }
+    ddaCache = list
+    return list
+  })().finally(() => {
+    ddaProbePromise = null
+  })
+  return ddaProbePromise
 }
 
 /** Picks the DDA output for a monitor by matching its size (ties keep monitor order). */
@@ -323,7 +320,7 @@ class Recorder {
     try {
       // 1. figure out what to capture (physical pixels)
       let displayRect: Rect
-      const monitors = await nativeMonitors()
+      const monitors = nativeMonitors()
       const desktop = monitors.length ? unionRect(monitors) : virtualDesktop()
       if (opts.kind === 'window' && process.platform === 'win32') {
         const wr = await windowRect(opts.sourceId)

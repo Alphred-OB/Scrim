@@ -53,8 +53,8 @@ export const TOURS: Record<TourName, TourStep[]> = {
       task: { todo: 'Move or resize a zoom', done: (n, b) => JSON.stringify(n.zoom.segments) !== JSON.stringify(b.zoom.segments), doIt: () => ed().update((e) => { const z = e.zoom.segments[0]; if (z) z.end = Math.min(z.end + 0.6, (e.zoom.segments[1]?.start ?? z.end + 0.6) - 0.05) }) }
     },
     {
-      target: 'tool-background', title: 'Pick a background', body: 'Open Background and choose a wallpaper, a live one, a gradient or your own picture.', place: 'right',
-      task: { todo: 'Change the background', done: (n, b) => JSON.stringify(n.background) !== JSON.stringify(b.background), doIt: () => { ed().setPanel('background'); ed().update((e) => { e.background.type = 'gradient'; e.background.gradient = { kind: 'linear', angle: 120, stops: [{ pos: 0, color: '#ff8a3d' }, { pos: 0.55, color: '#ff4d6d' }, { pos: 1, color: '#7c3aed' }] } }) } }
+      target: 'tool-background', title: 'Pick a background', body: 'Open Background and choose a wallpaper, a live one, a color or your own picture.', place: 'right',
+      task: { todo: 'Change the background', done: (n, b) => JSON.stringify(n.background) !== JSON.stringify(b.background), doIt: () => { ed().setPanel('background'); ed().update((e) => { e.background.type = 'color'; e.background.color = '#ff5a36'}) } }
     },
     {
       target: 'tool-text', title: 'Add a title', body: 'Open Text and add one, or press T. Double click it on the preview to type, and drag it anywhere.', place: 'right',

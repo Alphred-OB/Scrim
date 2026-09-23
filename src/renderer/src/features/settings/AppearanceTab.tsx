@@ -76,7 +76,7 @@ export default function AppearanceTab({ settings, save }: { settings: AppSetting
           <span className="hint">Start from any theme above, then tweak it here. Borders, hovers and muted text are worked out from these colors.</span>
           <div className="swatch-row">
             {THEMES.map((t) => (
-              <button key={t.id} className="swatch" title={`Start from ${t.name}`} style={{ background: `linear-gradient(135deg, ${t.colors.bg} 50%, ${t.colors.accent} 50%)` }} onClick={() => setCustom({ ...t.colors })} />
+              <button key={t.id} className="swatch" title={`Start from ${t.name}`} style={{ background: t.colors.bg, boxShadow: `inset -13px -13px 0 ${t.colors.accent}` }} onClick={() => setCustom({ ...t.colors })} />
             ))}
           </div>
         </div>

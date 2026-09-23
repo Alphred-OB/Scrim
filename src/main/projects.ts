@@ -240,6 +240,24 @@ export async function audioPeaks(file: string): Promise<number[]> {
   return out
 }
 
+/** Returns the sample project directory if it already exists, is complete, and contains the rich showcase configuration. */
+export async function getSampleDir(): Promise<string | null> {
+  const dir = join(await ensureRoot(), 'sample-project')
+  try {
+    const projPath = join(dir, 'project.json')
+    const videoPath = join(dir, 'screen.mp4')
+    if (existsSync(projPath) && existsSync(videoPath)) {
+      const p = await loadProject(dir)
+      if (p.edit?.texts?.length && p.edit?.transitions?.items?.length) {
+        return dir
+      }
+    }
+  } catch {
+    /* ignore and re-create */
+  }
+  return null
+}
+
 /** Folder for the practice project. Starting again replaces the old one, so there is only ever one. */
 export async function sampleBegin(): Promise<{ dir: string; video: string }> {
   const dir = join(await ensureRoot(), 'sample-project')
@@ -248,7 +266,7 @@ export async function sampleBegin(): Promise<{ dir: string; video: string }> {
   return { dir, video: join(dir, 'raw.mp4') }
 }
 
-/** Finishes the practice project: seek friendly video, cursor data, thumbnail and a nice starting look. */
+/** Finishes the practice project: seek friendly video, cursor data, thumbnail and a showcase of all features. */
 export async function sampleFinish(dir: string, cursor: CursorData, duration: number): Promise<string> {
   const raw = join(dir, 'raw.mp4')
   const target = join(dir, 'screen.mp4')
@@ -261,6 +279,135 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
   const dur = info.duration || duration
   const edit = defaultEdit(dur)
   edit.zoom.segments = autoZoomFromClicks(cursor, dur)
+
+  // Split into 2 clips to showcase cut transitions
+  const clip1Id = uid('c')
+  const clip2Id = uid('c')
+  const cutPoint = Math.min(5.2, +(dur * 0.48).toFixed(2))
+  edit.clips = [
+    { id: clip1Id, start: 0, end: cutPoint, speed: 1 },
+    { id: clip2Id, start: cutPoint, end: dur, speed: 1 }
+  ]
+
+  // Rich transitions: intro, outro, cut, per-cut override, and timeline transition items
+  edit.transitions = {
+    intro: { type: 'fade', duration: 0.6, ease: 'smooth' },
+    outro: { type: 'fade', duration: 0.6, ease: 'smooth' },
+    cut: { type: 'zoom', duration: 0.45, ease: 'smooth' },
+    perCut: {
+      [clip2Id]: { type: 'slide-left', duration: 0.5, ease: 'snappy' }
+    },
+    items: [
+      { id: uid('trans'), type: 'wipe', start: Math.min(7.2, +(dur * 0.68).toFixed(2)), end: Math.min(7.9, +(dur * 0.74).toFixed(2)), direction: 'right', ease: 'snappy' }
+    ]
+  }
+
+  // Showcase text overlays with diverse animations and styles
+  edit.texts = [
+    {
+      id: uid('t'),
+      start: 0.4,
+      end: 3.2,
+      lane: 0,
+      text: '⚡ Instant Workflow Demo',
+      x: 0.5,
+      y: 0.18,
+      font: 'Inter',
+      size: 42,
+      bold: true,
+      italic: false,
+      underline: false,
+      color: '#ffffff',
+      bg: '#0b0d12',
+      bgOpacity: 0.85,
+      padding: 16,
+      radius: 12,
+      align: 'center',
+      shadow: true,
+      anim: 'slide-up',
+      letterSpacing: 0
+    },
+    {
+      id: uid('t'),
+      start: 4.6,
+      end: 7.4,
+      lane: 0,
+      text: '🎯 Dynamic Cut & Transition',
+      x: 0.5,
+      y: 0.84,
+      font: 'Inter',
+      size: 38,
+      bold: true,
+      italic: false,
+      underline: false,
+      color: '#ffffff',
+      bg: '#0a84ff',
+      bgOpacity: 0.9,
+      padding: 14,
+      radius: 10,
+      align: 'center',
+      shadow: true,
+      anim: 'pop',
+      letterSpacing: 0
+    },
+    {
+      id: uid('t'),
+      start: 7.8,
+      end: Math.max(8.5, +(dur - 0.2).toFixed(2)),
+      lane: 0,
+      text: '✨ Studio Quality Polish',
+      x: 0.5,
+      y: 0.84,
+      font: 'Inter',
+      size: 38,
+      bold: true,
+      italic: false,
+      underline: false,
+      color: '#ffffff',
+      bg: '#30d158',
+      bgOpacity: 0.9,
+      padding: 14,
+      radius: 10,
+      align: 'center',
+      shadow: true,
+      anim: 'fade',
+      letterSpacing: 0
+    }
+  ]
+
+  // Showcase visual effects (both global look grade and timeline effect clips)
+  edit.effects = {
+    look: 'punchy',
+    brightness: 1.02,
+    contrast: 1.08,
+    saturation: 1.15,
+    vignette: 0.15,
+    grain: 0.02,
+    bloom: 0.1,
+    blur: 0,
+    pixelate: 0,
+    scanlines: 0
+  }
+  edit.effectClips = [
+    {
+      id: uid('fx'),
+      name: 'Cinematic Accent',
+      start: 2.2,
+      end: 5.0,
+      lane: 0,
+      look: 'cinematic',
+      brightness: 1.05,
+      contrast: 1.14,
+      saturation: 1.2,
+      vignette: 0.22,
+      grain: 0.04,
+      bloom: 0.16,
+      blur: 0,
+      pixelate: 0,
+      scanlines: 0
+    }
+  ]
+
   const p: Project = {
     version: 1,
     id: 'sample-project',

@@ -36,6 +36,9 @@ export function addTextAt(t: number, lane = 0): void {
   tx.end = Math.min(dur(), tx.start + 3)
   // overlapping text goes on the next free layer instead of stacking on top of another one
   tx.lane = freeLane(st().project!.edit.texts, tx.start, tx.end, lane)
+  // don't drop it right on top of a text that's on screen at the same time: stack it above
+  const busy = st().project!.edit.texts.filter((o) => o.start < tx.end && o.end > tx.start)
+  for (let k = 0; k < 6 && busy.some((o) => Math.abs(o.y - tx.y) < 0.09 && Math.abs(o.x - tx.x) < 0.3); k++) tx.y = Math.max(0.08, tx.y - 0.12)
   st().update((e) => e.texts.push(tx))
   st().select({ kind: 'text', id: tx.id })
 }

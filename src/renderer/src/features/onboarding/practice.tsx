@@ -7,8 +7,59 @@ import { queueTour } from './tours'
 
 const usePractice = create<{ progress: number | null; error: string }>(() => ({ progress: null, error: '' }))
 
+let preloadPromise: Promise<string> | null = null
+
+/** Preloads the practice project in the background so opening it is instantaneous. */
+export async function preloadSample(): Promise<void> {
+  try {
+    const ready = await api.sampleGetDir()
+    if (ready) return
+    if (!preloadPromise) {
+      preloadPromise = makeSampleProject().finally(() => {
+        preloadPromise = null
+      })
+    }
+    await preloadPromise
+  } catch (e) {
+    console.warn('[practice] preload error', e)
+  }
+}
+
 export async function startPractice(): Promise<void> {
   if (usePractice.getState().progress !== null) return
+
+  // 1. If already preloaded and ready on disk, open immediately (0ms!)
+  try {
+    const readyDir = await api.sampleGetDir()
+    if (readyDir) {
+      const s = useSettings.getState()
+      if (!s.settings.onboarded) await s.save({ onboarded: true })
+      queueTour('pro')
+      api.openEditor(readyDir)
+      return
+    }
+  } catch {
+    /* fallback to build */
+  }
+
+  // 2. If background preload is actively in-flight, await it
+  if (preloadPromise) {
+    usePractice.setState({ progress: 0.7, error: '' })
+    try {
+      const dir = await preloadPromise
+      const s = useSettings.getState()
+      if (!s.settings.onboarded) await s.save({ onboarded: true })
+      queueTour('pro')
+      api.openEditor(dir)
+      return
+    } catch {
+      /* fallback to fresh build */
+    } finally {
+      usePractice.setState({ progress: null })
+    }
+  }
+
+  // 3. Fallback: build on-demand with progress bar
   usePractice.setState({ progress: 0, error: '' })
   try {
     const dir = await makeSampleProject((p) => usePractice.setState({ progress: p }))

@@ -41,6 +41,7 @@ type Item = { id: string; start: number; end: number; lane?: number }
 const laneKey = (base: string, lane = 0) => (lane ? `${base}#${lane}` : base)
 const laneOf = (key: string) => Number(key.split('#')[1] ?? 0)
 const laneCount = (list: { lane?: number }[], spare = false) => (list.length ? Math.max(...list.map((x) => x.lane ?? 0)) + 1 + (spare ? 1 : 0) : 1)
+const BASE: Record<string, string> = { text: 'text', overlay: 'overlay', audioClip: 'audio', effect: 'effects', transition: 'transitions' }
 type Kind = 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition'
 interface Row { key: string; label: string; sub?: string; icon: string; color: string; kind?: Kind; hint?: string; toggle?: { on: boolean; set: () => void; icon: [string, string]; title: string } }
 
@@ -61,6 +62,8 @@ export default function Timeline() {
   const [width, setWidth] = useState(1000)
   const [ghost, setGhost] = useState<{ row: string; t: number } | null>(null)
   const [dropRow, setDropRow] = useState<string | null>(null)
+  // the extra empty layer only shows while something is being dragged onto that track
+  const [dragBase, setDragBase] = useState<string | null>(null)
   const [joinHint, setJoinHint] = useState<'start' | 'end' | null>(null)
   const pps = (width / Math.max(0.5, duration)) * zoom
   // empty space before the recording (drag the video right to make it); it sits at negative times
@@ -198,7 +201,10 @@ export default function Timeline() {
     const key = `drag-${kind}-${item.id}-${Date.now()}`
     let moved = false
     const mv = (ev: PointerEvent) => {
-      if (Math.abs(ev.clientX - x0) > 2 || (layered && mode === 'move' && Math.abs(ev.clientY - y0) > 6)) moved = true
+      if (Math.abs(ev.clientX - x0) > 2 || (layered && mode === 'move' && Math.abs(ev.clientY - y0) > 6)) {
+        if (!moved && layered && mode === 'move') setDragBase(BASE[kind] ?? null)
+        moved = true
+      }
       if (!moved) return
       // dragging up or down moves the item to another layer (one past the last makes a new layer)
       if (layered && mode === 'move') lane = Math.max(0, Math.min(lanes, lane0 + Math.round((ev.clientY - y0) / TRACK_H)))
@@ -232,6 +238,7 @@ export default function Timeline() {
     const up = () => {
       window.removeEventListener('pointermove', mv)
       window.removeEventListener('pointerup', up)
+      setDragBase(null)
       // never leave two items on top of each other on one layer: bump to the next free one
       if (moved && layered)
         update((ed) => {
@@ -429,30 +436,30 @@ export default function Timeline() {
     for (let l = 0; l < n; l++)
       rows.push(l === 0 ? { key: base, ...first } : { key: laneKey(base, l), label: '', sub: `Layer ${l + 1}`, icon: first.icon, color: first.color, kind: first.kind })
   }
+  const spareOn = dragBase ?? (dropRow ? dropRow.split('#')[0] : null)
   const rows: Row[] = [{ key: 'video', label: 'Video', icon: 'film', color: '#2b4fb8', kind: 'clip' }]
-  pushLanes('transitions', laneCount(edit.transitions.items, edit.transitions.items.length > 0), { label: 'Transitions', icon: 'transition', color: '#d9772b', kind: 'transition' })
+  pushLanes('transitions', laneCount(edit.transitions.items, spareOn === 'transitions'), { label: 'Transitions', icon: 'transition', color: '#d9772b', kind: 'transition' })
   const fxToggle = { on: edit.tracks.effects, set: () => update((e) => (e.tracks.effects = !e.tracks.effects)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Turn effects on this track on or off' }
-  pushLanes('effects', laneCount(edit.effectClips, true), { label: 'Effects', icon: 'fx', color: '#1aa3b8', kind: 'effect', hint: 'Drag an effect here to use it on part of the video', toggle: fxToggle })
+  pushLanes('effects', laneCount(edit.effectClips, spareOn === 'effects'), { label: 'Effects', icon: 'fx', color: '#1aa3b8', kind: 'effect', hint: 'Drag an effect here to use it on part of the video', toggle: fxToggle })
   if (media.webcam)
     rows.push({
       key: 'webcam', label: 'Webcam', icon: 'webcam', color: '#b85d2b',
       toggle: { on: edit.webcam.show, set: () => update((e) => (e.webcam.show = !e.webcam.show)), icon: ['eye', 'eyeOff'], title: 'Show or hide the webcam' }
     })
   const mediaToggle = { on: edit.tracks.media, set: () => update((e) => (e.tracks.media = !e.tracks.media)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Show or hide all media' }
-  pushLanes('overlay', laneCount(edit.overlays, true), { label: 'Media', icon: 'image', color: '#1f7a8c', kind: 'overlay', hint: 'Drop videos or images here', toggle: mediaToggle })
+  pushLanes('overlay', laneCount(edit.overlays, spareOn === 'overlay'), { label: 'Media', icon: 'image', color: '#1f7a8c', kind: 'overlay', hint: 'Drop videos or images here', toggle: mediaToggle })
   rows.push({
     key: 'zoom', label: 'Zoom', icon: 'zoom', color: '#6a47c9', kind: 'zoom', hint: 'Click to add a zoom',
     toggle: { on: edit.zoom.enabled, set: () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), icon: ['eye', 'eyeOff'], title: 'Turn all zooms on or off' }
   })
   const textToggle = { on: edit.tracks.text, set: () => update((e) => (e.tracks.text = !e.tracks.text)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Show or hide all text' }
-  // text always has one empty layer at the bottom, so two texts at the same time never have to overlap
-  pushLanes('text', laneCount(edit.texts, true), { label: 'Text', icon: 'text', color: '#11806a', kind: 'text', hint: 'Click to add text', toggle: textToggle })
+  pushLanes('text', laneCount(edit.texts, spareOn === 'text'), { label: 'Text', icon: 'text', color: '#11806a', kind: 'text', hint: 'Click to add text', toggle: textToggle })
   if (media.mic)
     rows.push({ key: 'mic', label: 'Microphone', icon: 'mic', color: '#2f9e5b', toggle: { on: !edit.audio.micMuted, set: () => update((e) => (e.audio.micMuted = !e.audio.micMuted)), icon: ['volume', 'mute'], title: 'Mute microphone' } })
   if (media.system)
     rows.push({ key: 'system', label: 'System audio', icon: 'audio', color: '#9e7a2f', toggle: { on: !edit.audio.systemMuted, set: () => update((e) => (e.audio.systemMuted = !e.audio.systemMuted)), icon: ['volume', 'mute'], title: 'Mute system audio' } })
   const audioToggle = { on: edit.tracks.audio, set: () => update((e) => (e.tracks.audio = !e.tracks.audio)), icon: ['volume', 'mute'] as [string, string], title: 'Mute or unmute all added audio' }
-  pushLanes('audio', laneCount(edit.audioClips, true), { label: 'Audio', icon: 'music', color: '#a2427a', kind: 'audioClip', hint: 'Drop music or sound here', toggle: audioToggle })
+  pushLanes('audio', laneCount(edit.audioClips, spareOn === 'audio'), { label: 'Audio', icon: 'music', color: '#a2427a', kind: 'audioClip', hint: 'Drop music or sound here', toggle: audioToggle })
   const top = (key: string) => RULER_H + Math.max(0, rows.findIndex((r) => r.key === key)) * TRACK_H
   const laneTop = (base: string, lane = 0) => top(laneKey(base, lane))
 
@@ -586,7 +593,7 @@ export default function Timeline() {
                 {lead * pps > 150 ? 'Intro space · add text or media' : ''}
               </div>
             )}
-            {edit.clips.map((c) => block('clip', c, top('video'), 'linear-gradient(180deg,#3563d6,#2849a8)', <>Clip{c.speed !== 1 ? ` · ${c.speed}x` : ''}</>))}
+            {edit.clips.map((c) => block('clip', c, top('video'), '#3563d6', <>Clip{c.speed !== 1 ? ` · ${c.speed}x` : ''}</>))}
 
             {/* start, end and cut transitions, shown as pills on the Transitions track */}
             {(() => {
@@ -643,17 +650,17 @@ export default function Timeline() {
             })()}
 
             {/* transitions placed anywhere */}
-            {edit.transitions.items.map((it) => block('transition', it, laneTop('transitions', it.lane), 'linear-gradient(180deg,#e0873a,#b8611f)', TRANSITIONS.find((x) => x.v === it.type)?.l ?? 'Transition'))}
+            {edit.transitions.items.map((it) => block('transition', it, laneTop('transitions', it.lane), '#e0873a', TRANSITIONS.find((x) => x.v === it.type)?.l ?? 'Transition'))}
 
             {/* effects on part of the video */}
-            {edit.effectClips.map((c) => block('effect', c, laneTop('effects', c.lane), 'linear-gradient(180deg,#22b3c9,#157f90)', c.name))}
+            {edit.effectClips.map((c) => block('effect', c, laneTop('effects', c.lane), '#22b3c9', c.name))}
 
             {/* webcam */}
             {media.webcam && (
               <div
                 className="tl-block"
                 onPointerDown={() => useEditor.getState().setPanel('webcam')}
-                style={{ left: X(Math.max(0, media.webcam.offset)), width: Math.max(10, (duration - Math.max(0, media.webcam.offset)) * pps), top: top('webcam') + 4, height: TRACK_H - 8, background: 'linear-gradient(180deg,#c9703a,#9c4f22)', opacity: edit.webcam.show ? 1 : 0.35, cursor: 'pointer' }}
+                style={{ left: X(Math.max(0, media.webcam.offset)), width: Math.max(10, (duration - Math.max(0, media.webcam.offset)) * pps), top: top('webcam') + 4, height: TRACK_H - 8, background: '#c9703a', opacity: edit.webcam.show ? 1 : 0.35, cursor: 'pointer' }}
               >
                 <span className="tl-label">Camera</span>
               </div>
@@ -662,18 +669,28 @@ export default function Timeline() {
             {/* overlays */}
             {edit.overlays.map((o) => {
               const a = edit.assets.find((x) => x.id === o.assetId)
-              return block('overlay', o, laneTop('overlay', o.lane), 'linear-gradient(180deg,#23879b,#17606f)', a?.name ?? 'Media',
+              return block('overlay', o, laneTop('overlay', o.lane), '#23879b', a?.name ?? 'Media',
                 a?.kind === 'image' ? <div className="tl-thumb" style={{ backgroundImage: `url(${mediaUrl(a.path)})` }} /> : undefined)
             })}
 
             {/* zooms */}
             {edit.zoom.segments.map((z) =>
-              block('zoom', z, top('zoom'), z.auto ? 'linear-gradient(180deg,#6247b8,#48338c)' : 'linear-gradient(180deg,#8a5cf0,#6a3fd1)',
+              block('zoom', z, top('zoom'), z.auto ? '#6247b8' : '#8a5cf0',
                 <>{z.auto ? 'Auto' : z.follow ? 'Follow' : 'Pinned'} · {z.scale.toFixed(1)}x</>)
             )}
 
             {/* text */}
-            {edit.texts.map((t) => block('text', t, laneTop('text', t.lane), 'linear-gradient(180deg,#17a086,#0f7462)', t.text.split('\n')[0] || 'Text'))}
+            {edit.texts.map((t) => {
+              // in and out animations show as ramps at the ends of the block
+              const len = Math.max(0.1, t.end - t.start)
+              const k = Math.min(1, len / ((t.inDur ?? 0.35) + (t.outDur ?? 0.35) + 0.001))
+              const rin = t.animIn && t.animIn !== 'none' ? (t.inDur ?? 0.35) * k * pps : 0
+              const rout = t.animOut && t.animOut !== 'none' ? (t.outDur ?? 0.35) * k * pps : 0
+              return block('text', t, laneTop('text', t.lane), '#17a086', <>{t.loop && t.loop !== 'none' ? '∿ ' : ''}{t.text.split('\n')[0] || 'Text'}</>, <>
+                {rin > 3 && <i className="tl-ramp in" style={{ width: rin }} />}
+                {rout > 3 && <i className="tl-ramp out" style={{ width: rout }} />}
+              </>)
+            })}
 
             {/* recorded audio with waveforms */}
             {media.mic && (
@@ -690,7 +707,7 @@ export default function Timeline() {
             {/* imported audio */}
             {edit.audioClips.map((c) => {
               const a = edit.assets.find((x) => x.id === c.assetId)
-              return block('audioClip', c, laneTop('audio', c.lane), 'linear-gradient(180deg,#a2427a,#7a2e5b)', a?.name ?? 'Audio',
+              return block('audioClip', c, laneTop('audio', c.lane), '#a2427a', a?.name ?? 'Audio',
                 a ? <div style={{ position: 'absolute', inset: 0, opacity: c.muted ? 0.3 : 0.9 }}><Waveform path={a.path} from={c.trimStart} to={c.trimStart + (c.end - c.start)} width={(c.end - c.start) * pps} height={TRACK_H - 8} color="rgba(255,255,255,.55)" /></div> : undefined)
             })}
 

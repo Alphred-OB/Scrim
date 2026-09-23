@@ -5,7 +5,7 @@ import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { Renderer, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
-import { clipAt, nextClip, sortedClips } from '../engine/timeMap'
+import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips } from '../engine/timeMap'
 import { Icon, openContextMenu } from '@/ui'
 
 type Box = { x: number; y: number; w: number; h: number }
@@ -454,10 +454,20 @@ export default function Preview() {
     useEditor.getState().update((ed) => {
       const z = ed.zoom.segments.find((s) => s.id === id)
       if (z) {
-        z.x = Math.min(1, Math.max(0, fx))
-        z.y = Math.min(1, Math.max(0, fy))
+        const nxVal = Math.min(1, Math.max(0, fx))
+        const nyVal = Math.min(1, Math.max(0, fy))
+        z.x = nxVal
+        z.y = nyVal
         z.follow = false
         z.auto = false
+        const tCur = logical.current
+        if (z.keyframes && z.keyframes.length > 0) {
+          const kf = z.keyframes.find((k) => Math.abs(k.t - tCur) <= 0.15)
+          if (kf) {
+            kf.x = nxVal
+            kf.y = nyVal
+          }
+        }
       }
     }, 'zoomfocus' + id)
   }
@@ -479,11 +489,18 @@ export default function Preview() {
     useEditor.getState().select(null)
   }
 
-  // pin marker position for manual zooms
+  // pin marker position for manual zooms (accurately tracks keyframed camera pan)
   let pin: { x: number; y: number } | null = null
   if (pinMode && selZoom) {
     const L = computeLayout(edit, srcW, srcH, box.w, box.h)
-    pin = { x: L.view.x + selZoom.x * L.view.w, y: L.view.y + selZoom.y * L.view.h }
+    let px = selZoom.x
+    let py = selZoom.y
+    if (selZoom.keyframes && selZoom.keyframes.length > 0) {
+      const kfState = sampleSegmentKeyframes(selZoom, logical.current)
+      px = kfState.x
+      py = kfState.y
+    }
+    pin = { x: L.view.x + px * L.view.w, y: L.view.y + py * L.view.h }
   }
 
   const isFull = useFullscreen(wrapRef)

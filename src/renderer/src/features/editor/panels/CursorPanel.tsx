@@ -49,7 +49,7 @@ export default function CursorPanel() {
         {GROUPS.map((g) => (
           <div key={g} style={{ marginTop: 14 }}>
             <div className="hint" style={{ marginBottom: 6, fontWeight: 600 }}>{g}</div>
-            <div className="h-scroll">
+            <div className="cursor-grid">
               {CURSORS.filter((x) => x.group === g).map((x) => (
                 <button key={x.id} className={`pick-tile ${c.style === x.id ? 'on' : ''}`} onClick={() => pick(x.id)} title={x.name}>
                   <img src={cursorThumb(x.id, c.style === x.id ? c.color : undefined, c.style === x.id ? c.outline : undefined)} width={48} height={48} alt="" />
