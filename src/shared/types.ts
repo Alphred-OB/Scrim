@@ -273,6 +273,23 @@ export interface EffectSettings {
 /** An effect on part of the video (Effects track). It replaces the whole-video effect while it plays. */
 export interface EffectClip extends EffectSettings { id: string; start: number; end: number; lane?: number; name: string }
 
+export type BlurType = 'blur' | 'pixelate' | 'solid'
+export interface BlurItem {
+  id: string
+  start: number
+  end: number
+  lane?: number
+  x: number // center 0..1 relative to screen content
+  y: number // center 0..1 relative to screen content
+  w: number // width 0..1 relative to screen content
+  h: number // height 0..1 relative to screen content
+  type: BlurType
+  radius: number // corner radius in px at 1080p
+  amount: number // intensity (blur radius or pixel block size)
+  darken: number // 0..1 darkness overlay for privacy guarantee
+  color?: string // tint or solid color
+}
+
 export interface AudioClip {
   id: string
   assetId: string
@@ -336,13 +353,14 @@ export interface EditState {
   transitions: TransitionSettings
   effects: EffectSettings
   effectClips: EffectClip[]
+  blurs: BlurItem[]
   /**
    * Empty space before the recording starts (seconds), made by dragging the video later on the
    * timeline. That space uses negative source time, so intro text and media sit at t < 0.
    */
   leadIn: number
   /** eye / speaker buttons on the timeline tracks */
-  tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean }
+  tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean; blurs?: boolean }
 }
 
 export interface Project {

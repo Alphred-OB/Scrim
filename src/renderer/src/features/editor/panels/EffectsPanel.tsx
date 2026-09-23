@@ -61,9 +61,28 @@ function paintShot(ctx: CanvasRenderingContext2D, W: number, H: number, b: boole
   } else ctx.fillRect(W * 0.3, H * 0.3, W * 0.4, H * 0.42)
 }
 
+const fxTickListeners = new Set<(now: number) => void>()
+let fxTickRaf = 0
+function subscribeFxTick(fn: (now: number) => void) {
+  fxTickListeners.add(fn)
+  if (fxTickListeners.size === 1) {
+    const loop = (now: number) => {
+      fxTickListeners.forEach((cb) => cb(now))
+      fxTickRaf = requestAnimationFrame(loop)
+    }
+    fxTickRaf = requestAnimationFrame(loop)
+  }
+  return () => {
+    fxTickListeners.delete(fn)
+    if (fxTickListeners.size === 0 && fxTickRaf) {
+      cancelAnimationFrame(fxTickRaf)
+      fxTickRaf = 0
+    }
+  }
+}
+
 function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name: string; on: boolean; onPick: (e: React.MouseEvent) => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const [hover, setHover] = useState(false)
   useEffect(() => {
     const c = ref.current!
     const ctx = c.getContext('2d')!
@@ -75,23 +94,16 @@ function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name
       const amount = outSide ? p * 2 : (1 - p) * 2
       if (type !== 'none') paintTransition(ctx, c.width, c.height, type, amount, outSide ? 'out' : 'in', 0.35, time, bufs)
     }
-    if (!hover) {
-      frame(0.38, 0)
-      return
-    }
-    let raf = 0
     const t0 = performance.now()
-    const loop = (now: number) => {
+    const onTick = (now: number) => {
       const s = (now - t0) / 1000
       const p = (s % 2.2) / 2.2
       // hold each shot for a moment around the transition
       const q = p < 0.2 ? 0 : p > 0.8 ? 1 : (p - 0.2) / 0.6
       frame(q, s)
-      raf = requestAnimationFrame(loop)
     }
-    raf = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(raf)
-  }, [type, hover])
+    return subscribeFxTick(onTick)
+  }, [type])
   return (
     <button
       className={`fx-tile ${on ? 'on' : ''}`}
@@ -102,8 +114,6 @@ function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name
         dragAsset.setFx({ kind: 'transition', type, name })
       }}
       onDragEnd={() => dragAsset.setFx(null)}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
       onClick={onPick}
       title="Click for options, or drag onto the timeline"
     >

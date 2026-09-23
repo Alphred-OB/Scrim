@@ -16,6 +16,9 @@ import { runSelfTest, selfTestDir } from './selftest'
 import { closeSplash, showSplash } from './splash'
 import { joinVideo, type JoinWhere } from './join'
 import './rpc'
+import { startLog } from './log'
+
+startLog()
 
 registerSchemes()
 // keep things smooth on low end GPUs/CPUs

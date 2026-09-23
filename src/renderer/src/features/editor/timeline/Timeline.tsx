@@ -10,7 +10,7 @@ import { freeLane } from '@shared/defaults'
 import { useEditor, Selection } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
-import { addAssetAt, addEffectAt, addTransitionAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from '../state/actions'
+import { addAssetAt, addBlurAt, addEffectAt, addTransitionAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from '../state/actions'
 import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
 import Waveform from './Waveform'
 import Filmstrip from './Filmstrip'
@@ -44,11 +44,11 @@ export const useTimelineView = create<{ zoom: number; height: number; snap: bool
 }))
 
 type Item = { id: string; start: number; end: number; lane?: number }
-type Kind = 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition'
+type Kind = 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition' | 'blur'
 interface Row { key: string; base: string; label: string; icon: string; color: string; kind?: Kind; h: number; lane?: number; toggle?: { on: boolean; set: () => void; icon: [string, string]; title: string } }
 
-const COLORS = { video: '#3563d6', text: '#14a37f', overlay: '#1d8aa0', effect: '#0f9fb3', transition: '#e07a2e', zoom: '#6d4fd1', zoomManual: '#8a5cf0', audio: '#b24a86', webcam: '#c9703a', mic: '#2f9e5b', system: '#9e7a2f' }
-const BASE: Record<string, string> = { text: 'text', overlay: 'overlay', audioClip: 'audio', effect: 'effects', transition: 'transitions', zoom: 'zoom' }
+const COLORS = { video: '#3563d6', text: '#14a37f', blur: '#e05638', overlay: '#1d8aa0', effect: '#0f9fb3', transition: '#e07a2e', zoom: '#6d4fd1', zoomManual: '#8a5cf0', audio: '#b24a86', webcam: '#c9703a', mic: '#2f9e5b', system: '#9e7a2f' }
+const BASE: Record<string, string> = { text: 'text', blur: 'blur', overlay: 'overlay', audioClip: 'audio', effect: 'effects', transition: 'transitions', zoom: 'zoom' }
 const laneKey = (base: string, lane = 0) => (lane ? `${base}#${lane}` : base)
 const lanesOf = (list: { lane?: number }[], spare: boolean) => (list.length ? Math.max(...list.map((x) => x.lane ?? 0)) + 1 + (spare ? 1 : 0) : spare ? 1 : 0)
 
@@ -155,7 +155,7 @@ export default function Timeline() {
   const snapPoints = (exclude: string): number[] => {
     const pts = [0, lead, outDur, o(timeBus.get())]
     for (const c of clips) pts.push(o(c.start), o(c.end))
-    for (const list of [edit.zoom.segments, edit.texts, edit.overlays, edit.audioClips, edit.effectClips, edit.transitions.items] as Item[][])
+    for (const list of [edit.zoom.segments, edit.texts, edit.blurs ?? [], edit.overlays, edit.audioClips, edit.effectClips, edit.transitions.items] as Item[][])
       for (const it of list) if (it.id !== exclude) pts.push(o(it.start), o(it.end))
     return pts
   }
@@ -185,7 +185,7 @@ export default function Timeline() {
   }
 
   const listFor = (kind: Kind, ed = edit): Item[] =>
-    kind === 'clip' ? ed.clips : kind === 'zoom' ? ed.zoom.segments : kind === 'text' ? ed.texts : kind === 'overlay' ? ed.overlays : kind === 'effect' ? ed.effectClips : kind === 'transition' ? ed.transitions.items : ed.audioClips
+    kind === 'clip' ? ed.clips : kind === 'zoom' ? ed.zoom.segments : kind === 'text' ? ed.texts : kind === 'blur' ? (ed.blurs ?? []) : kind === 'overlay' ? ed.overlays : kind === 'effect' ? ed.effectClips : kind === 'transition' ? ed.transitions.items : ed.audioClips
 
   const assetLen = (it: Item, kind: Kind): number => {
     if (kind !== 'overlay' && kind !== 'audioClip') return Infinity
@@ -373,6 +373,18 @@ export default function Timeline() {
       const set = find((e) => e.audioClips)
       return [{ label: 'Mute', checked: a.muted, onClick: () => set((x) => (x.muted = !x.muted)) }, { sep: true }, ...base, ...del]
     }
+    if (kind === 'blur') {
+      const b = it as unknown as { type: string }
+      const set = find((e) => e.blurs)
+      return [
+        { label: 'Frosted blur', checked: b.type === 'blur', onClick: () => set((x) => (x.type = 'blur')) },
+        { label: 'Pixelate mosaic', checked: b.type === 'pixelate', onClick: () => set((x) => (x.type = 'pixelate')) },
+        { label: 'Solid redaction bar', checked: b.type === 'solid', onClick: () => set((x) => (x.type = 'solid')) },
+        { sep: true },
+        ...base,
+        ...del
+      ]
+    }
     return [...base, ...del]
   }
 
@@ -390,6 +402,7 @@ export default function Timeline() {
   if (edit.zoom.segments.length || spareOn === 'zoom')
     rows.push({ key: 'zoom', base: 'zoom', label: 'Zoom', icon: 'zoom', color: COLORS.zoom, kind: 'zoom', h: TRACK_H, toggle: eye(edit.zoom.enabled, () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), 'Turn all zooms on or off') })
   pushLanes('text', lanesOf(edit.texts, spareOn === 'text'), { label: 'Text', icon: 'text', color: COLORS.text, kind: 'text', toggle: eye(edit.tracks.text, () => update((e) => (e.tracks.text = !e.tracks.text)), 'Show or hide all text') })
+  pushLanes('blur', lanesOf(edit.blurs ?? [], spareOn === 'blur'), { label: 'Blur', icon: 'eyeOff', color: COLORS.blur, kind: 'blur', toggle: eye(edit.tracks.blurs !== false, () => update((e) => (e.tracks.blurs = !(e.tracks.blurs !== false))), 'Show or hide blur regions') })
   pushLanes('overlay', lanesOf(edit.overlays, spareOn === 'overlay'), { label: 'Media', icon: 'image', color: COLORS.overlay, kind: 'overlay', toggle: eye(edit.tracks.media, () => update((e) => (e.tracks.media = !e.tracks.media)), 'Show or hide all media') })
   pushLanes('effects', lanesOf(edit.effectClips, spareOn === 'effects'), { label: 'Effects', icon: 'fx', color: COLORS.effect, kind: 'effect', toggle: eye(edit.tracks.effects, () => update((e) => (e.tracks.effects = !e.tracks.effects)), 'Turn effects on or off') })
   pushLanes('transitions', lanesOf(edit.transitions.items, spareOn === 'transitions'), { label: 'Transitions', icon: 'transition', color: COLORS.transition, kind: 'transition' })
@@ -480,6 +493,7 @@ export default function Timeline() {
     const t = timeAt(e.clientX)
     if (row.key === 'zoom') addZoomAt(t)
     else if (row.kind === 'text') addTextAt(t, row.lane ?? 0)
+    else if (row.kind === 'blur') addBlurAt(t, row.lane ?? 0)
   }
 
   // ---- blocks ----
@@ -635,12 +649,13 @@ export default function Timeline() {
                 style={{ top: top(r.key), height: r.h, width: total + tail }}
                 onPointerDown={onRowPointerDown}
                 onDoubleClick={(e) => onRowDouble(e, r)}
-                onPointerMove={(e) => ((r.key === 'zoom' || r.kind === 'text') && e.target === e.currentTarget ? setGhost({ row: r.key, T: outAt(e.clientX) }) : ghost && setGhost(null))}
+                onPointerMove={(e) => ((r.key === 'zoom' || r.kind === 'text' || r.kind === 'blur') && e.target === e.currentTarget ? setGhost({ row: r.key, T: outAt(e.clientX) }) : ghost && setGhost(null))}
                 onPointerLeave={() => setGhost(null)}
                 onContextMenu={(e) =>
                   openContextMenu(e, [
                     ...(r.key === 'zoom' ? [{ label: 'Add zoom here', onClick: () => addZoomAt(timeAt(e.clientX)) }] : []),
                     ...(r.kind === 'text' ? [{ label: 'Add text here', onClick: () => addTextAt(timeAt(e.clientX), r.lane ?? 0) }] : []),
+                    ...(r.kind === 'blur' ? [{ label: 'Add blur here', onClick: () => addBlurAt(timeAt(e.clientX), r.lane ?? 0) }] : []),
                     ...(r.key === 'video' ? [{ label: 'Add a video before this one…', onClick: () => joinVideoAt('start') }, { label: 'Add a video after this one…', onClick: () => joinVideoAt('end') }, { sep: true }] : []),
                     { label: 'Split video at playhead', hint: 'S', onClick: () => splitAtPlayhead() }
                   ])
@@ -651,7 +666,7 @@ export default function Timeline() {
             {/* double click to add */}
             {ghost && (
               <div className="tl-ghost" style={{ left: X(ghost.T), top: top(ghost.row) + 3, width: Math.max(90, (ghost.row === 'zoom' ? 2.5 : 3) * pps), height: TRACK_H - 6 }}>
-                Double click to add {ghost.row === 'zoom' ? 'a zoom' : 'text'}
+                Double click to add {ghost.row === 'zoom' ? 'a zoom' : ghost.row.startsWith('blur') ? 'a blur' : 'text'}
               </div>
             )}
 
@@ -710,6 +725,20 @@ export default function Timeline() {
                 {rout > 3 && <i className="tl-ramp out" style={{ width: rout }} />}
               </>, !edit.tracks.text)
             })}
+
+            {/* blur & redaction */}
+            {(edit.blurs ?? []).map((b) =>
+              block(
+                'blur',
+                b,
+                laneKey('blur', b.lane),
+                COLORS.blur,
+                'eyeOff',
+                b.type === 'pixelate' ? 'Pixelate' : b.type === 'solid' ? 'Redact' : 'Blur',
+                undefined,
+                edit.tracks.blurs === false
+              )
+            )}
 
             {/* recorded sound: one waveform piece per clip, so cuts show up here too */}
             {(['mic', 'system'] as const).map((k) => {

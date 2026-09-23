@@ -1,5 +1,5 @@
 import { drawAnimatedText } from './textAnim'
-import type { ClickEvent, EditState, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
+import type { BlurItem, ClickEvent, EditState, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
 import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
 import { drawLive, drawWallpaper } from './backgrounds'
@@ -138,6 +138,18 @@ export function overlayRect(o: OverlayClip, iw: number, ih: number, W: number, H
 export function webcamRect(edit: EditState, W: number, H: number): { x: number; y: number; w: number; h: number } {
   const s = edit.webcam.size * Math.min(W, H)
   return { x: edit.webcam.x * W - s / 2, y: edit.webcam.y * H - s / 2, w: s, h: s }
+}
+
+/** Where a blur / redact region sits on the output canvas, taking window layout and viewport zoom into account. */
+export function blurRect(b: BlurItem, L: Layout, vp: { x: number; y: number; w: number; h: number }): { x: number; y: number; w: number; h: number } {
+  const cx = b.x - b.w / 2
+  const cy = b.y - b.h / 2
+  return {
+    x: L.view.x + ((cx - vp.x) / vp.w) * L.view.w,
+    y: L.view.y + ((cy - vp.y) / vp.h) * L.view.h,
+    w: (b.w / vp.w) * L.view.w,
+    h: (b.h / vp.h) * L.view.h
+  }
 }
 
 function drawWebcam(ctx: Ctx, edit: EditState, cam: { src: CanvasImageSource; w: number; h: number }, W: number, H: number, k: number): void {
@@ -285,6 +297,57 @@ export class Renderer {
 
   private tiny: AnyCanvas | null = null
   private region: AnyCanvas | null = null
+  private blurScratch: AnyCanvas | null = null
+  private blurTiny: AnyCanvas | null = null
+
+  /** Regional blur, pixelation, or solid redaction over a sensitive area. */
+  private drawBlurRegion(ctx: Ctx, r: { x: number; y: number; w: number; h: number }, b: BlurItem, k: number): void {
+    if (r.w <= 1 || r.h <= 1) return
+    const w = Math.max(1, Math.round(r.w))
+    const h = Math.max(1, Math.round(r.h))
+    const rad = Math.min((b.radius ?? 8) * k, Math.min(w, h) / 2)
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(r.x, r.y, r.w, r.h, rad)
+    ctx.clip()
+
+    if (b.type === 'solid') {
+      ctx.fillStyle = b.color || '#000000'
+      ctx.fillRect(r.x, r.y, r.w, r.h)
+    } else {
+      if (!this.blurScratch || this.blurScratch.width !== w || this.blurScratch.height !== h) {
+        this.blurScratch = makeCanvas(w, h)
+      }
+      const sc = this.blurScratch.getContext('2d') as Ctx
+      sc.clearRect(0, 0, w, h)
+      sc.drawImage(ctx.canvas as CanvasImageSource, -r.x, -r.y)
+
+      if (b.type === 'pixelate') {
+        const block = Math.max(3, (3 + (b.amount ?? 0.6) * 36) * k)
+        const tw = Math.max(1, Math.round(w / block))
+        const th = Math.max(1, Math.round(h / block))
+        if (!this.blurTiny || this.blurTiny.width !== tw || this.blurTiny.height !== th) {
+          this.blurTiny = makeCanvas(tw, th)
+        }
+        const tc = this.blurTiny.getContext('2d') as Ctx
+        tc.drawImage(this.blurScratch, 0, 0, tw, th)
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(this.blurTiny, r.x, r.y, r.w, r.h)
+        ctx.imageSmoothingEnabled = true
+      } else {
+        const px = Math.max(2, (8 + (b.amount ?? 0.6) * 36) * k)
+        ctx.filter = `blur(${px.toFixed(1)}px)`
+        ctx.drawImage(this.blurScratch, r.x, r.y, r.w, r.h)
+        ctx.filter = 'none'
+      }
+
+      if (b.darken > 0) {
+        ctx.fillStyle = `rgba(0,0,0,${Math.min(1, b.darken)})`
+        ctx.fillRect(r.x, r.y, r.w, r.h)
+      }
+    }
+    ctx.restore()
+  }
 
   /** Blur, pixelate and bloom work on a copy of the recording's area. */
   private postEffects(ctx: Ctx, fx: EffectSettings, r: { x: number; y: number; w: number; h: number }, k: number): void {
@@ -425,6 +488,17 @@ export class Renderer {
       ctx.filter = 'none'
       this.postEffects(ctx, fx, L.view, L.k)
       drawVignetteGrain(ctx, fx, L.view, t)
+
+      // 3.5. regional blur / redact
+      if (edit.tracks.blurs !== false && edit.blurs?.length) {
+        const blurs = [...edit.blurs].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0))
+        for (const b of blurs) {
+          if (t >= b.start && t <= b.end) {
+            const br = blurRect(b, L, vp)
+            this.drawBlurRegion(ctx, br, b, L.k)
+          }
+        }
+      }
 
       // 4. cursor + click effects (inside the window clip)
       if (!inFrame && edit.cursor.show && inp.cursor && !cursorHiddenAt(inp.cursor, inp.t)) {
@@ -765,10 +839,12 @@ export function paintTransition(
     case 'slide-right':
     case 'slide-up':
     case 'slide-down': {
-      // the old shot leaves one way and the new one arrives from the other side
+      // dynamic push with motion blur so the cut is punchy and never drops to an empty black frame
       const horiz = type === 'slide-left' || type === 'slide-right'
       const sign = type === 'slide-left' || type === 'slide-up' ? -1 : 1
-      const d = (out ? sign : -sign) * e * (horiz ? W : H)
+      const d = (out ? sign : -sign) * (e * 0.45) * (horiz ? W : H)
+      ctx.filter = `blur(${Math.round(e * 10 * k)}px)`
+      ctx.globalAlpha = Math.max(0.25, 1 - e * 0.5)
       ctx.drawImage(img, horiz ? d : 0, horiz ? 0 : d)
       break
     }

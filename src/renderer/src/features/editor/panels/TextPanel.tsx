@@ -207,11 +207,29 @@ function StyleChip({ p, sample }: { p: Partial<TextItem>; sample: string }) {
   )
 }
 
-/** Animated tile for one in, out or loop animation. It plays while hovered or selected. */
+const tickListeners = new Set<(now: number) => void>()
+let tickRaf = 0
+function subscribeTick(fn: (now: number) => void) {
+  tickListeners.add(fn)
+  if (tickListeners.size === 1) {
+    const loop = (now: number) => {
+      tickListeners.forEach((cb) => cb(now))
+      tickRaf = requestAnimationFrame(loop)
+    }
+    tickRaf = requestAnimationFrame(loop)
+  }
+  return () => {
+    tickListeners.delete(fn)
+    if (tickListeners.size === 0 && tickRaf) {
+      cancelAnimationFrame(tickRaf)
+      tickRaf = 0
+    }
+  }
+}
+
+/** Animated tile for one in, out or loop animation. Always plays live so users can see each motion clearly. */
 function MotionTile({ id, name, phase, on, onPick }: { id: string; name: string; phase: Phase; on: boolean; onPick: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const [hover, setHover] = useState(false)
-  const playing = hover || on
   useEffect(() => {
     const c = ref.current
     if (!c) return
@@ -230,26 +248,23 @@ function MotionTile({ id, name, phase, on, onPick }: { id: string; name: string;
       phase === 'in' ? { ...base, animIn: id as TextMotion, start: 0, end: 1000 }
         : phase === 'out' ? { ...base, animOut: id as TextMotion, start: -1000, end: 0.6 }
           : { ...base, loop: id as TextLoop, start: -10, end: 1000 }
-    let raf = 0
     const t0 = performance.now()
-    const frame = (now: number) => {
+    const onTick = (now: number) => {
       const s = (now - t0) / 1000
-      // in: plays in and holds; out: holds, then plays out; loop: runs on
-      const cycle = 1.8
+      // in: plays in and holds; out: holds, then plays out; loop: runs continuously
+      const cycle = 2.0
       const lt = phase === 'loop' ? s : s % cycle
-      const t = !playing ? (phase === 'out' ? -0.5 : phase === 'in' ? 5 : 0) : phase === 'in' ? lt - 0.25 : phase === 'out' ? lt - 0.9 : lt
+      const t = phase === 'in' ? lt - 0.25 : phase === 'out' ? lt - 1.1 : lt
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, W, H)
       if (id !== 'none' || phase === 'loop') {
         if (t >= tx.start && t <= tx.end) drawAnimatedText(ctx, tx, t, W, H, 1)
       } else drawAnimatedText(ctx, tx, 0, W, H, 1)
-      if (playing) raf = requestAnimationFrame(frame)
     }
-    raf = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(raf)
-  }, [id, phase, playing])
+    return subscribeTick(onTick)
+  }, [id, phase])
   return (
-    <button className={`motion-tile ${on ? 'on' : ''}`} onClick={onPick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} title={name}>
+    <button className={`motion-tile ${on ? 'on' : ''}`} onClick={onPick} title={name}>
       <canvas ref={ref} style={{ width: 96, height: 54 }} />
       <span>{name}</span>
     </button>

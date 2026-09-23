@@ -70,8 +70,9 @@ export function defaultEdit(duration: number): EditState {
     },
     effects: defaultEffect(),
     effectClips: [],
+    blurs: [],
     leadIn: 0,
-    tracks: { media: true, text: true, audio: true, effects: true }
+    tracks: { media: true, text: true, audio: true, effects: true, blurs: true }
   }
 }
 
@@ -116,6 +117,24 @@ export function newZoom(t: number, x = 0.5, y = 0.5): ZoomSegment {
   return { id: uid('z'), start: t, end: t + 2.5, scale: 1.6, x, y, follow: true }
 }
 
+export function newBlur(t: number, x = 0.5, y = 0.5) {
+  return {
+    id: uid('b'),
+    start: t,
+    end: t + 3,
+    lane: undefined as number | undefined,
+    x,
+    y,
+    w: 0.28,
+    h: 0.1,
+    type: 'blur' as const,
+    radius: 8,
+    amount: 0.6,
+    darken: 0.15,
+    color: '#000000'
+  }
+}
+
 /** Fill in fields added in later versions so old project files keep working. */
 export function migrateProject(p: Project): Project {
   const d = defaultEdit(p.media.screen.duration)
@@ -143,12 +162,13 @@ export function migrateProject(p: Project): Project {
     transitions: { ...d.transitions, ...e.transitions, perCut: { ...(e.transitions?.perCut ?? {}) }, items: e.transitions?.items ?? [] },
     effects: { ...d.effects, ...e.effects },
     effectClips: (e.effectClips ?? []).map((c) => ({ ...defaultEffect(), ...c })),
+    blurs: (e.blurs ?? []).map((b) => ({ ...b, type: b.type ?? 'blur', radius: b.radius ?? 8, amount: b.amount ?? 0.6, darken: b.darken ?? 0.15 })),
     tracks: { ...d.tracks, ...e.tracks },
     clips: e.clips?.length ? e.clips : d.clips,
     texts: (e.texts ?? []).map(migrateText)
   }
   // projects from before layers: spread overlapping items over layers so nothing is stacked
-  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips, p.edit.effectClips, p.edit.transitions.items] as { start: number; end: number; lane?: number }[][]) {
+  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips, p.edit.effectClips, p.edit.transitions.items, p.edit.blurs] as { start: number; end: number; lane?: number }[][]) {
     if (list.every((x) => x.lane !== undefined)) continue
     const ends: number[] = []
     for (const it of [...list].sort((a, b) => a.start - b.start)) {
@@ -161,13 +181,14 @@ export function migrateProject(p: Project): Project {
   return p
 }
 
-/** Texts from before in/out animations: turn the single animation into an in and an out. */
+/** Texts migration: cleans emojis and ensures in/out animations. */
 function migrateText(t: TextItem): TextItem {
-  if (t.animIn) return t
+  const text = t.text ? t.text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1FA00}-\u{1FAFF}\u{FE0F}]/gu, '').trim() : t.text
+  if (t.animIn) return { ...t, text }
   const a = t.anim ?? 'fade'
   const animIn: TextMotion = a
   const animOut: TextMotion = a === 'typewriter' || a === 'pop' ? 'fade' : a
-  return { ...t, animIn, animOut, inDur: a === 'typewriter' ? Math.max(0.4, t.text.length * 0.04) : 0.35, outDur: 0.35, loop: 'none' }
+  return { ...t, text, animIn, animOut, inDur: a === 'typewriter' ? Math.max(0.4, text.length * 0.04) : 0.35, outDur: 0.35, loop: 'none' }
 }
 
 /** First layer where [start, end] doesn't overlap anything, starting from `from`. */

@@ -11,8 +11,8 @@
 The real cursor is hidden in the video. Scrim logs where it goes and every click, then draws a smooth cursor in the editor. That's what makes the zooms, ripples and restyling possible.
 
 ## Editor layout
-- **Left rail:** Background, Cursor, Zoom, Text, Media, Webcam, Audio, Clips, AI (coming soon)
-- **Center:** live preview. You can drag text, media and the webcam around on it. The corner button (or **F**) shows it full screen.
+- **Left rail:** Background, Cursor, Zoom, Text, Blur, Media, Effects, Webcam, Audio, Clips, AI (coming soon)
+- **Center:** live preview. You can drag text, media, webcam and blur regions around on it. The corner button (or **F**) shows it full screen.
 - **Bottom:** the timeline. Drag its top edge to make it taller.
 
 ## Timeline
@@ -24,6 +24,7 @@ The real cursor is hidden in the video. Scrim logs where it goes and every click
 | Zoom | Click an empty spot to add a zoom. Drag, trim, right click for follow or pin, and zoom amount. |
 | Clicks | Every click you made. Click a dot to turn that effect on or off. |
 | Text | Click an empty spot to add text. |
+| Blur | Redactions for passwords, API keys and sensitive info. Drag, resize on canvas, trim edges. |
 | Microphone / System audio | Waveforms. The speaker icon mutes. |
 | Audio | Imported music and sounds, with fades |
 
@@ -42,6 +43,9 @@ Wallpapers (24), Live (animated: aurora, orbit, concentric, contour, waves, boke
 
 ## Text
 Add from the Text panel, the Text track or **T**. Drag on the preview to move it (it snaps to the center). Drag the white corner to resize, and double click to type directly on the video. Styles include font, size, bold, italic, underline, alignment, color, box, letter spacing, shadow and animation (fade, slide, pop, typewriter).
+
+## Blur & Redact
+Add from the Blur panel, the Blur track, or double-click an empty spot on the Blur track. Drag directly on the preview to position over sensitive content (passwords, emails, API keys, tokens), and drag the corner handle to resize. Options include **Blur** (frosted glass), **Pixelate** (mosaic censorship), and **Solid bar** (redaction bar), with controls for intensity, corner radius, and privacy darken shield. Redaction coordinates lock directly to your screen content, meaning the masked area pans and zooms automatically with camera zoom.
 
 ## Media
 Import with the button, **Ctrl+I**, or by dragging files onto the editor. Supports mp4, mov, webm, mkv, avi, mp3, wav, m4a, ogg, png, jpg, webp and gif. Anything the editor can't play directly is converted automatically. The library is split into Videos, Audio and Images. Drag any item anywhere onto the timeline: audio lands on the Audio track, videos and images on the Media track. Or double click to add at the playhead.

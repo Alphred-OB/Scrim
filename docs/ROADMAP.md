@@ -29,6 +29,7 @@ Where we are, and where we're heading. Status as of v0.3.0 (September 2026).
 - Cursor library (19 styles) with full styling, live 2D and 3D backgrounds
 - Full screen preview, drag media anywhere on the timeline, media split by type
 - Honest export: real frame rate and resolution choices only
+- **Regional blur & redaction:** hide passwords and emails with frosted blur, mosaic pixelate, or solid black bars that automatically track and scale with auto-zoom
 
 ## Next up
 
@@ -44,7 +45,6 @@ Where we are, and where we're heading. Status as of v0.3.0 (September 2026).
 - Crash reporting and a "send feedback" button
 
 ### Ideas backlog
-- Blur or pixelate regions (hide passwords and emails)
 - Keystroke overlay (show the shortcuts you press)
 - Speed ramps with smooth transitions
 - Multiple scenes with transitions between them

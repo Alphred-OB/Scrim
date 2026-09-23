@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import type { CursorData, EditState, Project } from '@shared/types'
 import { api } from '@/lib/api'
 
-export type Panel = 'background' | 'cursor' | 'zoom' | 'text' | 'media' | 'effects' | 'webcam' | 'audio' | 'settings' | 'ai'
-export type Selection = { kind: 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition'; id: string } | null
+export type Panel = 'background' | 'cursor' | 'zoom' | 'text' | 'media' | 'effects' | 'blur' | 'webcam' | 'audio' | 'settings' | 'ai'
+export type Selection = { kind: 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition' | 'blur'; id: string } | null
 
 interface EditorStore {
   project: Project | null
@@ -99,6 +99,7 @@ export const useEditor = create<EditorStore>((set, get) => ({
     set({ selection: s })
     if (s?.kind === 'zoom') set({ panel: 'zoom' })
     if (s?.kind === 'text') set({ panel: 'text' })
+    if (s?.kind === 'blur') set({ panel: 'blur' })
     if (s?.kind === 'overlay' || s?.kind === 'audioClip') set({ panel: 'media' })
     if (s?.kind === 'clip') set({ panel: 'settings' })
   },

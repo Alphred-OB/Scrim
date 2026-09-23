@@ -1,6 +1,6 @@
 // Editing actions shared by the timeline, panels, context menus and keyboard shortcuts.
-import type { Asset, AudioClip, EffectClip, EffectLook, OverlayClip, TransitionType } from '@shared/types'
-import { defaultEffect, freeLane, newText, newZoom, uid } from '@shared/defaults'
+import type { Asset, AudioClip, BlurItem, EffectClip, EffectLook, OverlayClip, TransitionType } from '@shared/types'
+import { defaultEffect, freeLane, newBlur, newText, newZoom, uid } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { api } from '@/lib/api'
 import { flushSave, useEditor } from './store'
@@ -95,20 +95,21 @@ export function splitAtPlayhead(): void {
   if (!p) return
   const t = timeBus.get()
   const sel = s.selection
-  // split the selected overlay / audio / text if the playhead is inside it, otherwise the video
+  // split the selected overlay / audio / text / blur if the playhead is inside it, otherwise the video
   if (sel && sel.kind !== 'clip' && sel.kind !== 'zoom') {
-    const list = sel.kind === 'overlay' ? p.edit.overlays : sel.kind === 'audioClip' ? p.edit.audioClips : p.edit.texts
+    const list = sel.kind === 'overlay' ? p.edit.overlays : sel.kind === 'audioClip' ? p.edit.audioClips : sel.kind === 'blur' ? p.edit.blurs : p.edit.texts
     const it = list.find((x) => x.id === sel.id)
     if (it && t > it.start + 0.1 && t < it.end - 0.1) {
       const nid = uid('s')
       s.update((e) => {
-        const arr = (sel.kind === 'overlay' ? e.overlays : sel.kind === 'audioClip' ? e.audioClips : e.texts) as { id: string; start: number; end: number; trimStart?: number }[]
+        const arr = (sel.kind === 'overlay' ? e.overlays : sel.kind === 'audioClip' ? e.audioClips : sel.kind === 'blur' ? e.blurs : e.texts) as { id: string; start: number; end: number; trimStart?: number }[]
         const src = arr.find((x) => x.id === sel.id)!
         const copy = { ...structuredClone(src), id: nid, start: t }
         if (copy.trimStart !== undefined) copy.trimStart = (src.trimStart ?? 0) + (t - src.start)
         src.end = t
         arr.push(copy)
       })
+      s.select({ kind: sel.kind, id: nid })
       return
     }
   }
@@ -137,6 +138,7 @@ export function deleteSelection(): void {
     else if (sel.kind === 'audioClip') e.audioClips = e.audioClips.filter((c) => c.id !== sel.id)
     else if (sel.kind === 'effect') e.effectClips = e.effectClips.filter((c) => c.id !== sel.id)
     else if (sel.kind === 'transition') e.transitions.items = e.transitions.items.filter((c) => c.id !== sel.id)
+    else if (sel.kind === 'blur') e.blurs = e.blurs.filter((c) => c.id !== sel.id)
   })
   s.select(null)
 }
@@ -146,7 +148,7 @@ export function duplicateSelection(): void {
   const sel = s.selection
   if (!sel || sel.kind === 'clip' || !s.project) return
   s.update((e) => {
-    const arr = (sel.kind === 'zoom' ? e.zoom.segments : sel.kind === 'text' ? e.texts : sel.kind === 'overlay' ? e.overlays : sel.kind === 'effect' ? e.effectClips : sel.kind === 'transition' ? e.transitions.items : e.audioClips) as { id: string; start: number; end: number }[]
+    const arr = (sel.kind === 'zoom' ? e.zoom.segments : sel.kind === 'text' ? e.texts : sel.kind === 'overlay' ? e.overlays : sel.kind === 'effect' ? e.effectClips : sel.kind === 'transition' ? e.transitions.items : sel.kind === 'blur' ? e.blurs : e.audioClips) as { id: string; start: number; end: number }[]
     const it = arr.find((x) => x.id === sel.id)
     if (!it) return
     const len = it.end - it.start
@@ -154,6 +156,18 @@ export function duplicateSelection(): void {
     if ('lane' in it || sel.kind !== 'zoom') copy.lane = freeLane(arr, copy.start, copy.end, (it as { lane?: number }).lane ?? 0)
     if (copy.end - copy.start > 0.2) arr.push(copy)
   })
+}
+
+export function addBlurAt(t: number, lane?: number, x = 0.5, y = 0.5): string | null {
+  const s = st()
+  if (!s.project) return null
+  const it: BlurItem = newBlur(t, x, y)
+  s.update((e) => {
+    it.lane = lane !== undefined ? lane : freeLane(e.blurs, it.start, it.end)
+    e.blurs.push(it)
+  })
+  s.select({ kind: 'blur', id: it.id })
+  return it.id
 }
 
 export function toggleClick(t: number): void {

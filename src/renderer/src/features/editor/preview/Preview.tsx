@@ -3,13 +3,13 @@ import type { Asset, EditState } from '@shared/types'
 import { mediaUrl } from '@/lib/api'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
-import { Renderer, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
+import { Renderer, blurRect, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
-import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips } from '../engine/timeMap'
+import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips, viewport, zoomAt } from '../engine/timeMap'
 import { Icon, openContextMenu } from '@/ui'
 
 type Box = { x: number; y: number; w: number; h: number }
-type Handle = { kind: 'text' | 'overlay' | 'webcam'; id: string; box: Box } // box in CSS px relative to canvas
+type Handle = { kind: 'text' | 'overlay' | 'webcam' | 'blur'; id: string; box: Box } // box in CSS px relative to canvas
 
 /** Everything that plays alongside the main video, and what time it should be at. */
 interface Follower { key: string; el: HTMLMediaElement; want: number | null; volume: number; muted: boolean; rate: number }
@@ -257,6 +257,20 @@ export default function Preview() {
       const r = webcamRect(L.edit, W, H)
       hs.push({ kind: 'webcam', id: 'webcam', box: { x: r.x * sx, y: r.y * sy, w: r.w * sx, h: r.h * sy } })
     }
+    if (L.edit.tracks.blurs !== false && L.edit.blurs) {
+      const lay = computeLayout(L.edit, srcW, srcH, W, H)
+      const toContent = (x: number, y: number): [number, number] => [
+        (x * srcW - lay.crop.x) / lay.crop.w,
+        (y * srcH - lay.crop.y) / lay.crop.h
+      ]
+      const z = zoomAt(L.edit.zoom, t, L.camera, toContent)
+      const vp = viewport(z)
+      for (const b of byLane(L.edit.blurs)) {
+        if (t < b.start || t > b.end) continue
+        const r = blurRect(b, lay, vp)
+        hs.push({ kind: 'blur', id: b.id, box: { x: r.x * sx, y: r.y * sy, w: r.w * sx, h: r.h * sy } })
+      }
+    }
     const key = JSON.stringify(hs.map((h) => [h.id, Math.round(h.box.x), Math.round(h.box.y), Math.round(h.box.w), Math.round(h.box.h)]))
     if (key !== lastHandles.current) {
       lastHandles.current = key
@@ -366,13 +380,21 @@ export default function Preview() {
       if (!cur) {
         const n = nextClip(cs, t)
         if (n) v.currentTime = n.start
-        else return useEditor.getState().setPlaying(false)
+        else {
+          v.pause()
+          return useEditor.getState().setPlaying(false)
+        }
       } else {
         if (v.playbackRate !== cur.speed) v.playbackRate = cur.speed
+        const idx = cs.indexOf(cur)
+        const next = idx >= 0 && idx < cs.length - 1 ? cs[idx + 1] : undefined
         if (t >= cur.end - 0.03) {
-          const n = nextClip(cs, cur.end + 0.001)
-          if (n) v.currentTime = n.start
-          else {
+          if (next) {
+            // If the next clip does not immediately follow in the source recording, jump to it
+            if (Math.abs(next.start - cur.end) > 0.04) {
+              v.currentTime = next.start
+            }
+          } else {
             v.pause()
             return useEditor.getState().setPlaying(false)
           }
@@ -409,23 +431,35 @@ export default function Preview() {
     e.preventDefault()
     const st = useEditor.getState()
     if (h.kind === 'webcam') st.setPanel('webcam')
-    else st.select({ kind: h.kind === 'text' ? 'text' : 'overlay', id: h.id })
+    else st.select({ kind: h.kind === 'text' ? 'text' : h.kind === 'overlay' ? 'overlay' : 'blur', id: h.id })
     const e0 = st.project!.edit
     const start = canvasXY(e)
-    const item = h.kind === 'text' ? e0.texts.find((x) => x.id === h.id) : h.kind === 'overlay' ? e0.overlays.find((x) => x.id === h.id) : e0.webcam
+    const item = h.kind === 'text' ? e0.texts.find((x) => x.id === h.id) : h.kind === 'overlay' ? e0.overlays.find((x) => x.id === h.id) : h.kind === 'blur' ? e0.blurs.find((x) => x.id === h.id) : e0.webcam
     if (!item) return
     const ox = item.x
     const oy = item.y
-    const size0 = h.kind === 'text' ? (item as { size: number }).size : h.kind === 'overlay' ? (item as { w: number }).w : (item as { size: number }).size
+    const size0 = h.kind === 'text' ? (item as { size: number }).size : h.kind === 'overlay' ? (item as { w: number }).w : h.kind === 'blur' ? (item as { w: number }).w : (item as { size: number }).size
+    const blurH0 = h.kind === 'blur' ? (item as { h: number }).h : 0
     const key = `${mode}-${h.id}-${Date.now()}`
+    const lay = computeLayout(e0, srcW, srcH, box.w, box.h)
+    const toContent = (x: number, y: number): [number, number] => [(x * srcW - lay.crop.x) / lay.crop.w, (y * srcH - lay.crop.y) / lay.crop.h]
+    const z = zoomAt(e0.zoom, logical.current, live.current.camera, toContent)
+    const vp = viewport(z)
     const mv = (ev: PointerEvent) => {
       const p = canvasXY(ev)
       useEditor.getState().update((ed) => {
-        const it = h.kind === 'text' ? ed.texts.find((x) => x.id === h.id) : h.kind === 'overlay' ? ed.overlays.find((x) => x.id === h.id) : ed.webcam
+        const it = h.kind === 'text' ? ed.texts.find((x) => x.id === h.id) : h.kind === 'overlay' ? ed.overlays.find((x) => x.id === h.id) : h.kind === 'blur' ? ed.blurs.find((x) => x.id === h.id) : ed.webcam
         if (!it) return
         if (mode === 'move') {
-          it.x = snap(ox + p.nx - start.nx)
-          it.y = snap(oy + p.ny - start.ny)
+          if (h.kind === 'blur') {
+            const dContentX = (((p.nx - start.nx) * box.w) / Math.max(1, lay.view.w)) * vp.w
+            const dContentY = (((p.ny - start.ny) * box.h) / Math.max(1, lay.view.h)) * vp.h
+            it.x = Math.max(0, Math.min(1, ox + dContentX))
+            it.y = Math.max(0, Math.min(1, oy + dContentY))
+          } else {
+            it.x = snap(ox + p.nx - start.nx)
+            it.y = snap(oy + p.ny - start.ny)
+          }
         } else {
           // scale from the center by how far the pointer moved away from it
           const d0 = Math.hypot(start.nx - ox, (start.ny - oy) * (box.h / box.w))
@@ -433,6 +467,10 @@ export default function Preview() {
           const f = Math.max(0.2, Math.min(5, d1 / Math.max(0.01, d0)))
           if (h.kind === 'text') (it as { size: number }).size = Math.round(Math.max(12, Math.min(300, size0 * f)))
           else if (h.kind === 'overlay') (it as { w: number }).w = Math.max(0.05, Math.min(1, size0 * f))
+          else if (h.kind === 'blur') {
+            ;(it as { w: number }).w = Math.max(0.03, Math.min(1, size0 * f))
+            ;(it as { h: number }).h = Math.max(0.015, Math.min(1, blurH0 * f))
+          }
           else (it as { size: number }).size = Math.max(0.08, Math.min(0.6, size0 * f))
         }
       }, key)
@@ -538,7 +576,10 @@ export default function Preview() {
                 className={`handle ${sel ? 'sel' : ''}`}
                 style={{ left: h.box.x, top: h.box.y, width: h.box.w, height: h.box.h, borderRadius: h.kind === 'webcam' && edit.webcam.shape === 'circle' ? '50%' : 6 }}
                 onPointerDown={(e) => startMove(e, h, 'move')}
-                onDoubleClick={() => h.kind === 'text' && setEditing(h.id)}
+                onDoubleClick={() => {
+                  if (h.kind === 'text') setEditing(h.id)
+                  else if (h.kind === 'blur') useEditor.getState().setPanel('blur')
+                }}
                 onContextMenu={(e) =>
                   openContextMenu(e, h.kind === 'text'
                     ? [
@@ -553,6 +594,14 @@ export default function Preview() {
                           { label: 'Make full screen', onClick: () => useEditor.getState().update((ed) => { const o = ed.overlays.find((x) => x.id === h.id); if (o) o.mode = 'full' }) },
                           { sep: true },
                           { label: 'Delete', danger: true, onClick: () => useEditor.getState().update((ed) => (ed.overlays = ed.overlays.filter((x) => x.id !== h.id))) }
+                        ]
+                    : h.kind === 'blur'
+                      ? [
+                          { label: 'Frosted blur', onClick: () => useEditor.getState().update((ed) => { const b = ed.blurs.find((x) => x.id === h.id); if (b) b.type = 'blur' }) },
+                          { label: 'Pixelate mosaic', onClick: () => useEditor.getState().update((ed) => { const b = ed.blurs.find((x) => x.id === h.id); if (b) b.type = 'pixelate' }) },
+                          { label: 'Solid redaction bar', onClick: () => useEditor.getState().update((ed) => { const b = ed.blurs.find((x) => x.id === h.id); if (b) b.type = 'solid' }) },
+                          { sep: true },
+                          { label: 'Delete', danger: true, onClick: () => useEditor.getState().update((ed) => (ed.blurs = ed.blurs.filter((x) => x.id !== h.id))) }
                         ]
                       : [{ label: 'Hide webcam', onClick: () => useEditor.getState().update((ed) => (ed.webcam.show = false)) }])
                 }

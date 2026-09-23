@@ -19,11 +19,13 @@ import BackgroundPanel from './panels/BackgroundPanel'
 import CursorPanel from './panels/CursorPanel'
 import ZoomPanel from './panels/ZoomPanel'
 import TextPanel from './panels/TextPanel'
+import BlurPanel from './panels/BlurPanel'
 import AudioPanel from './panels/AudioPanel'
 import ClipPanel from './panels/ClipPanel'
 import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
+import RailIcon from './RailIcon'
 import { addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
@@ -32,6 +34,7 @@ const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boo
   { id: 'cursor', icon: 'cursor', title: 'Cursor & clicks', label: 'Cursor' },
   { id: 'zoom', icon: 'zoom', title: 'Zoom' },
   { id: 'text', icon: 'text', title: 'Text' },
+  { id: 'blur', icon: 'eyeOff', title: 'Blur & redact', label: 'Blur' },
   { id: 'media', icon: 'image', title: 'Media library', label: 'Media' },
   { id: 'effects', icon: 'fx', title: 'Transitions & effects', label: 'Effects' },
   { id: 'webcam', icon: 'webcam', title: 'Webcam' },
@@ -94,6 +97,7 @@ function EditorView() {
   const [name, setName] = useState(project.name)
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
+  const [clickedRail, setClickedRail] = useState<Panel | null>(null)
   const busy = useEditor((s) => s.busy)
   // first visit to the editor: show the guided tour of the interface
   const loadedDir = useEditor((s) => s.project?.dir)
@@ -322,10 +326,20 @@ function EditorView() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <nav data-tour="rail" className="surface rail" style={{ width: 68, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 8, borderRight: '1px solid var(--line)', overflowY: 'auto' }}>
           {RAIL.map((r) => (
-            <button key={r.id} data-tour={`tool-${r.id}`} className={`rail-btn ${panel === r.id ? 'active' : ''}`} title={r.title} onClick={() => setPanel(r.id)}>
-              <Icon name={r.icon} size={19} />
+            <button
+              key={r.id}
+              data-tour={`tool-${r.id}`}
+              className={`rail-btn ${panel === r.id ? 'active' : ''} ${clickedRail === r.id ? 'clicked' : ''}`}
+              title={r.title}
+              onClick={() => {
+                setClickedRail(r.id)
+                setPanel(r.id)
+                setTimeout(() => setClickedRail((cur) => (cur === r.id ? null : cur)), 450)
+              }}
+            >
+              <RailIcon id={r.id} active={panel === r.id} clicked={clickedRail === r.id} size={20} />
               <span>{r.label ?? r.title}</span>
-              {r.soon && <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, background: 'var(--warn)' }} />}
+              {r.soon && <span className="rail-soon-dot" />}
             </button>
           ))}
         </nav>
@@ -335,6 +349,7 @@ function EditorView() {
             {panel === 'cursor' && <CursorPanel />}
             {panel === 'zoom' && <ZoomPanel />}
             {panel === 'text' && <TextPanel />}
+            {panel === 'blur' && <BlurPanel />}
             {panel === 'media' && <MediaPanel />}
             {panel === 'webcam' && <WebcamPanel />}
             {panel === 'audio' && <AudioPanel />}

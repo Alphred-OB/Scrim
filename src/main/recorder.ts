@@ -1,4 +1,4 @@
-import { BrowserWindow, desktopCapturer, dialog, screen, globalShortcut, Tray, Menu, nativeImage } from 'electron'
+import { BrowserWindow, desktopCapturer, dialog, screen, globalShortcut, Tray, Menu, nativeImage, Notification } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { promises as fs, existsSync } from 'fs'
 import { join } from 'path'
@@ -186,7 +186,9 @@ export async function probeDdaOutputs(): Promise<DdaOutput[]> {
       if (!m) break
       list.push({ idx: +m[1], width: +m[2], height: +m[3] })
     }
-    ddaCache = list
+    // a failed probe (GPU busy, secure desktop) is tried again next time instead of forcing GDI for the whole session
+    ddaCache = list.length ? list : null
+    console.log('[rec] DDA outputs', JSON.stringify(list))
     return list
   })().finally(() => {
     ddaProbePromise = null
@@ -194,13 +196,17 @@ export async function probeDdaOutputs(): Promise<DdaOutput[]> {
   return ddaProbePromise
 }
 
-/** Picks the DDA output for a monitor by matching its size (ties keep monitor order). */
+/** Picks the DDA output for a monitor by matching its size (ties keep monitor order).
+ * Sizes can be off by a pixel or two after Windows display scaling is rounded, so they only need to be close. */
+const near = (a: number, b: number) => Math.abs(a - b) <= 4
 function ddaIndexFor(monitor: Rect, monitors: Rect[], outputs: DdaOutput[]): number | null {
-  const same = monitors.filter((m) => m.width === monitor.width && m.height === monitor.height)
+  const same = monitors.filter((m) => near(m.width, monitor.width) && near(m.height, monitor.height))
   const pos = same.indexOf(monitor)
-  const candidates = outputs.filter((o) => o.width === monitor.width && o.height === monitor.height)
-  if (!candidates.length) return null
-  return (candidates[pos] ?? candidates[0]).idx
+  const candidates = outputs.filter((o) => near(o.width, monitor.width) && near(o.height, monitor.height))
+  if (candidates.length) return (candidates[pos] ?? candidates[0]).idx
+  // one screen and one output: it can only be that one
+  if (monitors.length === 1 && outputs.length === 1) return outputs[0].idx
+  return null
 }
 
 function monitorFor(rect: Rect, monitors: Rect[]): Rect | null {
@@ -338,6 +344,7 @@ class Recorder {
 
       // 2. choose the capture engine: GPU desktop duplication when possible, GDI as the fallback
       this.engine = await this.pickEngine(monitors)
+      console.log('[rec] start', JSON.stringify({ kind: opts.kind, source: opts.sourceId, rect: this.rect, engine: this.engine, fps: opts.fps }))
 
       const { id, dir } = await newProjectDir()
       this.id = id
@@ -356,6 +363,10 @@ class Recorder {
       }
       if (this.cancelled) return
       if (!protect) this.hooks.hideToolbar() // GDI capture freezes/slows when a protected, see-through window is on screen
+      if (!protect && Notification.isSupported()) {
+        // the bar can't stay on screen with this capture method, so say how to stop
+        new Notification({ title: 'Scrim is recording', body: `Stop with ${getSettings().shortcuts.stopRecording || 'Alt+Shift+S'} or the Scrim icon in the taskbar tray.`, silent: true }).show()
+      }
       this.showTray()
 
       // 4. audio + webcam in the renderer, video in ffmpeg, cursor in main
@@ -418,9 +429,11 @@ class Recorder {
     if (outputs.length && mon) {
       const idx = ddaIndexFor(mon, monitors, outputs)
       if (idx !== null) {
-        // DDA crops within one monitor
-        this.rect = even(clampTo(this.rect, mon))
-        return { kind: 'dda', output: idx, monitor: mon }
+        // DDA crops within one monitor, using the output's real pixel size
+        const out = outputs.find((o) => o.idx === idx)!
+        const real = { x: mon.x, y: mon.y, width: out.width, height: out.height }
+        this.rect = even(clampTo(this.rect, real))
+        return { kind: 'dda', output: idx, monitor: real }
       }
     }
     return { kind: 'gdi' }
@@ -600,6 +613,7 @@ class Recorder {
   }
 
   private async fail(msg: string): Promise<void> {
+    console.error('[rec] failed:', msg)
     this.cleanupRuntime()
     this.proc?.kill('SIGKILL')
     this.proc = null
