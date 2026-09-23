@@ -371,80 +371,86 @@ export class Renderer {
       ctx.drawImage(this.staticBg(edit, W, H, inp.bgImage), 0, 0)
     }
 
-    // 2. shadow
-    const sh = this.shadowLayer(L, edit.frame.shadow)
-    if (sh) ctx.drawImage(sh.c, L.box.x - sh.pad, L.box.y - sh.pad)
-
-    // 3. window
-    ctx.save()
-    ctx.beginPath()
-    ctx.roundRect(L.box.x, L.box.y, L.box.w, L.box.h, L.radius)
-    ctx.clip()
-    ctx.fillStyle = '#000'
-    ctx.fillRect(L.box.x, L.box.y, L.box.w, L.box.h)
-    if (L.bar > 0) drawBrowserBar(ctx, L)
-
-    const toContent = (x: number, y: number): [number, number] => [
-      (x * srcW - L.crop.x) / L.crop.w,
-      (y * srcH - L.crop.y) / L.crop.h
-    ]
-    const z = zoomAt(edit.zoom, t, inp.camera, toContent)
-    const vp = viewport(z)
-    // media set to play "inside the frame" replaces the recording for its duration
     // layers: higher lanes draw on top; hidden tracks are skipped entirely
     const overlays = edit.tracks.media ? [...edit.overlays].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0)) : []
     const inFrame = [...overlays].reverse().find((o) => o.mode === 'frame' && t >= o.start && t <= o.end && inp.overlays?.has(o.id))
-    const fx = activeEffect(edit, t)
-    const look = effectFilter(fx)
-    if (look) ctx.filter = look
-    if (inFrame) {
-      const src = inp.overlays!.get(inFrame.id)!
-      ctx.globalAlpha = inFrame.opacity
-      drawFit(ctx, src.src, src.w, src.h, L.view, inFrame.fit)
-      ctx.globalAlpha = 1
-    } else if (inp.drawFrame) {
-      inp.drawFrame(
-        ctx,
-        L.crop.x + vp.x * L.crop.w,
-        L.crop.y + vp.y * L.crop.h,
-        vp.w * L.crop.w,
-        vp.h * L.crop.h,
-        L.view.x,
-        L.view.y,
-        L.view.w,
-        L.view.h
-      )
-    }
+    // before the recording starts (the lead-in) there's no window, only the background,
+    // unless media is set to play inside the frame
+    const showWindow = t >= 0 || !!inFrame
+    let z: ZoomState = { scale: 1, fx: 0.5, fy: 0.5 }
+    if (showWindow) {
+      // 2. shadow
+      const sh = this.shadowLayer(L, edit.frame.shadow)
+      if (sh) ctx.drawImage(sh.c, L.box.x - sh.pad, L.box.y - sh.pad)
 
-    ctx.filter = 'none'
-    this.postEffects(ctx, fx, L.view, L.k)
-    drawVignetteGrain(ctx, fx, L.view, t)
-
-    // 4. cursor + click effects (inside the window clip)
-    if (!inFrame && edit.cursor.show && inp.cursor && !cursorHiddenAt(inp.cursor, inp.t)) {
+      // 3. window
       ctx.save()
-      ctx.beginPath()
-      ctx.rect(L.view.x, L.view.y, L.view.w, L.view.h)
-      ctx.clip()
-      const project = (x: number, y: number): [number, number] => {
-        const [cx, cy] = toContent(x, y)
-        return [L.view.x + ((cx - vp.x) / vp.w) * L.view.w, L.view.y + ((cy - vp.y) / vp.h) * L.view.h]
-      }
-      const pxPerSrc = L.view.w / (vp.w * L.crop.w) // output px per source px
-      drawCursorLayer(ctx, edit, inp, project, pxPerSrc)
-      ctx.restore()
-    }
-    ctx.restore()
-
-    // 5. border
-    if (edit.frame.border > 0) {
-      ctx.save()
-      ctx.strokeStyle = edit.frame.borderColor
-      ctx.lineWidth = edit.frame.border * L.k
       ctx.beginPath()
       ctx.roundRect(L.box.x, L.box.y, L.box.w, L.box.h, L.radius)
-      ctx.stroke()
+      ctx.clip()
+      ctx.fillStyle = '#000'
+      ctx.fillRect(L.box.x, L.box.y, L.box.w, L.box.h)
+      if (L.bar > 0) drawBrowserBar(ctx, L)
+
+      const toContent = (x: number, y: number): [number, number] => [
+        (x * srcW - L.crop.x) / L.crop.w,
+        (y * srcH - L.crop.y) / L.crop.h
+      ]
+      z = zoomAt(edit.zoom, t, inp.camera, toContent)
+      const vp = viewport(z)
+      // media set to play "inside the frame" replaces the recording for its duration
+      const fx = activeEffect(edit, t)
+      const look = effectFilter(fx)
+      if (look) ctx.filter = look
+      if (inFrame) {
+        const src = inp.overlays!.get(inFrame.id)!
+        ctx.globalAlpha = inFrame.opacity
+        drawFit(ctx, src.src, src.w, src.h, L.view, inFrame.fit)
+        ctx.globalAlpha = 1
+      } else if (inp.drawFrame) {
+        inp.drawFrame(
+          ctx,
+          L.crop.x + vp.x * L.crop.w,
+          L.crop.y + vp.y * L.crop.h,
+          vp.w * L.crop.w,
+          vp.h * L.crop.h,
+          L.view.x,
+          L.view.y,
+          L.view.w,
+          L.view.h
+        )
+      }
+
+      ctx.filter = 'none'
+      this.postEffects(ctx, fx, L.view, L.k)
+      drawVignetteGrain(ctx, fx, L.view, t)
+
+      // 4. cursor + click effects (inside the window clip)
+      if (!inFrame && edit.cursor.show && inp.cursor && !cursorHiddenAt(inp.cursor, inp.t)) {
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(L.view.x, L.view.y, L.view.w, L.view.h)
+        ctx.clip()
+        const project = (x: number, y: number): [number, number] => {
+          const [cx, cy] = toContent(x, y)
+          return [L.view.x + ((cx - vp.x) / vp.w) * L.view.w, L.view.y + ((cy - vp.y) / vp.h) * L.view.h]
+        }
+        const pxPerSrc = L.view.w / (vp.w * L.crop.w) // output px per source px
+        drawCursorLayer(ctx, edit, inp, project, pxPerSrc)
+        ctx.restore()
+      }
       ctx.restore()
+
+      // 5. border
+      if (edit.frame.border > 0) {
+        ctx.save()
+        ctx.strokeStyle = edit.frame.borderColor
+        ctx.lineWidth = edit.frame.border * L.k
+        ctx.beginPath()
+        ctx.roundRect(L.box.x, L.box.y, L.box.w, L.box.h, L.radius)
+        ctx.stroke()
+        ctx.restore()
+      }
     }
 
     // 6. imported media (picture in picture, logos, b-roll)
@@ -483,7 +489,7 @@ export class Renderer {
     }
 
     // 7. webcam
-    if (edit.webcam.show && inp.webcam) drawWebcam(ctx, edit, inp.webcam, W, H, L.k)
+    if (edit.webcam.show && inp.webcam && t >= 0) drawWebcam(ctx, edit, inp.webcam, W, H, L.k)
 
     // 8. text
     if (edit.tracks.text) {
@@ -908,6 +914,20 @@ export interface ActiveTransition { type: string; amount: number; side: 'in' | '
 export function transitionAt(edit: EditState, t: number): ActiveTransition | null {
   const tr = edit.transitions
   const clips = [...edit.clips].sort((a, b) => a.start - b.start)
+  const lead = edit.leadIn ?? 0
+  const pickT = (x: Transition | undefined): Transition | null => (x && x.type !== 'none' && x.duration > 0 ? x : null)
+  // in the lead-in: the start transition at its beginning, and a cut into the recording at its end
+  if (t < 0 && lead > 0) {
+    let best: ActiveTransition | null = null
+    const intro = pickT(tr.intro)
+    const into = pickT(tr.perCut['lead'] ?? tr.cut)
+    if (intro && t + lead < intro.duration) best = { type: intro.type, amount: 1 - (t + lead) / intro.duration, side: 'in', direction: intro.direction ?? 'none', ease: intro.ease ?? 'smooth' }
+    if (into && -t < into.duration / 2) {
+      const amt = 1 - -t / (into.duration / 2)
+      if (!best || amt > best.amount) best = { type: into.type, amount: amt, side: 'out', direction: into.direction ?? 'none', ease: into.ease ?? 'smooth' }
+    }
+    return best
+  }
   const i = clips.findIndex((c) => t >= c.start - 1e-6 && t <= c.end + 1e-6)
   if (i < 0) return null
   const c = clips[i]
@@ -915,7 +935,7 @@ export function transitionAt(edit: EditState, t: number): ActiveTransition | nul
   const toEnd = (c.end - t) / c.speed
   const pick = (x: Transition | undefined): Transition | null => (x && x.type !== 'none' && x.duration > 0 ? x : null)
   // the cut before this clip (or the intro) and the cut after it (or the outro)
-  const before = i === 0 ? pick(tr.intro) : pick(tr.perCut[c.id] ?? tr.cut)
+  const before = i === 0 ? (lead > 0 ? pick(tr.perCut['lead'] ?? tr.cut) : pick(tr.intro)) : pick(tr.perCut[c.id] ?? tr.cut)
   const after = i === clips.length - 1 ? pick(tr.outro) : pick(tr.perCut[clips[i + 1].id] ?? tr.cut)
   // intro/outro use their full length; a cut shares its length between both sides
   let best: ActiveTransition | null = null
@@ -923,7 +943,7 @@ export function transitionAt(edit: EditState, t: number): ActiveTransition | nul
     if (amount > 0 && (!best || amount > best.amount)) best = { type: x.type, amount, side, direction: x.direction ?? 'none', ease: x.ease ?? 'smooth' }
   }
   if (before) {
-    const d = i === 0 ? before.duration : before.duration / 2
+    const d = i === 0 && lead <= 0 ? before.duration : before.duration / 2
     if (fromStart < d) consider(before, 1 - fromStart / d, 'in')
   }
   if (after) {

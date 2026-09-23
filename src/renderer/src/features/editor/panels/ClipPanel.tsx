@@ -21,7 +21,7 @@ export default function ClipPanel() {
           <button className="btn" style={{ flex: 1 }} disabled={!sel || clips.length <= 1} onClick={deleteSelection}><Icon name="trash" size={15} /> Delete clip</button>
         </div>
         <span className="hint">Split at the playhead, select the part you don't want, then delete it. Drag clip edges to trim.</span>
-        <div className="chip">Final length {fmtTime(outputDuration(clips), true)} from {fmtTime(project.media.screen.duration, true)}</div>
+        <div className="chip">Final length {fmtTime(outputDuration(clips, project.edit.leadIn ?? 0), true)} from {fmtTime(project.media.screen.duration, true)}</div>
         <button className="btn sm" onClick={() => update((e) => (e.clips = [{ id: uid('c'), start: 0, end: project.media.screen.duration, speed: 1 }]))}>Restore all cuts</button>
       </Section>
       {sel && (

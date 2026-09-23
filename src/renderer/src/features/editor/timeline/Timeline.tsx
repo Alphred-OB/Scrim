@@ -63,10 +63,12 @@ export default function Timeline() {
   const [dropRow, setDropRow] = useState<string | null>(null)
   const [joinHint, setJoinHint] = useState<'start' | 'end' | null>(null)
   const pps = (width / Math.max(0.5, duration)) * zoom
-  const total = duration * pps
+  // empty space before the recording (drag the video right to make it); it sits at negative times
+  const lead = edit.leadIn ?? 0
+  const total = (duration + lead) * pps
   // open space after the end so the timeline never feels boxed in and can be zoomed freely
   const tail = Math.max(240, width * 0.5)
-  const X = (t: number) => 12 + t * pps
+  const X = (t: number) => 12 + (t + lead) * pps
 
   useEffect(() => {
     const el = scrollRef.current!
@@ -83,7 +85,7 @@ export default function Timeline() {
       e.preventDefault()
       const r = sc.getBoundingClientRect()
       const screenX = Math.max(HEAD_W, e.clientX - r.left)
-      zoomAnchor = { time: (sc.scrollLeft + screenX - HEAD_W - 12) / prevPps.current, screenX }
+      zoomAnchor = { time: (sc.scrollLeft + screenX - HEAD_W - 12) / prevPps.current - leadRef.current, screenX }
       useTimelineView.getState().setZoom((z) => z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))
     }
     sc.addEventListener('wheel', on, { passive: false })
@@ -93,20 +95,22 @@ export default function Timeline() {
   // zooming keeps what you're looking at in place: the point under the mouse (Ctrl+wheel),
   // otherwise the playhead if it's on screen, otherwise the middle of the view
   const prevPps = useRef(pps)
+  const leadRef = useRef(lead)
+  leadRef.current = lead
   useLayoutEffect(() => {
     const sc = scrollRef.current
     const before = prevPps.current
     prevPps.current = pps
     if (!sc || before === pps) return
-    const Xb = (t: number) => HEAD_W + 12 + t * before
+    const Xb = (t: number) => HEAD_W + 12 + (t + lead) * before
     let a = zoomAnchor
     zoomAnchor = null
     if (!a) {
       const ph = timeBus.get()
       const phX = Xb(ph) - sc.scrollLeft
-      a = phX >= HEAD_W && phX <= sc.clientWidth ? { time: ph, screenX: phX } : { time: (sc.scrollLeft + (sc.clientWidth + HEAD_W) / 2 - HEAD_W - 12) / before, screenX: (sc.clientWidth + HEAD_W) / 2 }
+      a = phX >= HEAD_W && phX <= sc.clientWidth ? { time: ph, screenX: phX } : { time: (sc.scrollLeft + (sc.clientWidth + HEAD_W) / 2 - HEAD_W - 12) / before - lead, screenX: (sc.clientWidth + HEAD_W) / 2 }
     }
-    sc.scrollLeft = Math.max(0, HEAD_W + 12 + a.time * pps - a.screenX)
+    sc.scrollLeft = Math.max(0, HEAD_W + 12 + (a.time + lead) * pps - a.screenX)
   }, [pps])
 
   useEffect(() => {
@@ -126,12 +130,12 @@ export default function Timeline() {
   const timeAt = (clientX: number) => {
     const sc = scrollRef.current!
     const r = sc.getBoundingClientRect()
-    return Math.min(duration, Math.max(0, (clientX - r.left + sc.scrollLeft - HEAD_W - 12) / pps))
+    return Math.min(duration, Math.max(-lead, (clientX - r.left + sc.scrollLeft - HEAD_W - 12) / pps - lead))
   }
 
   // edges things snap to while dragging
   const snapPoints = (exclude: string): number[] => {
-    const pts = [0, duration, timeBus.get()]
+    const pts = [-lead, 0, duration, timeBus.get()]
     for (const c of edit.clips) pts.push(c.start, c.end)
     for (const list of [edit.zoom.segments, edit.texts, edit.overlays, edit.audioClips] as Item[][]) for (const it of list) if (it.id !== exclude) pts.push(it.start, it.end)
     return pts
@@ -175,17 +179,18 @@ export default function Timeline() {
     if (e.button !== 0) return
     e.stopPropagation()
     select({ kind, id: item.id })
+    if (kind === 'clip' && mode === 'move') return dragVideo(e.clientX)
     const x0 = e.clientX
     const y0 = e.clientY
-    const layered = kind === 'text' || kind === 'overlay' || kind === 'audioClip' || kind === 'effect'
+    const layered = kind === 'text' || kind === 'overlay' || kind === 'audioClip' || kind === 'effect' || kind === 'transition'
     const lane0 = item.lane ?? 0
-    const lanes = laneCount(listFor(kind), kind === 'text')
+    const lanes = laneCount(listFor(kind), true)
     let lane = lane0
     const s0 = item.start
     const e0 = item.end
     const others = listFor(kind).filter((o) => o.id !== item.id)
     const stacks = kind === 'text' || kind === 'overlay' || kind === 'audioClip' || kind === 'effect' || kind === 'transition'
-    const lo = stacks ? 0 : Math.max(0, ...others.filter((o) => o.end <= s0 + 1e-3).map((o) => o.end))
+    const lo = stacks ? -lead : Math.max(0, ...others.filter((o) => o.end <= s0 + 1e-3).map((o) => o.end))
     const hi = stacks ? duration : Math.min(duration, ...others.filter((o) => o.start >= e0 - 1e-3).map((o) => o.start))
     const maxLen = assetLen(item, kind)
     const trim0 = (item as { trimStart?: number }).trimStart ?? 0
@@ -235,6 +240,31 @@ export default function Timeline() {
           if (it) it.lane = freeLane(list, it.start, it.end, it.lane ?? 0, it.id)
         }, key)
       if (!moved && mode === 'move') {
+        const t = timeAt(x0)
+        setTime(t)
+        timeBus.emit(t)
+      }
+    }
+    window.addEventListener('pointermove', mv)
+    window.addEventListener('pointerup', up)
+  }
+
+  // dragging the video block slides the whole recording later or earlier, leaving room before it
+  const dragVideo = (x0: number) => {
+    const lead0 = lead
+    const key = `lead-${Date.now()}`
+    let moved = false
+    const mv = (ev: PointerEvent) => {
+      if (Math.abs(ev.clientX - x0) > 3) moved = true
+      if (!moved) return
+      let next = Math.max(0, lead0 + (ev.clientX - x0) / pps)
+      if (next * pps < 8) next = 0 // snap back to the very start
+      update((ed) => (ed.leadIn = +next.toFixed(3)), key)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', mv)
+      window.removeEventListener('pointerup', up)
+      if (!moved) {
         const t = timeAt(x0)
         setTime(t)
         timeBus.emit(t)
@@ -333,7 +363,8 @@ export default function Timeline() {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
       const under = rowAt(e.clientY) ?? ''
-      setDropRow(fx.kind === 'transition' ? 'transitions' : under.split('#')[0] === 'effects' ? under : 'effects')
+      const base = fx.kind === 'transition' ? 'transitions' : 'effects'
+      setDropRow(under.split('#')[0] === base ? under : base)
       return
     }
     if (a) {
@@ -363,9 +394,12 @@ export default function Timeline() {
         return addEffectAt(fx.look, fx.name, t, 5, under.split('#')[0] === 'effects' ? laneOf(under) : 0)
       }
       // dropped near a cut: that cut gets it; anywhere else: a free-standing transition
-      const cut = cutNear(t)
+      const under = rowAt(e.clientY) ?? ''
+      const lane = under.split('#')[0] === 'transitions' ? laneOf(under) : 0
+      // dropped near a cut on the first layer: that cut gets it; anywhere else: a free-standing transition
+      const cut = lane === 0 ? cutNear(t) : null
       if (cut) return update((ed) => (ed.transitions.perCut[cut.id] = { type: fx.type, duration: ed.transitions.perCut[cut.id]?.duration ?? ed.transitions.cut.duration ?? 0.6 }))
-      return addTransitionAt(fx.type, t)
+      return addTransitionAt(fx.type, t, 0.8, lane)
     }
     const a = dragAsset.get()
     if (!a) return
@@ -396,16 +430,16 @@ export default function Timeline() {
       rows.push(l === 0 ? { key: base, ...first } : { key: laneKey(base, l), label: '', sub: `Layer ${l + 1}`, icon: first.icon, color: first.color, kind: first.kind })
   }
   const rows: Row[] = [{ key: 'video', label: 'Video', icon: 'film', color: '#2b4fb8', kind: 'clip' }]
-  rows.push({ key: 'transitions', label: 'Transitions', icon: 'transition', color: '#d9772b', kind: 'transition' })
+  pushLanes('transitions', laneCount(edit.transitions.items, edit.transitions.items.length > 0), { label: 'Transitions', icon: 'transition', color: '#d9772b', kind: 'transition' })
   const fxToggle = { on: edit.tracks.effects, set: () => update((e) => (e.tracks.effects = !e.tracks.effects)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Turn effects on this track on or off' }
-  pushLanes('effects', laneCount(edit.effectClips), { label: 'Effects', icon: 'fx', color: '#1aa3b8', kind: 'effect', hint: 'Drag an effect here to use it on part of the video', toggle: fxToggle })
+  pushLanes('effects', laneCount(edit.effectClips, true), { label: 'Effects', icon: 'fx', color: '#1aa3b8', kind: 'effect', hint: 'Drag an effect here to use it on part of the video', toggle: fxToggle })
   if (media.webcam)
     rows.push({
       key: 'webcam', label: 'Webcam', icon: 'webcam', color: '#b85d2b',
       toggle: { on: edit.webcam.show, set: () => update((e) => (e.webcam.show = !e.webcam.show)), icon: ['eye', 'eyeOff'], title: 'Show or hide the webcam' }
     })
   const mediaToggle = { on: edit.tracks.media, set: () => update((e) => (e.tracks.media = !e.tracks.media)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Show or hide all media' }
-  pushLanes('overlay', laneCount(edit.overlays), { label: 'Media', icon: 'image', color: '#1f7a8c', kind: 'overlay', hint: 'Drop videos or images here', toggle: mediaToggle })
+  pushLanes('overlay', laneCount(edit.overlays, true), { label: 'Media', icon: 'image', color: '#1f7a8c', kind: 'overlay', hint: 'Drop videos or images here', toggle: mediaToggle })
   rows.push({
     key: 'zoom', label: 'Zoom', icon: 'zoom', color: '#6a47c9', kind: 'zoom', hint: 'Click to add a zoom',
     toggle: { on: edit.zoom.enabled, set: () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), icon: ['eye', 'eyeOff'], title: 'Turn all zooms on or off' }
@@ -418,7 +452,7 @@ export default function Timeline() {
   if (media.system)
     rows.push({ key: 'system', label: 'System audio', icon: 'audio', color: '#9e7a2f', toggle: { on: !edit.audio.systemMuted, set: () => update((e) => (e.audio.systemMuted = !e.audio.systemMuted)), icon: ['volume', 'mute'], title: 'Mute system audio' } })
   const audioToggle = { on: edit.tracks.audio, set: () => update((e) => (e.tracks.audio = !e.tracks.audio)), icon: ['volume', 'mute'] as [string, string], title: 'Mute or unmute all added audio' }
-  pushLanes('audio', laneCount(edit.audioClips), { label: 'Audio', icon: 'music', color: '#a2427a', kind: 'audioClip', hint: 'Drop music or sound here', toggle: audioToggle })
+  pushLanes('audio', laneCount(edit.audioClips, true), { label: 'Audio', icon: 'music', color: '#a2427a', kind: 'audioClip', hint: 'Drop music or sound here', toggle: audioToggle })
   const top = (key: string) => RULER_H + Math.max(0, rows.findIndex((r) => r.key === key)) * TRACK_H
   const laneTop = (base: string, lane = 0) => top(laneKey(base, lane))
 
@@ -435,7 +469,7 @@ export default function Timeline() {
 
   const step = niceStep(90 / pps)
   const ticks: number[] = []
-  for (let t = 0; t <= duration + tail / pps + 1e-6; t += step) ticks.push(t)
+  for (let u = 0; u <= duration + lead + tail / pps + 1e-6; u += step) ticks.push(u - lead)
   const clips = sortedClips(edit.clips)
   const gaps: [number, number][] = []
   let last = 0
@@ -459,7 +493,7 @@ export default function Timeline() {
   }
 
   return (
-    <div className="surface" style={{ height, flexShrink: 0, borderTop: '1px solid var(--line)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+    <div data-tour="timeline" className="surface" style={{ height, flexShrink: 0, borderTop: '1px solid var(--line)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       <div className="tl-resize" onPointerDown={resize} title="Drag to resize the timeline" />
       <div
         style={{ flex: 1, overflow: 'auto', position: 'relative' }}
@@ -477,7 +511,7 @@ export default function Timeline() {
           <div className="tl-heads" style={{ height: contentH }}>
             <div style={{ height: RULER_H }} />
             {rows.map((r) => (
-              <div key={r.key} className={`tl-head ${r.toggle && !r.toggle.on ? 'off' : ''}`} style={{ height: TRACK_H }}>
+              <div key={r.key} data-tour={r.label ? 'track-' + r.key : undefined} className={`tl-head ${r.toggle && !r.toggle.on ? 'off' : ''}`} style={{ height: TRACK_H }}>
                 <span style={{ color: r.color, display: 'inline-flex', visibility: r.label ? 'visible' : 'hidden' }}><Icon name={r.icon} size={14} /></span>
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label || <span className="tl-sublabel">{r.sub}</span>}</span>
                 {r.toggle && (
@@ -494,7 +528,7 @@ export default function Timeline() {
             <div className="tl-ruler" onPointerDown={(e) => scrub(e.clientX)} style={{ height: RULER_H }}>
               {ticks.map((t) => (
                 <div key={t} style={{ position: 'absolute', left: X(t), top: 5, fontSize: 10, color: 'var(--faint)', transform: 'translateX(-50%)', whiteSpace: 'nowrap', opacity: t > duration + 1e-6 ? 0.4 : 1 }}>
-                  {fmtRuler(t, step)}
+                  {fmtRuler(t + lead, step)}
                   <div style={{ width: 1, height: 5, background: 'var(--line-2)', margin: '3px auto 0' }} />
                 </div>
               ))}
@@ -546,7 +580,12 @@ export default function Timeline() {
             )}
 
             {/* video clips */}
-            <div className="tl-hatch" style={{ left: X(0), width: total, top: top('video') + 4, height: TRACK_H - 8 }} />
+            <div className="tl-hatch" style={{ left: X(0), width: duration * pps, top: top('video') + 4, height: TRACK_H - 8 }} />
+            {lead > 0 && (
+              <div className="tl-lead" style={{ left: X(-lead), width: lead * pps, top: top('video') + 4, height: TRACK_H - 8 }} title="Empty space before your recording">
+                {lead * pps > 150 ? 'Intro space · add text or media' : ''}
+              </div>
+            )}
             {edit.clips.map((c) => block('clip', c, top('video'), 'linear-gradient(180deg,#3563d6,#2849a8)', <>Clip{c.speed !== 1 ? ` · ${c.speed}x` : ''}</>))}
 
             {/* start, end and cut transitions, shown as pills on the Transitions track */}
@@ -579,9 +618,18 @@ export default function Timeline() {
                 )
               }
               const out = [
-                pill('intro', clips[0].start + tr.intro.duration / 2, tr.intro, `Start: ${name(tr.intro)}`, (e) => openContextMenu(e, menu(tr.intro, (v) => update((ed) => (ed.transitions.intro = v ?? ed.transitions.intro)), false, true))),
+                pill('intro', (lead > 0 ? -lead : clips[0].start) + tr.intro.duration / 2, tr.intro, `Start: ${name(tr.intro)}`, (e) => openContextMenu(e, menu(tr.intro, (v) => update((ed) => (ed.transitions.intro = v ?? ed.transitions.intro)), false, true))),
                 pill('outro', clips[clips.length - 1].end - tr.outro.duration / 2, tr.outro, `End: ${name(tr.outro)}`, (e) => openContextMenu(e, menu(tr.outro, (v) => update((ed) => (ed.transitions.outro = v ?? ed.transitions.outro)), false, true)))
               ]
+              if (lead > 0) {
+                const own = tr.perCut['lead']
+                const cur = own ?? tr.cut
+                out.push(
+                  pill('cut-lead', 0, cur, `Into the recording: ${name(cur)}${own ? '' : ' (from Every cut)'}`, (e) =>
+                    openContextMenu(e, menu(cur, (v) => update((ed) => { if (v) ed.transitions.perCut['lead'] = v; else delete ed.transitions.perCut['lead'] }), true, !!own))
+                  )
+                )
+              }
               clips.slice(1).forEach((c, i) => {
                 const own = tr.perCut[c.id]
                 const cur = own ?? tr.cut
@@ -595,7 +643,7 @@ export default function Timeline() {
             })()}
 
             {/* transitions placed anywhere */}
-            {edit.transitions.items.map((it) => block('transition', it, top('transitions'), 'linear-gradient(180deg,#e0873a,#b8611f)', TRANSITIONS.find((x) => x.v === it.type)?.l ?? 'Transition'))}
+            {edit.transitions.items.map((it) => block('transition', it, laneTop('transitions', it.lane), 'linear-gradient(180deg,#e0873a,#b8611f)', TRANSITIONS.find((x) => x.v === it.type)?.l ?? 'Transition'))}
 
             {/* effects on part of the video */}
             {edit.effectClips.map((c) => block('effect', c, laneTop('effects', c.lane), 'linear-gradient(180deg,#22b3c9,#157f90)', c.name))}

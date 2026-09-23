@@ -8,6 +8,8 @@ import { timeBus } from './timeBus'
 
 const st = () => useEditor.getState()
 const dur = () => st().project?.media.screen.duration ?? 0
+/** Intro space before the recording (items there sit at negative times). */
+const lead = () => st().project?.edit.leadIn ?? 0
 
 export function addZoomAt(t: number, len = 2.5): string | null {
   const p = st().project
@@ -30,8 +32,8 @@ export function addZoomAt(t: number, len = 2.5): string | null {
 }
 
 export function addTextAt(t: number, lane = 0): void {
-  const tx = newText(t)
-  tx.end = Math.min(dur(), t + 3)
+  const tx = newText(Math.max(-lead(), t))
+  tx.end = Math.min(dur(), tx.start + 3)
   // overlapping text goes on the next free layer instead of stacking on top of another one
   tx.lane = freeLane(st().project!.edit.texts, tx.start, tx.end, lane)
   st().update((e) => e.texts.push(tx))
@@ -55,7 +57,7 @@ export function addAssetAt(asset: Asset, t0: number, lane = 0): void {
   const s = st()
   const e0 = s.project!.edit
   // it lands exactly where it was dropped; if that spot is taken it goes on the next free layer
-  const t = Math.max(0, Math.min(t0, dur() - 0.5))
+  const t = Math.max(-lead(), Math.min(t0, dur() - 0.5))
   const end = Math.min(dur(), t + (asset.kind === 'image' ? 4 : Math.max(0.5, asset.duration)))
   if (end - t < 0.2) return
   const layer = freeLane(asset.kind === 'audio' ? e0.audioClips : e0.overlays, t, end, lane)
@@ -190,8 +192,10 @@ export async function joinVideoAt(where: 'start' | 'end', file?: string): Promis
 }
 
 /** Places a transition centered at `at` on the Transitions track. */
-export function addTransitionAt(type: TransitionType, at: number, length = 0.8): void {
-  const it = { id: uid('tr'), type, start: Math.max(0, at - length / 2), end: Math.min(dur(), at + length / 2) }
+export function addTransitionAt(type: TransitionType, at: number, length = 0.8, lane = 0): void {
+  const start = Math.max(-lead(), at - length / 2)
+  const end = Math.min(dur(), at + length / 2)
+  const it = { id: uid('tr'), type, start, end, lane: freeLane(st().project!.edit.transitions.items, start, end, lane) }
   st().update((e) => e.transitions.items.push(it))
   st().select({ kind: 'transition', id: it.id })
 }
@@ -199,7 +203,7 @@ export function addTransitionAt(type: TransitionType, at: number, length = 0.8):
 /** Adds an effect to part of the video on the Effects track (next free layer if something's there). */
 export function addEffectAt(look: EffectLook, name: string, t: number, length = 5, lane = 0): void {
   const e0 = st().project!.edit
-  const start = Math.max(0, Math.min(t, dur() - 0.5))
+  const start = Math.max(-lead(), Math.min(t, dur() - 0.5))
   const end = Math.min(dur(), start + length)
   const clip: EffectClip = { ...defaultEffect(), look, name, id: uid('fx'), start, end, lane: freeLane(e0.effectClips, start, end, lane) }
   st().update((e) => e.effectClips.push(clip))

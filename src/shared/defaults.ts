@@ -70,6 +70,7 @@ export function defaultEdit(duration: number): EditState {
     },
     effects: defaultEffect(),
     effectClips: [],
+    leadIn: 0,
     tracks: { media: true, text: true, audio: true, effects: true }
   }
 }
@@ -139,7 +140,7 @@ export function migrateProject(p: Project): Project {
     texts: e.texts ?? []
   }
   // projects from before layers: spread overlapping items over layers so nothing is stacked
-  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips, p.edit.effectClips] as { start: number; end: number; lane?: number }[][]) {
+  for (const list of [p.edit.texts, p.edit.overlays, p.edit.audioClips, p.edit.effectClips, p.edit.transitions.items] as { start: number; end: number; lane?: number }[][]) {
     if (list.every((x) => x.lane !== undefined)) continue
     const ends: number[] = []
     for (const it of [...list].sort((a, b) => a.start - b.start)) {
@@ -212,6 +213,7 @@ export function defaultSettings(): AppSettings {
     arrowStep: 0.5,
     recordBorder: true,
     onboarded: false,
+    toursSeen: [],
     uiFont: 'Inter',
     uiScale: 1,
     exportProgress: 'wavy',

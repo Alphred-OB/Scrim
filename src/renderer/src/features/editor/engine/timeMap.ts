@@ -5,12 +5,14 @@ export function sortedClips(clips: Clip[]): Clip[] {
   return clips.slice().sort((a, b) => a.start - b.start)
 }
 
-export function outputDuration(clips: Clip[]): number {
-  return clips.reduce((s, c) => s + (c.end - c.start) / c.speed, 0)
+export function outputDuration(clips: Clip[], leadIn = 0): number {
+  return leadIn + clips.reduce((s, c) => s + (c.end - c.start) / c.speed, 0)
 }
 
-/** Output (edited) time -> source time. */
-export function outputToSource(clips: Clip[], T: number): number {
+/** Output (edited) time -> source time. The lead-in (empty space before the video) maps to negative times. */
+export function outputToSource(clips: Clip[], T: number, leadIn = 0): number {
+  if (T < leadIn) return T - leadIn
+  T -= leadIn
   const cs = sortedClips(clips)
   let acc = 0
   for (const c of cs) {
@@ -23,9 +25,10 @@ export function outputToSource(clips: Clip[], T: number): number {
 }
 
 /** Source time -> output time (times inside a removed gap snap to the next clip). */
-export function sourceToOutput(clips: Clip[], t: number): number {
+export function sourceToOutput(clips: Clip[], t: number, leadIn = 0): number {
+  if (t < 0) return Math.max(0, t + leadIn)
   const cs = sortedClips(clips)
-  let acc = 0
+  let acc = leadIn
   for (const c of cs) {
     if (t < c.start) return acc
     if (t <= c.end) return acc + (t - c.start) / c.speed

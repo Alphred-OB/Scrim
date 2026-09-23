@@ -4,6 +4,7 @@ import { uid } from '@shared/defaults'
 import { api } from '@/lib/api'
 import { useSettings, matches } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
+import { maybeAutoStart, startTour } from '@/features/onboarding/tours'
 import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { useEditor, flushSave, Panel } from './state/store'
@@ -94,6 +95,12 @@ function EditorView() {
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
   const busy = useEditor((s) => s.busy)
+  // first visit to the editor: show the guided tour of the interface
+  const loadedDir = useEditor((s) => s.project?.dir)
+  useEffect(() => {
+    if (loadedDir) maybeAutoStart('editor')
+  }, [loadedDir])
+
   // picking a transition or effect on the timeline opens its settings
   const selKind = useEditor((s) => s.selection?.kind)
   useEffect(() => {
@@ -121,7 +128,7 @@ function EditorView() {
       state: () => {
         const e = useEditor.getState().project!.edit
         const st = useEditor.getState()
-        return { transitionItems: e.transitions.items.length, effectClips: e.effectClips.length, time: st.time, duration: st.project!.media.screen.duration, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
+        return { transitionItems: e.transitions.items.length, effectClips: e.effectClips.length, time: st.time, duration: st.project!.media.screen.duration, leadIn: e.leadIn ?? 0, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
       },
       export: async (out: string, patch?: Partial<import('@shared/types').ExportSettings>) => {
         const st = useEditor.getState()
@@ -149,7 +156,7 @@ function EditorView() {
       const arrow = arrowSetting > 0 ? arrowSetting : 1 / fps
       const step = (d: number) => {
         st.setPlaying(false)
-        st.setTime(Math.max(0, Math.min(project.media.screen.duration, timeBus.get() + d)))
+        st.setTime(Math.max(-(st.project!.edit.leadIn ?? 0), Math.min(project.media.screen.duration, timeBus.get() + d)))
       }
       const actions: Record<string, () => void> = {
         playPause: () => st.setPlaying(!st.playing),
@@ -217,7 +224,8 @@ function EditorView() {
     const st = useEditor.getState()
     st.setPlaying(false)
     const cs = sortedClips(st.project!.edit.clips)
-    st.setTime(dir < 0 ? cs[0]?.start ?? 0 : Math.max(0, (cs[cs.length - 1]?.end ?? 0) - 0.05))
+    const lead = st.project!.edit.leadIn ?? 0
+    st.setTime(dir < 0 ? (lead > 0 ? -lead : cs[0]?.start ?? 0) : Math.max(0, (cs[cs.length - 1]?.end ?? 0) - 0.05))
   }
 
   const savePreset = async () => {
@@ -267,7 +275,7 @@ function EditorView() {
           />
         </div>
         <div style={{ position: 'relative' }}>
-          <button className="btn ghost sm" onClick={() => setPresetsOpen((o) => !o)}><Icon name="bookmark" size={15} /> Presets <Icon name="chevron" size={13} /></button>
+          <button data-tour="presets" className="btn ghost sm" onClick={() => setPresetsOpen((o) => !o)}><Icon name="bookmark" size={15} /> Presets <Icon name="chevron" size={13} /></button>
           {presetsOpen && (
             <div className="menu glass pop-in" style={{ position: 'absolute', right: 0, top: 38, width: 270, zIndex: 50 }} onMouseLeave={() => setPresetsOpen(false)}>
               {presets.length === 0 && <div className="hint" style={{ padding: 8 }}>Save your favourite look (background, frame, cursor, webcam) to reuse it on every recording.</div>}
@@ -299,12 +307,13 @@ function EditorView() {
             </div>
           )}
         </div>
+        <button className="icon-btn" title="Show me around" onClick={() => startTour('editor')}><Icon name="help" /></button>
         <button className="icon-btn" title={`Settings (${kb('settings')})`} onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
-        <button className="btn primary sm" style={{ marginLeft: 4, height: 32 }} onClick={() => { useEditor.getState().setPlaying(false); setExporting(true) }}><Icon name="download" size={15} /> Export</button>
+        <button data-tour="export" className="btn primary sm" style={{ marginLeft: 4, height: 32 }} onClick={() => { useEditor.getState().setPlaying(false); setExporting(true) }}><Icon name="download" size={15} /> Export</button>
       </header>
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <nav className="surface" style={{ width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, borderRight: '1px solid var(--line)' }}>
+        <nav data-tour="rail" className="surface" style={{ width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, borderRight: '1px solid var(--line)' }}>
           {RAIL.map((r) => (
             <button key={r.id} className={`icon-btn ${panel === r.id ? 'active' : ''}`} style={{ width: 40, height: 40, borderRadius: 11, position: 'relative' }} title={r.title} onClick={() => setPanel(r.id)}>
               <Icon name={r.icon} size={19} />
@@ -312,7 +321,7 @@ function EditorView() {
             </button>
           ))}
         </nav>
-        <aside className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
+        <aside data-tour="panel" className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
           <div className="fade-in" key={panel}>
             {panel === 'background' && <BackgroundPanel />}
             {panel === 'cursor' && <CursorPanel />}
@@ -331,7 +340,7 @@ function EditorView() {
             <div style={{ width: 110 }}>
               <Select compact value={project.edit.aspect} options={ASPECTS} onChange={(v) => update((e) => (e.aspect = v))} />
             </div>
-            <button className="btn ghost sm" onClick={() => setPanel('background')}><Icon name="crop" size={15} /> Crop</button>
+            <button data-tour="crop" className="btn ghost sm" onClick={() => setPanel('background')}><Icon name="crop" size={15} /> Crop</button>
           </div>
 
           <Preview />
@@ -339,15 +348,15 @@ function EditorView() {
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4 }}>
             <div className="transport-side" />
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
-              <TimeLabel />
+              <TimeLabel lead={project.edit.leadIn ?? 0} />
               <button className="icon-btn" onClick={() => jump(-1)} title="Go to start"><Icon name="prev" /></button>
-              <button className="play-btn" onClick={() => useEditor.getState().setPlaying(!playing)} title={`Play / pause (${kb('playPause')})`}>
+              <button data-tour="play" className="play-btn" onClick={() => useEditor.getState().setPlaying(!playing)} title={`Play / pause (${kb('playPause')})`}>
                 <Icon name={playing ? 'pause' : 'play'} size={19} />
               </button>
               <button className="icon-btn" onClick={() => jump(1)} title="Go to end"><Icon name="next" /></button>
-              <span className="hint" style={{ minWidth: 56 }}>{fmtTime(project.media.screen.duration)}</span>
+              <span className="hint" style={{ minWidth: 56 }}>{fmtTime(project.media.screen.duration + (project.edit.leadIn ?? 0))}</span>
             </div>
-            <div className="transport-side" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div data-tour="tl-zoom" className="transport-side" style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <div className="tl-zoom" title="Timeline zoom">
               <button className="icon-btn sm" title="Zoom timeline out" onClick={() => useTimelineView.getState().setZoom((z) => z / 1.5)}><Icon name="minus" size={14} /></button>
               <input
@@ -404,7 +413,7 @@ function AiPanel() {
   )
 }
 
-function TimeLabel() {
+function TimeLabel({ lead }: { lead: number }) {
   const [t, setT] = useState(timeBus.get())
   useEffect(() => {
     let last = 0
@@ -416,5 +425,5 @@ function TimeLabel() {
       }
     })
   }, [])
-  return <span className="hint" style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(t, true)}</span>
+  return <span className="hint" style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(Math.max(0, t + lead), true)}</span>
 }

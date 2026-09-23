@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- New: drag the whole video right to make empty space before it, like CapCut. Fill it with text, pictures or a video for an intro over the background. Drag it back to the start to remove the space.
+- New: transitions, effects, media and audio all get layers. Things at the same time stack on their own layer, and you can drag them between layers.
+- New: guided tour of the editor and home screen that points at each part of the interface. Runs the first time, and again from the ? button.
 - New: splash screen while Scrim starts
 - New: welcome tour on first run (7 short steps, skippable). Take it again from the ? button on the home screen or Settings, General.
 - New: home screen asks what you want to do: Record, or Edit (recent projects, search, import a video, open a project, drop a video to import)

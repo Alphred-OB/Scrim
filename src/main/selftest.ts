@@ -122,6 +122,18 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
       openEditor(env.SCRIM_TEST_DIR!)
       await wait(3500)
       await shot('editor.png')
+      await step('editor tour walks through the interface', async () => {
+        await wait(800)
+        const steps: string[] = []
+        for (let k = 0; k < 20 && (await js<boolean>('!!document.querySelector(".coach-card")')); k++) {
+          steps.push(await js<string>('document.querySelector(".coach-card h3, .coach-card b, .coach-card")?.textContent?.slice(0, 40) ?? ""'))
+          if (k < 3) await shot(`tour-${k + 1}.png`)
+          await js(`document.querySelector('.coach-foot .btn.primary').click()`, true)
+          await wait(350)
+        }
+        log('tour steps', steps.length)
+        if (steps.length < 4) throw new Error('editor tour did not run, steps: ' + steps.length)
+      })
 
       if (env.SCRIM_TEST_IMPORT) {
         log('import errors', JSON.stringify(await js(`window.__scrim.import(${JSON.stringify(env.SCRIM_TEST_IMPORT.split(','))})`)))
@@ -331,6 +343,26 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         win.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
         await js(`document.querySelector('.modal-back')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))`)
         await wait(300)
+      })
+
+      await step('drag the video right to make intro space', async () => {
+        await js('window.__scrim.seek(0)')
+        await wait(300)
+        const b = await js<{ x: number; y: number }>(`(() => { const top = [...document.querySelectorAll('.tl-block')].sort((a, b) => a.getBoundingClientRect().y - b.getBoundingClientRect().y)[0].getBoundingClientRect(); return { x: Math.round(top.x + 40), y: Math.round(top.y + top.height / 2) } })()`)
+        win.webContents.sendInputEvent({ type: 'mouseDown', x: b.x, y: b.y, button: 'left', clickCount: 1 })
+        for (let i = 1; i <= 8; i++) {
+          win.webContents.sendInputEvent({ type: 'mouseMove', x: b.x + i * 20, y: b.y, button: 'left' } as Electron.MouseInputEvent)
+          await wait(30)
+        }
+        win.webContents.sendInputEvent({ type: 'mouseUp', x: b.x + 160, y: b.y, button: 'left', clickCount: 1 })
+        await wait(400)
+        const lead = (await state()).leadIn as number
+        log('lead in', lead)
+        if (!(lead > 0.3)) throw new Error('video did not move, lead is ' + lead)
+        await js(`window.__scrim.addText(${-lead})`)
+        await js(`window.__scrim.seek(${-lead / 2})`)
+        await wait(600)
+        await shot('intro-space.png')
       })
 
       await step('full screen preview', async () => {

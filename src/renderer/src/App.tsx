@@ -10,6 +10,7 @@ import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost } from '@/ui'
 import Onboarding from '@/features/onboarding/Onboarding'
+import CoachMarks from '@/features/onboarding/CoachMarks'
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(() => location.hash.slice(1) || '/')
@@ -72,6 +73,7 @@ export default function App() {
       )}
       <ContextMenuHost />
       {settingsLoaded && !settings.onboarded && <Onboarding />}
+      <CoachMarks />
     </>
   )
 }

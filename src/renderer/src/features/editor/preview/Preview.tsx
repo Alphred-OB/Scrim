@@ -112,7 +112,7 @@ export default function Preview() {
   const syncFollowers = (isPlaying: boolean) => {
     const v = videoRef.current
     if (!v) return
-    for (const f of followers(v.currentTime)) {
+    for (const f of followers(logical.current)) {
       const el = f.el
       el.volume = Math.max(0, Math.min(1, f.volume))
       el.muted = f.muted
@@ -136,6 +136,10 @@ export default function Preview() {
     // background videos loop on their own, even while the editor is paused, so they always look alive
     if (bgv && bgv.paused) bgv.play().catch(() => {})
   }
+
+  // The editor's own clock. Usually the video's time, but it also runs through the lead-in
+  // (empty space before the recording), where the video element can't go.
+  const logical = useRef(time)
 
   // Adaptive preview quality: if frames take too long to draw (big full screen, low end GPU),
   // render smaller while playing and scale up. The export is always full quality.
@@ -167,7 +171,7 @@ export default function Preview() {
     }
     const ctx = c.getContext('2d', { alpha: false })!
     const L = live.current
-    const t = at ?? v.currentTime
+    const t = at ?? logical.current
     const bgv = pool.current.get('bg') as HTMLVideoElement | undefined
     const cam = pool.current.get('webcam') as HTMLVideoElement | undefined
     const overlays = new Map<string, { src: CanvasImageSource; w: number; h: number }>()
@@ -248,7 +252,10 @@ export default function Preview() {
     if (!v || playing) return
     if (time !== lastSeek.current) {
       lastSeek.current = time
-      if (Math.abs(v.currentTime - time) > 0.001) v.currentTime = time
+      logical.current = time
+      // the lead-in (negative time) has no recording; park the video on its first frame
+      const vt = Math.max(0, time)
+      if (Math.abs(v.currentTime - vt) > 0.001) v.currentTime = vt
     }
     syncFollowers(false)
     timeBus.emit(time)
@@ -284,15 +291,25 @@ export default function Preview() {
     if (!playing) {
       v.pause()
       syncFollowers(false)
-      useEditor.getState().setTime(v.currentTime)
+      useEditor.getState().setTime(logical.current)
       return
     }
     const clips = sortedClips(live.current.edit.clips)
-    if (!clipAt(clips, v.currentTime) || v.currentTime >= duration - 0.05) {
-      const n = nextClip(clips, v.currentTime) ?? clips[0]
-      if (n) v.currentTime = n.start
+    const lead = live.current.edit.leadIn ?? 0
+    const last = clips[clips.length - 1]
+    // at the very end: start again from the top (the lead-in if there is one)
+    if (last && logical.current >= last.end - 0.05) logical.current = lead > 0 ? -lead : clips[0].start
+    let intro: { wall: number; from: number } | null = null
+    if (logical.current < 0) {
+      intro = { wall: performance.now(), from: logical.current }
+      v.currentTime = clips[0]?.start ?? 0
+    } else {
+      if (!clipAt(clips, v.currentTime) || v.currentTime >= duration - 0.05) {
+        const n = nextClip(clips, v.currentTime) ?? clips[0]
+        if (n) v.currentTime = n.start
+      }
+      v.play().catch(() => {})
     }
-    v.play().catch(() => {})
     let raf = 0
     // Time of the frame the video is actually showing. If decoding falls behind, the cursor,
     // zoom and text follow the visible frame instead of running ahead of a frozen picture.
@@ -305,6 +322,20 @@ export default function Preview() {
     }
     if ('requestVideoFrameCallback' in v) vfc = v.requestVideoFrameCallback(onFrame)
     const loop = () => {
+      if (intro) {
+        const it = intro.from + (performance.now() - intro.wall) / 1000
+        if (it < 0) {
+          logical.current = it
+          draw.current(it)
+          timeBus.emit(it)
+          syncFollowers(true)
+          raf = requestAnimationFrame(loop)
+          return
+        }
+        // lead-in is over: the recording takes over
+        intro = null
+        v.play().catch(() => {})
+      }
       const cs = sortedClips(live.current.edit.clips)
       const t = v.currentTime
       const cur = clipAt(cs, t)
@@ -329,6 +360,7 @@ export default function Preview() {
       const now = performance.now()
       if (lastLoop && now - lastLoop > 30) adapt(now - lastLoop - 16)
       lastLoop = now
+      logical.current = at
       draw.current(at)
       timeBus.emit(at)
       syncFollowers(true)
@@ -436,7 +468,7 @@ export default function Preview() {
   const assetOf = (id: string): Asset | undefined => assets.get(id)
 
   return (
-    <div ref={wrapRef} className="preview-wrap">
+    <div ref={wrapRef} className="preview-wrap" data-tour="preview">
       <button className="icon-btn preview-full-btn" title={`${isFull ? 'Exit full screen' : 'Full screen preview'} (F)`} onClick={togglePreviewFullscreen}>
         <Icon name={isFull ? 'x' : 'expand'} size={16} />
       </button>

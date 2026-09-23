@@ -42,7 +42,7 @@ export async function canEncode(format: ExportSettings['format'], W: number, H: 
 export function exportDims(project: Project, s: ExportSettings): { W: number; H: number; fps: number; frames: number; duration: number } {
   const res = s.resolution > 0 ? s.resolution : originalRes(project)
   const [W, H] = outputSize(project.edit, project.media.screen.width, project.media.screen.height, res)
-  const duration = outputDuration(project.edit.clips)
+  const duration = outputDuration(project.edit.clips, project.edit.leadIn ?? 0)
   return { W, H, fps: s.fps, duration, frames: Math.max(1, Math.round(duration * s.fps)) }
 }
 
@@ -123,7 +123,8 @@ export async function exportProject(
   const { W, H, fps, frames, duration: outDur } = exportDims(project, settings)
   const clips = sortedClips(edit.clips)
   const webm = settings.format === 'webm'
-  const srcTime = (k: number) => Math.min(duration - 0.001, outputToSource(clips, k / fps))
+  const lead = edit.leadIn ?? 0
+  const srcTime = (k: number) => Math.min(duration - 0.001, outputToSource(clips, k / fps, lead))
 
   onProgress({ phase: 'prepare', progress: 0 })
   await document.fonts.ready
@@ -207,7 +208,7 @@ export async function exportProject(
   await output.start()
 
   const times = function* () {
-    for (let k = 0; k < frames; k++) yield srcTime(k)
+    for (let k = 0; k < frames; k++) yield Math.max(0, srcTime(k)) // the lead-in has no recording frames
   }
 
   let prev: VideoSample | null = null
@@ -305,8 +306,9 @@ export async function exportProject(
       videoPath: tmpVideo,
       outPath,
       duration: outDur,
-      clips,
-      tracks,
+      // the mixer works on times from 0: shift everything past the lead-in, which is one more silent-or-not stretch
+      clips: lead > 0 ? [{ id: 'lead', start: 0, end: lead, speed: 1 }, ...clips.map((c) => ({ ...c, start: c.start + lead, end: c.end + lead }))] : clips,
+      tracks: lead > 0 ? tracks.map((t) => ({ ...t, offset: t.offset + lead, window: t.window ? ([t.window[0] + lead, t.window[1] + lead] as [number, number]) : undefined })) : tracks,
       music: a.musicPath && !a.musicMuted ? { path: a.musicPath, volume: a.musicVolume } : undefined,
       gif: settings.format === 'gif' ? { width: W, fps } : undefined,
       format: settings.format

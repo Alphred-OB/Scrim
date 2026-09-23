@@ -6,6 +6,7 @@ import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu } from '@/u
 import SettingsModal from '@/features/settings/SettingsModal'
 import { matches, useSettings } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
+import { maybeAutoStart } from '@/features/onboarding/tours'
 
 const LS = 'df.recordPrefs'
 interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; webcam: WebcamRecordOptions }
@@ -44,6 +45,11 @@ export default function Launcher() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const recBusy = status.state === 'recording' || status.state === 'paused' || status.state === 'countdown' || status.state === 'stopping'
   const cam = prefs.webcam
+  // after the welcome tour, point out the home screen once
+  const onboarded = useSettings((s) => s.settings.onboarded)
+  useEffect(() => {
+    if (tab === 'home' && onboarded) maybeAutoStart('home')
+  }, [tab, onboarded])
   useEffect(() => {
     if (recBusy) setTab('record')
   }, [recBusy])
@@ -209,8 +215,19 @@ export default function Launcher() {
         </button>
         {tab !== 'home' && <span className="crumb">{tab === 'record' ? 'New recording' : 'Your projects'}</span>}
         <div style={{ flex: 1 }} />
-        <button className="icon-btn" title="Take the tour" onClick={() => useSettings.getState().save({ onboarded: false })}><Icon name="help" /></button>
-        <button className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
+        <button
+          data-tour="help"
+          className="icon-btn"
+          title="Take the tour"
+          onClick={() => {
+            setTab('home')
+            const s = useSettings.getState()
+            s.save({ onboarded: false, toursSeen: (s.settings.toursSeen ?? []).filter((t) => t !== 'home') })
+          }}
+        >
+          <Icon name="help" />
+        </button>
+        <button data-tour="settings" className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
       </header>
 
       {status.state === 'error' && (
@@ -223,19 +240,19 @@ export default function Launcher() {
         <div className="home fade-in">
           <h1>What would you like to do?</h1>
           <div className="home-choices">
-            <button className="home-card rec" onClick={() => setTab('record')}>
+            <button data-tour="home-record" className="home-card rec" onClick={() => setTab('record')}>
               <span className="home-icon"><Icon name="record" size={26} /></span>
               <b>Record</b>
               <span>Your screen, a window or a browser tab, with your mic and webcam.</span>
             </button>
-            <button className="home-card edit" onClick={() => setTab('projects')}>
+            <button data-tour="home-edit" className="home-card edit" onClick={() => setTab('projects')}>
               <span className="home-icon"><Icon name="scissors" size={24} /></span>
               <b>Edit</b>
               <span>Open a recent project, or bring in a video to polish.</span>
             </button>
           </div>
           {projects.length > 0 && (
-            <div className="home-recent">
+            <div className="home-recent" data-tour="home-recent">
               <div className="section-head">
                 <span className="section-title">Continue where you left off</span>
                 <button className="link" onClick={() => setTab('projects')}>See all {projects.length}</button>

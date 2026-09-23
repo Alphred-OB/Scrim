@@ -234,7 +234,7 @@ export interface TransitionSettings {
   items: TransitionItem[]
 }
 /** A transition placed on the Transitions track: it peaks in the middle of start..end. */
-export interface TransitionItem { id: string; type: TransitionType; start: number; end: number; direction?: TransitionDir; ease?: TransitionEase }
+export interface TransitionItem { id: string; type: TransitionType; start: number; end: number; lane?: number; direction?: TransitionDir; ease?: TransitionEase }
 
 export type EffectLook =
   | 'none' | 'vivid' | 'punchy' | 'warm' | 'cool' | 'cinematic' | 'cyberpunk' | 'dreamy' | 'faded' | 'matte'
@@ -318,6 +318,11 @@ export interface EditState {
   transitions: TransitionSettings
   effects: EffectSettings
   effectClips: EffectClip[]
+  /**
+   * Empty space before the recording starts (seconds), made by dragging the video later on the
+   * timeline. That space uses negative source time, so intro text and media sit at t < 0.
+   */
+  leadIn: number
   /** eye / speaker buttons on the timeline tracks */
   tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean }
 }
@@ -383,4 +388,6 @@ export interface AppSettings {
   recordBorder: boolean
   /** false until the welcome tour has been finished or skipped */
   onboarded: boolean
+  /** guided interface tours already shown ('home', 'editor') */
+  toursSeen: string[]
 }
