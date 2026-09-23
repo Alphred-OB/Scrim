@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- New: arrow keys move the playhead 0.5 seconds by default (pick one frame up to 5 seconds in Settings, General). Shift moves 5 times further, comma and period step one frame, Home and End jump to the start and end. The timeline scrolls to follow.
+- New: 12 themes (including Black & white and White & black) plus a fully custom theme (accent, background, panels, text, dark or light base), a choice of interface font, and interface size
+- New: animated export progress with 6 styles (wavy ring like the Play Store, clean ring, liquid fill, orbit, dots, wavy bar), a check mark that draws itself when done, and optional confetti
+- New: spotlight modes (glow, dim the rest, ring), when to show it (always, while moving, on clicks), strength, darkness, shade color, edge softness and ring thickness
 - New: pause and resume while recording (floating bar, tray, or Alt+Shift+P). Paused time is left out of the video, audio, webcam and cursor.
 - New: Ctrl+S saves the project, Ctrl+O opens a project or any video
 - Changed: the floating bar no longer has Discard or Restart, so a recording can't be deleted by a stray click. Both are still in the tray menu and ask before deleting.

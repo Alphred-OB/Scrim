@@ -100,6 +100,10 @@ export interface CropSettings { top: number; bottom: number; left: number; right
 
 export type CursorStyle = string // id from the cursor library (renderer/features/editor/engine/cursors.ts)
 export type ClickEffect = 'none' | 'ripple' | 'ring' | 'pulse'
+/** glow = colored light around the cursor, dim = darken everything else, ring = outlined circle */
+export type SpotlightMode = 'glow' | 'dim' | 'ring'
+/** always, only while the cursor moves, or only around clicks */
+export type SpotlightWhen = 'always' | 'moving' | 'clicks'
 export interface CursorSettings {
   show: boolean
   style: CursorStyle
@@ -116,9 +120,16 @@ export interface CursorSettings {
   bounceMs: number
   sway: number
   hideIdle: boolean
-  highlight: boolean // soft spotlight around cursor
-  highlightColor: string
+  highlight: boolean // spotlight around cursor
+  highlightMode: SpotlightMode
+  highlightColor: string // glow / ring color
   highlightSize: number // multiplier
+  highlightOpacity: number // 0..1 strength of the glow or ring
+  highlightSoftness: number // 0 = hard edge, 1 = fully feathered
+  highlightDim: number // 0..0.9 how dark everything else gets in "dim" mode
+  highlightDimColor: string // shade color used by "dim" mode
+  highlightRing: number // ring thickness multiplier (ring mode)
+  highlightWhen: SpotlightWhen
   hiddenClicks: number[] // click times (rounded ms) whose effect is switched off
 }
 
@@ -301,10 +312,20 @@ export interface RecorderStatus {
 
 // ---- app wide settings (not per project) ----
 export type ExportSound = 'chime' | 'pop' | 'success' | 'custom'
+export interface ThemeColors { base: 'dark' | 'light'; bg: string; panel: string; text: string; accent: string }
+export type ExportProgressStyle = 'wavy' | 'ring' | 'liquid' | 'dots' | 'orbit' | 'bar'
 export interface AppSettings {
   shortcuts: Record<string, string> // action id -> key combo like "Ctrl+Z"
   exportSound: { enabled: boolean; sound: ExportSound; customPath?: string; volume: number }
   reduceTransparency: boolean
-  theme: 'dark' | 'light' | 'system'
+  /** 'dark', 'light', 'system', a preset id from lib/theme.ts, or 'custom' */
+  theme: string
+  customTheme?: ThemeColors
+  uiFont: string
+  uiScale: number // 0.8..1.3 interface zoom
+  exportProgress: ExportProgressStyle
+  exportCelebrate: boolean // confetti when an export finishes
   captureEngine: 'auto' | 'dda' | 'gdi'
+  /** seconds the arrow keys move the playhead (0 = one frame); Shift moves 5x */
+  arrowStep: number
 }

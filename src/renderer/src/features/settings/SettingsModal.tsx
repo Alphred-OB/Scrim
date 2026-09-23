@@ -3,7 +3,8 @@ import { SHORTCUTS, defaultSettings } from '@shared/defaults'
 import type { AppSettings, ExportSound } from '@shared/types'
 import { useSettings, comboFromEvent, playDoneSound } from '@/lib/settings'
 import { api } from '@/lib/api'
-import { Icon, Select, Seg, Slider, Toggle } from '@/ui'
+import { Icon, ProgressViz, PROGRESS_STYLES, Select, Seg, Slider, Toggle } from '@/ui'
+import AppearanceTab from './AppearanceTab'
 
 type Tab = 'general' | 'shortcuts' | 'export' | 'appearance' | 'ai'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -20,6 +21,13 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const save = useSettings((s) => s.save)
   const [recording, setRecording] = useState<string | null>(null)
   const [dda, setDda] = useState<boolean | null>(null)
+  // fake progress that loops so the animation previews move
+  const [demo, setDemo] = useState(0.1)
+  useEffect(() => {
+    if (tab !== 'export') return
+    const id = setInterval(() => setDemo((d) => (d >= 1 ? 0 : Math.min(1, d + 0.04))), 120)
+    return () => clearInterval(id)
+  }, [tab])
 
   useEffect(() => {
     api.engines().then((e) => setDda(e.dda)).catch(() => setDda(false))
@@ -79,6 +87,25 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               </span>
             </div>
           )}
+          {tab === 'general' && (
+            <div className="section">
+              <span className="section-title">Arrow keys in the editor</span>
+              <Select
+                value={settings.arrowStep ?? 0.5}
+                options={[
+                  { v: 0, l: 'One frame' },
+                  { v: 0.1, l: '0.1 second' },
+                  { v: 0.25, l: '0.25 second' },
+                  { v: 0.5, l: '0.5 second' },
+                  { v: 1, l: '1 second' },
+                  { v: 2, l: '2 seconds' },
+                  { v: 5, l: '5 seconds' }
+                ]}
+                onChange={(v) => save({ arrowStep: v })}
+              />
+              <span className="hint">Left and Right move the playhead by this much. Hold Shift to move 5 times further. Comma and period always move one frame.</span>
+            </div>
+          )}
 
           {tab === 'shortcuts' && (
             <div className="section">
@@ -105,6 +132,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
+          {tab === 'export' && (
+            <div className="section">
+              <span className="section-title">Progress animation</span>
+              <div className="progress-pick">
+                {PROGRESS_STYLES.map((p) => (
+                  <button key={p.id} className={`pick-tile ${(settings.exportProgress ?? 'wavy') === p.id ? 'on' : ''}`} onClick={() => save({ exportProgress: p.id })}>
+                    <ProgressViz kind={p.id} value={demo} size={p.id === 'bar' ? 44 : 64} bare />
+                    <span>{p.name}</span>
+                  </button>
+                ))}
+              </div>
+              <Toggle label="Confetti when it's done" value={settings.exportCelebrate ?? true} onChange={(v) => save({ exportCelebrate: v })} />
+            </div>
+          )}
           {tab === 'export' && (
             <div className="section">
               <span className="section-title">When an export finishes</span>
@@ -140,31 +181,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {tab === 'appearance' && (
-            <div className="section">
-              <span className="section-title">Theme</span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
-                {(
-                  [
-                    { id: 'dark', l: 'Dark', bg: 'linear-gradient(135deg,#1b1c22,#0a0b0e)' },
-                    { id: 'light', l: 'Light', bg: 'linear-gradient(135deg,#ffffff,#dfe1e6)' },
-                    { id: 'system', l: 'Match Windows', bg: 'linear-gradient(135deg,#f5f5f7 50%,#1b1c22 50%)' }
-                  ] as const
-                ).map((t) => {
-                  const on = settings.theme === t.id
-                  return (
-                    <button key={t.id} className={`theme-card ${on ? 'on' : ''}`} onClick={() => save({ theme: t.id })}>
-                      <div style={{ height: 70, borderRadius: 8, background: t.bg, border: '1px solid var(--line)' }} />
-                      <b>{t.l}</b>
-                    </button>
-                  )
-                })}
-              </div>
-              <div style={{ marginTop: 14 }}>
-                <Toggle label="Reduce transparency (faster on low end PCs)" value={settings.reduceTransparency} onChange={(v) => save({ reduceTransparency: v })} />
-              </div>
-            </div>
-          )}
+          {tab === 'appearance' && <AppearanceTab settings={settings} save={save} />}
 
           {tab === 'ai' && (
             <div className="section">

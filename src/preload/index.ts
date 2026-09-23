@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 
 const invoke = (ch: string, ...a: unknown[]) => ipcRenderer.invoke(ch, ...a)
 
@@ -46,6 +46,7 @@ const api = {
   notify: (title: string, body: string) => invoke('app:notify', title, body),
   engines: () => invoke('app:engines'),
   setTheme: (t: 'dark' | 'light') => invoke('app:theme', t),
+  setZoom: (f: number) => webFrame.setZoomFactor(Math.max(0.7, Math.min(1.5, f))),
 
   openEditor: (dir: string) => ipcRenderer.send('nav:editor', dir),
 

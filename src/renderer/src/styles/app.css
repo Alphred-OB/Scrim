@@ -5,7 +5,7 @@ html, body, #root { height: 100%; margin: 0; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font, 'Inter'), 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   font-size: 13px;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   letter-spacing: -0.005em;
@@ -52,7 +52,7 @@ input, select, textarea { font-family: inherit; }
 .btn:hover { background: var(--card-hi); border-color: var(--line-2); }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-.btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.primary { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 .btn.primary:hover { background: var(--accent-2); }
 .btn.danger { background: var(--danger); border-color: transparent; color: #fff; }
 .btn.ghost { background: transparent; border-color: transparent; }
@@ -130,8 +130,8 @@ textarea.field-input { resize: vertical; min-height: 64px; line-height: 1.4; }
 /* menus */
 .menu { min-width: 200px; border-radius: 12px; padding: 5px; }
 .menu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 5px 10px; min-height: 32px; border-radius: 7px; background: none; border: none; cursor: pointer; font-size: 13px; color: var(--text); }
-.menu-item:hover:not(:disabled), .menu-item.hi { background: var(--accent); color: #fff; }
-.menu-item:hover .mi-hint, .menu-item.hi .mi-hint { color: rgba(255, 255, 255, 0.8); }
+.menu-item:hover:not(:disabled), .menu-item.hi { background: var(--accent); color: var(--on-accent); }
+.menu-item:hover .mi-hint, .menu-item.hi .mi-hint { color: var(--on-accent); opacity: 0.8; }
 .menu-item.danger { color: #ff6b62; }
 .menu-item.danger:hover { background: var(--danger); color: #fff; }
 .mi-icon { width: 16px; display: inline-flex; justify-content: center; font-size: 12px; }
@@ -240,7 +240,7 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .tl-eye.off { color: var(--faint); }
 .mi-text { flex: 1; display: flex; flex-direction: column; gap: 1px; text-align: left; }
 .mi-sub { font-size: 11px; color: var(--dim); font-weight: 400; max-width: 300px; white-space: normal; }
-.menu-item.hi .mi-sub { color: rgba(255, 255, 255, 0.8); }
+.menu-item.hi .mi-sub { color: var(--on-accent); opacity: 0.8; }
 .menu-item:disabled { opacity: 0.5; cursor: default; }
 
 /* preview + full screen */
@@ -258,4 +258,15 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 
 /* join marker when dragging a video onto the Video track */
 .tl-join { position: absolute; width: 4px; border-radius: 2px; background: var(--accent); z-index: 6; pointer-events: none; }
-.tl-join span { position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 11px; font-weight: 600; color: #fff; background: var(--accent); padding: 3px 8px; border-radius: 6px; }
+.tl-join span { position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--on-accent); background: var(--accent); padding: 3px 8px; border-radius: 6px; }
+
+/* export finished: circle pops in, check draws itself */
+.done-burst { position: relative; display: flex; align-items: center; justify-content: center; }
+.done-confetti { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+.done-circle { fill: var(--ok); transform-origin: center; animation: donePop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.done-check { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: doneDraw 0.35s 0.3s ease-out forwards; }
+@keyframes donePop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes doneDraw { to { stroke-dashoffset: 0; } }
+.progress-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.progress-pick .pick-tile { width: auto; }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }

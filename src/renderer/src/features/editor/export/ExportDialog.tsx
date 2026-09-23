@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ExportFormat, ExportSettings, Project } from '@shared/types'
 import { api } from '@/lib/api'
 import { playDoneSound } from '@/lib/settings'
-import { Icon, Select, Seg, fmtTime, type Option } from '@/ui'
+import { DoneBurst, Icon, ProgressViz, Select, Seg, fmtTime, type Option } from '@/ui'
+import { useSettings } from '@/lib/settings'
 import { useEditor, flushSave } from '../state/store'
 import { outputSize } from '../engine/compositor'
 import { GIF_MAX_FPS, GIF_MAX_RES, canEncode, estimateExportSeconds, exportDims, exportProject, originalRes, sourceFps, type ExportProgress } from './exporter'
@@ -97,6 +98,8 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const set = (patch: Partial<ExportSettings>) => update((e) => Object.assign(e.export, patch))
   const choices = useExportChoices(project, s)
+  const progressStyle = useSettings((x) => x.settings.exportProgress ?? 'wavy')
+  const celebrate = useSettings((x) => x.settings.exportCelebrate ?? true)
   const { W, H, duration } = exportDims(project, s)
 
   // if the current choice isn't possible (e.g. 60 fps on a 27 fps recording), switch to the nearest real one
@@ -193,7 +196,9 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'running' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="progress"><div style={{ width: `${pct}%` }} /></div>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+              <ProgressViz kind={progressStyle} value={prog.phase === 'prepare' ? null : pct / 100} size={170} />
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }} className="hint">
               <span>
                 {prog.phase === 'prepare'
@@ -211,10 +216,10 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'done' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 28, height: 28, borderRadius: 14, background: 'var(--ok)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>✓</span>
-              <b>Your video is ready</b>
-              <span className="hint">in {fmtTime(took)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+              <DoneBurst confetti={celebrate} size={96} />
+              <b style={{ fontSize: 16 }}>Your video is ready</b>
+              <span className="hint">Exported in {fmtTime(took)}</span>
             </div>
             <div className="chip" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{outPath}</div>
             <div style={{ display: 'flex', gap: 8 }}>

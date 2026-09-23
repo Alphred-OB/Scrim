@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import type { ClickEffect } from '@shared/types'
+import type { ClickEffect, SpotlightMode, SpotlightWhen } from '@shared/types'
 import { defaultEdit } from '@shared/defaults'
-import { ColorRow, Section, Slider, Toggle } from '@/ui'
+import { ColorRow, Section, Seg, Slider, Toggle } from '@/ui'
 import { useEditor } from '../state/store'
 import { CURSORS, cursorDef } from '../engine/cursors'
 import { cursorThumb } from '../engine/thumbnails'
@@ -78,17 +78,53 @@ export default function CursorPanel() {
           <Toggle label="Hide when not moving" value={c.hideIdle} onChange={(v) => update((e) => (e.cursor.hideIdle = v))} />
         </Section>
 
-        <Section title="Spotlight">
+        <Section
+          title="Spotlight"
+          onReset={() =>
+            update((e) => {
+              for (const k of ['highlightMode', 'highlightColor', 'highlightSize', 'highlightOpacity', 'highlightSoftness', 'highlightDim', 'highlightDimColor', 'highlightRing', 'highlightWhen'] as const)
+                (e.cursor as unknown as Record<string, unknown>)[k] = d[k]
+            })
+          }
+        >
           <Toggle label="Spotlight around the cursor" value={c.highlight} onChange={(v) => update((e) => (e.cursor.highlight = v))} />
           {c.highlight && (
             <>
-              <ColorRow label="Color" value={c.highlightColor} onChange={(v) => update((e) => (e.cursor.highlightColor = v), 'hcolor')} />
-              <div className="swatch-row">
-                {['#ffe678', '#ffffff', '#0a84ff', '#ff453a', '#30d158', '#bf5af2'].map((col) => (
-                  <button key={col} className={`swatch ${c.highlightColor === col ? 'on' : ''}`} style={{ background: col }} onClick={() => update((e) => (e.cursor.highlightColor = col))} />
-                ))}
-              </div>
-              <Slider label="Size" value={c.highlightSize} min={0.4} max={3} step={0.05} def={1} format={(v) => `${v.toFixed(2)}x`} onChange={(v) => update((e) => (e.cursor.highlightSize = v), 'hsize')} />
+              <Seg
+                options={[{ v: 'glow', l: 'Glow' }, { v: 'dim', l: 'Dim the rest' }, { v: 'ring', l: 'Ring' }]}
+                value={c.highlightMode}
+                onChange={(v) => update((e) => (e.cursor.highlightMode = v as SpotlightMode))}
+              />
+              <span className="hint">
+                {c.highlightMode === 'dim' ? 'Darkens everything except the area around the cursor.' : c.highlightMode === 'ring' ? 'Draws a circle that follows the cursor.' : 'A soft light that follows the cursor.'}
+              </span>
+              <span className="section-title" style={{ marginTop: 4 }}>Show</span>
+              <Seg
+                options={[{ v: 'always', l: 'Always' }, { v: 'moving', l: 'When moving' }, { v: 'clicks', l: 'On clicks' }]}
+                value={c.highlightWhen}
+                onChange={(v) => update((e) => (e.cursor.highlightWhen = v as SpotlightWhen))}
+              />
+              {c.highlightMode === 'dim' ? (
+                <>
+                  <ColorRow label="Shade color" value={c.highlightDimColor} onChange={(v) => update((e) => (e.cursor.highlightDimColor = v), 'hdc')} />
+                  <Slider label="Darkness" value={c.highlightDim} min={0.05} max={0.9} step={0.01} def={d.highlightDim} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.cursor.highlightDim = v), 'hdim')} />
+                </>
+              ) : (
+                <>
+                  <ColorRow label="Color" value={c.highlightColor} onChange={(v) => update((e) => (e.cursor.highlightColor = v), 'hcolor')} />
+                  <div className="swatch-row">
+                    {['#ffe678', '#ffffff', '#0a84ff', '#ff453a', '#30d158', '#bf5af2'].map((col) => (
+                      <button key={col} className={`swatch ${c.highlightColor === col ? 'on' : ''}`} style={{ background: col }} onClick={() => update((e) => (e.cursor.highlightColor = col))} />
+                    ))}
+                  </div>
+                  <Slider label="Strength" value={c.highlightOpacity} min={0.05} max={1} step={0.01} def={d.highlightOpacity} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.cursor.highlightOpacity = v), 'hop')} />
+                </>
+              )}
+              <Slider label="Size" value={c.highlightSize} min={0.3} max={4} step={0.05} def={d.highlightSize} format={(v) => `${v.toFixed(2)}x`} onChange={(v) => update((e) => (e.cursor.highlightSize = v), 'hsize')} />
+              <Slider label="Edge softness" value={c.highlightSoftness} min={0} max={1} step={0.01} def={d.highlightSoftness} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.cursor.highlightSoftness = v), 'hsoft')} />
+              {c.highlightMode === 'ring' && (
+                <Slider label="Ring thickness" value={c.highlightRing} min={0.3} max={4} step={0.05} def={d.highlightRing} format={(v) => `${v.toFixed(2)}x`} onChange={(v) => update((e) => (e.cursor.highlightRing = v), 'hring')} />
+              )}
             </>
           )}
         </Section>

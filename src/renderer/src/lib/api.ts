@@ -14,6 +14,7 @@ export interface MuxJobIn {
 }
 
 export interface Api {
+  setZoom(factor: number): void
   pauseRecording(): Promise<void>
   resumeRecording(): Promise<void>
   /** Ctrl+O dialog. Returns the project folder to open, or null if cancelled. */

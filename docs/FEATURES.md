@@ -38,7 +38,7 @@ Wallpapers (24), Live (animated: aurora, orbit, concentric, contour, waves, boke
 - **Master zoom** scales every zoom at once. **Transition speed** sets how fast it eases in and out.
 
 ## Cursor and clicks
-19 cursor styles in five groups: Classic (macOS, Windows, outline), Simple, Pointy (including neon), Touch (dot, touch circle, ring) and Special (hand, crosshair, pen). Style it with fill, outline, outline width, size, shadow and opacity. Motion has smoothing, sway and hide when not moving. There's also a spotlight with its own color and size. Click effects: ripple, ring or pulse, with color and bounce.
+19 cursor styles in five groups: Classic (macOS, Windows, outline), Simple, Pointy (including neon), Touch (dot, touch circle, ring) and Special (hand, crosshair, pen). Style it with fill, outline, outline width, size, shadow and opacity. Motion has smoothing, sway and hide when not moving. The spotlight can glow, dim everything else, or draw a ring. Choose when it shows (always, while moving, on clicks), and set its color, strength, darkness, size and edge softness. Click effects: ripple, ring or pulse, with color and bounce.
 
 ## Text
 Add from the Text panel, the Text track or **T**. Drag on the preview to move it (it snaps to the center). Drag the white corner to resize, and double click to type directly on the video. Styles include font, size, bold, italic, underline, alignment, color, box, letter spacing, shadow and animation (fade, slide, pop, typewriter).
@@ -61,8 +61,8 @@ MP4 (H.264), WebM (VP9 + Opus), MOV, or GIF. Pick the resolution (with the real 
 ## Settings (gear icon, Ctrl+,)
 - **General:** capture engine. Automatic uses GPU capture when possible. Compatibility uses GDI.
 - **Shortcuts:** click any shortcut and press new keys. Clashes are flagged.
-- **Export:** finish sound on or off, chime, success, pop or your own file, volume, and a test button
-- **Appearance:** dark, light, or match Windows, and reduce transparency for low end PCs
+- **Export:** progress animation style, confetti, finish sound on or off, chime, success, pop or your own file, volume, and a test button
+- **Appearance:** 12 themes or your own custom colors, interface font and size, and reduce transparency for low end PCs
 - **AI:** what's coming
 
 ## Default shortcuts
@@ -74,8 +74,10 @@ MP4 (H.264), WebM (VP9 + Opus), MOV, or GIF. Pick the resolution (with the real 
 | Delete selected | Delete |
 | Duplicate selected | Ctrl+D |
 | Add zoom / text | Z / T |
-| Frame step | Left / Right |
-| Jump 1 second | Shift+Left / Shift+Right |
+| Step (0.5s by default, set in General) | Left / Right |
+| Big step (5x) | Shift+Left / Shift+Right |
+| One frame | , / . |
+| Start / end | Home / End |
 | Timeline zoom | = / - (or Ctrl + mouse wheel) |
 | Export | Ctrl+E |
 | Import media | Ctrl+I |

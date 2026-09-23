@@ -65,9 +65,10 @@ export default function Timeline() {
     const move = (t: number) => {
       if (playheadRef.current) playheadRef.current.style.transform = `translateX(${X(t)}px)`
       const sc = scrollRef.current
-      if (sc && useEditor.getState().playing) {
-        const x = X(t)
-        if (x > sc.scrollLeft + sc.clientWidth - 40 || x < sc.scrollLeft) sc.scrollLeft = x - 80
+      // keep the playhead in view while playing or stepping with the arrow keys
+      if (sc) {
+        const x = X(t) + HEAD_W
+        if (x > sc.scrollLeft + sc.clientWidth - 40 || x < sc.scrollLeft + HEAD_W) sc.scrollLeft = Math.max(0, x - HEAD_W - 80)
       }
     }
     move(timeBus.get())

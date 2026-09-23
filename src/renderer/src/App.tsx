@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { startMedia, stopMedia, cancelMedia, pauseMedia, resumeMedia } from '@/lib/mediaCapture'
 import { useSettings } from '@/lib/settings'
+import { applyTheme } from '@/lib/theme'
 import Launcher from '@/features/launcher/Launcher'
 import Toolbar from '@/features/recording/Toolbar'
 import Bubble from '@/features/recording/Bubble'
@@ -39,7 +40,7 @@ function registerRpc(): void {
 export default function App() {
   const route = useHashRoute()
   const reduce = useSettings((s) => s.settings.reduceTransparency)
-  const theme = useSettings((s) => s.settings.theme)
+  const settings = useSettings((s) => s.settings)
   useEffect(() => {
     useSettings.getState().load()
   }, [])
@@ -48,15 +49,12 @@ export default function App() {
   }, [reduce])
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const apply = () => {
-      const t = theme === 'system' ? (mq.matches ? 'light' : 'dark') : theme
-      document.documentElement.dataset.theme = t
-      if (!location.hash.includes('toolbar') && !location.hash.includes('bubble')) api.setTheme(t).catch(() => {})
-    }
+    const main = !location.hash.includes('toolbar') && !location.hash.includes('bubble')
+    const apply = () => applyTheme(settings, mq.matches, main)
     apply()
     mq.addEventListener('change', apply)
     return () => mq.removeEventListener('change', apply)
-  }, [theme])
+  }, [settings.theme, settings.customTheme, settings.uiFont, settings.uiScale])
 
   if (route.startsWith('/toolbar')) return <Toolbar />
   if (route.startsWith('/bubble')) return <Bubble query={route.split('?')[1] ?? ''} />

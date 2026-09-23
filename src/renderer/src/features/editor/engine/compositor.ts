@@ -446,6 +446,9 @@ function drawCursorLayer(
   const base = Math.max(0.6, pxPerSrc) * 1.0 * cs.size // cursor ~ its real size, scaled
   const clickDur = 0.55
 
+  // spotlight first, so dim mode never darkens the click effects or the cursor
+  if (cs.highlight) drawSpotlight(ctx, cs, inp, px, py, Math.max(0.6, pxPerSrc), p.idle)
+
   // click effects under the cursor
   if (cs.clickEffect !== 'none') {
     const hidden = new Set(cs.hiddenClicks)
@@ -489,18 +492,6 @@ function drawCursorLayer(
   if (cs.hideIdle && p.idle > 1.5) alpha = Math.max(0, 1 - (p.idle - 1.5) / 0.4)
   if (alpha <= 0.01) return
 
-  if (cs.highlight) {
-    ctx.save()
-    const R = 60 * base * cs.highlightSize
-    const g = ctx.createRadialGradient(px, py, 0, px, py, R)
-    g.addColorStop(0, hexA(cs.highlightColor, 0.4))
-    g.addColorStop(1, hexA(cs.highlightColor, 0))
-    ctx.fillStyle = g
-    ctx.globalAlpha = alpha
-    ctx.fillRect(px - R, py - R, R * 2, R * 2)
-    ctx.restore()
-  }
-
   // press bounce
   let bounce = 1
   if (cs.clickBounce > 1) {
@@ -525,6 +516,60 @@ function drawCursorLayer(
 }
 
 // ---------------- text ----------------
+/** How strongly the spotlight shows right now (0..1), based on its "when" setting. */
+function spotlightStrength(cs: EditState['cursor'], t: number, idle: number, clicks: RenderInputs['clicks']): number {
+  if (cs.highlightWhen === 'moving') return Math.max(0, Math.min(1, 1 - (idle - 0.3) / 0.5))
+  if (cs.highlightWhen === 'clicks') {
+    let k = 0
+    for (const c of clicks) {
+      const up = c.up ?? c.t + 0.1
+      if (t < c.t - 0.3 || t > up + 0.7) continue
+      const v = t < c.t ? (t - (c.t - 0.3)) / 0.3 : t <= up + 0.3 ? 1 : 1 - (t - up - 0.3) / 0.4
+      k = Math.max(k, v)
+    }
+    return Math.max(0, Math.min(1, k))
+  }
+  return 1
+}
+
+function drawSpotlight(ctx: Ctx, cs: EditState['cursor'], inp: RenderInputs, px: number, py: number, unit: number, idle: number): void {
+  const k = spotlightStrength(cs, inp.t, idle, inp.clicks)
+  if (k <= 0.01) return
+  const R = 120 * unit * cs.highlightSize
+  const soft = Math.max(0, Math.min(1, cs.highlightSoftness))
+  const hard = 1 - soft // where the edge starts fading
+  ctx.save()
+  if (cs.highlightMode === 'dim') {
+    // everything outside the circle gets shaded; the gradient's last color fills the rest of the view
+    const g = ctx.createRadialGradient(px, py, 0, px, py, R)
+    g.addColorStop(0, hexA(cs.highlightDimColor, 0))
+    g.addColorStop(Math.min(0.98, hard * 0.98), hexA(cs.highlightDimColor, 0))
+    g.addColorStop(1, hexA(cs.highlightDimColor, cs.highlightDim))
+    ctx.globalAlpha = k
+    ctx.fillStyle = g
+    ctx.fillRect(-1e5, -1e5, 2e5, 2e5)
+  } else if (cs.highlightMode === 'ring') {
+    const w = Math.max(1, 3 * unit * cs.highlightRing)
+    ctx.globalAlpha = k * Math.min(1, cs.highlightOpacity * 2)
+    ctx.strokeStyle = cs.highlightColor
+    ctx.lineWidth = w
+    if (soft > 0.05) ctx.shadowColor = cs.highlightColor
+    ctx.shadowBlur = soft * 12 * unit
+    ctx.beginPath()
+    ctx.arc(px, py, R * 0.7, 0, Math.PI * 2)
+    ctx.stroke()
+  } else {
+    const g = ctx.createRadialGradient(px, py, 0, px, py, R)
+    g.addColorStop(0, hexA(cs.highlightColor, cs.highlightOpacity))
+    g.addColorStop(Math.min(0.98, hard * 0.98), hexA(cs.highlightColor, cs.highlightOpacity))
+    g.addColorStop(1, hexA(cs.highlightColor, 0))
+    ctx.globalAlpha = k
+    ctx.fillStyle = g
+    ctx.fillRect(px - R, py - R, R * 2, R * 2)
+  }
+  ctx.restore()
+}
+
 function hexA(hex: string, a: number): string {
   let h = hex.replace('#', '')
   if (h.length === 3) h = h.split('').map((c) => c + c).join('')

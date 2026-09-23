@@ -100,6 +100,8 @@ function EditorView() {
       panel: (p: Panel) => useEditor.getState().setPanel(p),
       settings: () => setSettingsOpen(true),
       exportDialog: () => setExporting(true),
+      patchCursor: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.cursor, patch)),
+      seek: (t: number) => useEditor.getState().setTime(t),
       import: (paths: string[]) => importMedia(useEditor.getState().project!.dir, paths, timeBus.get()),
       estimate: () => {
         const st = useEditor.getState()
@@ -132,6 +134,8 @@ function EditorView() {
       const st = useEditor.getState()
       const sc = useSettings.getState().settings.shortcuts
       const fps = project.media.screen.fps || 30
+      const arrowSetting = useSettings.getState().settings.arrowStep ?? 0.5
+      const arrow = arrowSetting > 0 ? arrowSetting : 1 / fps
       const step = (d: number) => {
         st.setPlaying(false)
         st.setTime(Math.max(0, Math.min(project.media.screen.duration, timeBus.get() + d)))
@@ -144,10 +148,14 @@ function EditorView() {
         delete: deleteSelection,
         addZoom: () => addZoomAt(timeBus.get()),
         addText: () => addTextAt(timeBus.get()),
-        stepBack: () => step(-1 / fps),
-        stepForward: () => step(1 / fps),
-        jumpBack: () => step(-1),
-        jumpForward: () => step(1),
+        stepBack: () => step(-arrow),
+        stepForward: () => step(arrow),
+        jumpBack: () => step(-arrow * 5),
+        jumpForward: () => step(arrow * 5),
+        frameBack: () => step(-1 / fps),
+        frameForward: () => step(1 / fps),
+        goStart: () => jump(-1),
+        goEnd: () => jump(1),
         timelineIn: () => useTimelineView.getState().setZoom((z) => z * 1.5),
         timelineOut: () => useTimelineView.getState().setZoom((z) => z / 1.5),
         export: () => setExporting(true),
@@ -197,7 +205,7 @@ function EditorView() {
   const jump = (dir: -1 | 1) => {
     const st = useEditor.getState()
     st.setPlaying(false)
-    const cs = sortedClips(project.edit.clips)
+    const cs = sortedClips(st.project!.edit.clips)
     st.setTime(dir < 0 ? cs[0]?.start ?? 0 : Math.max(0, (cs[cs.length - 1]?.end ?? 0) - 0.05))
   }
 
