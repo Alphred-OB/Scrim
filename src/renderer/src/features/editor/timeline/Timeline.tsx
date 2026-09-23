@@ -10,7 +10,7 @@ import { freeLane } from '@shared/defaults'
 import { useEditor, Selection } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
-import { addAssetAt, addBlurAt, addEffectAt, addTransitionAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from '../state/actions'
+import { addAssetAt, addBlurAt, addEffectAt, addTransitionItem, setTransitionAtJoint, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from '../state/actions'
 import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
 import Waveform from './Waveform'
 import Filmstrip from './Filmstrip'
@@ -74,6 +74,8 @@ export default function Timeline() {
   const [joinHint, setJoinHint] = useState<'start' | 'end' | null>(null)
   const [snapLine, setSnapLine] = useState<number | null>(null)
   const [hoverT, setHoverT] = useState<number | null>(null)
+  // the start, cut or end a dragged transition will land on
+  const [hotJoint, setHotJoint] = useState<string | null>(null)
 
   // ---- time: everything on screen is output time (what plays after cuts and speed changes) ----
   const clips = sortedClips(edit.clips)
@@ -405,6 +407,7 @@ export default function Timeline() {
   pushLanes('blur', lanesOf(edit.blurs ?? [], spareOn === 'blur'), { label: 'Blur', icon: 'eyeOff', color: COLORS.blur, kind: 'blur', toggle: eye(edit.tracks.blurs !== false, () => update((e) => (e.tracks.blurs = !(e.tracks.blurs !== false))), 'Show or hide blur regions') })
   pushLanes('overlay', lanesOf(edit.overlays, spareOn === 'overlay'), { label: 'Media', icon: 'image', color: COLORS.overlay, kind: 'overlay', toggle: eye(edit.tracks.media, () => update((e) => (e.tracks.media = !e.tracks.media)), 'Show or hide all media') })
   pushLanes('effects', lanesOf(edit.effectClips, spareOn === 'effects'), { label: 'Effects', icon: 'fx', color: COLORS.effect, kind: 'effect', toggle: eye(edit.tracks.effects, () => update((e) => (e.tracks.effects = !e.tracks.effects)), 'Turn effects on or off') })
+  // transitions sit on the cuts (round buttons on the video); this line is for ones in the middle of a shot
   pushLanes('transitions', lanesOf(edit.transitions.items, spareOn === 'transitions'), { label: 'Transitions', icon: 'transition', color: COLORS.transition, kind: 'transition' })
   if (media.webcam) rows.push({ key: 'webcam', base: 'webcam', label: 'Camera', icon: 'webcam', color: COLORS.webcam, h: TRACK_H, toggle: eye(edit.webcam.show, () => update((e) => (e.webcam.show = !e.webcam.show)), 'Show or hide the camera') })
   if (media.mic) rows.push({ key: 'mic', base: 'mic', label: 'Voice', icon: 'mic', color: COLORS.mic, h: TRACK_H, toggle: { on: !edit.audio.micMuted, set: () => update((e) => (e.audio.micMuted = !e.audio.micMuted)), icon: ['volume', 'mute'], title: 'Mute your voice' } })
@@ -434,8 +437,19 @@ export default function Timeline() {
     if (fx) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
-      const base = fx.kind === 'transition' ? 'transitions' : 'effects'
-      setDropRow(under?.base === base ? under.key : base)
+      if (fx.kind === 'transition') {
+        // on the Transitions line: a free transition there; anywhere else: the nearest cut, start or end
+        if (under?.base === 'transitions') {
+          setHotJoint(null)
+          setDropRow(under.key)
+        } else {
+          const T = outAt(e.clientX)
+          setHotJoint(jointList().reduce((a, b) => (Math.abs(b.at - T) < Math.abs(a.at - T) ? b : a)).key)
+          setDropRow('transitions')
+        }
+        return
+      }
+      setDropRow(under?.base === 'effects' ? under.key : 'effects')
       return
     }
     if (a) {
@@ -461,10 +475,11 @@ export default function Timeline() {
       dragAsset.setFx(null)
       const t = timeAt(e.clientX)
       if (fx.kind === 'effect') return addEffectAt(fx.look, fx.name, t, 5, under?.base === 'effects' ? under.lane ?? 0 : 0)
-      // dropped on the video near a cut: that cut gets it; anywhere else: a free-standing transition
-      const cut = under?.key === 'video' || !under ? cutNear(outAt(e.clientX)) : null
-      if (cut) return update((ed) => (ed.transitions.perCut[cut.id] = { type: fx.type, duration: ed.transitions.perCut[cut.id]?.duration ?? ed.transitions.cut.duration ?? 0.6 }))
-      return addTransitionAt(fx.type, t, 0.8, under?.base === 'transitions' ? under.lane ?? 0 : 0)
+      setHotJoint(null)
+      if (under?.base === 'transitions') return addTransitionItem(fx.type, t, 0.8, under.lane ?? 0)
+      // anywhere else it goes between shots: the nearest start, cut or end
+      setTransitionAtJoint(fx.type, outAt(e.clientX))
+      return
     }
     const a = dragAsset.get()
     if (!a) return
@@ -477,11 +492,7 @@ export default function Timeline() {
     if (live) addAssetAt(live, timeAt(e.clientX), under?.base === base ? under.lane ?? 0 : 0)
   }
 
-  // the clip right after a cut near output time T (within about 16 pixels)
-  const cutNear = (T: number) => {
-    for (let i = 1; i < clips.length; i++) if (Math.abs(o(clips[i].start) - T) * pps < 16) return clips[i]
-    return null
-  }
+  const jointList = () => [{ key: 'intro', at: lead }, ...clips.slice(1).map((c) => ({ key: c.id, at: o(c.start) })), { key: 'outro', at: outDur }]
 
   const onRowPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || e.target !== e.currentTarget) return
@@ -542,7 +553,7 @@ export default function Timeline() {
   const joint = (key: string, T: number, cur: Transition, title: string, onMenu: (e: React.MouseEvent) => void, edge?: 'l' | 'r') => (
     <button
       key={key}
-      className={`tl-joint ${cur.type !== 'none' ? 'on' : ''} ${edge ?? ''}`}
+      className={`tl-joint ${cur.type !== 'none' ? 'on' : ''} ${edge ?? ''} ${hotJoint === key.replace(/^cut/, '') ? 'hot' : ''}`}
       style={{ left: X(T), top: top('video') + VIDEO_H / 2 }}
       title={`${title}. Click to change.`}
       onPointerDown={(e) => e.stopPropagation()}
@@ -603,6 +614,7 @@ export default function Timeline() {
           if (e.currentTarget.contains(e.relatedTarget as Node)) return
           setDropRow(null)
           setJoinHint(null)
+          setHotJoint(null)
         }}
         onDrop={onDrop}
       >
@@ -691,7 +703,7 @@ export default function Timeline() {
             )}
             {joints}
 
-            {/* transitions placed anywhere */}
+            {/* transitions on their own line */}
             {edit.transitions.items.map((it) => block('transition', it, laneKey('transitions', it.lane), COLORS.transition, 'transition', TRANSITIONS.find((x) => x.v === it.type)?.l ?? 'Transition'))}
 
             {/* effects */}

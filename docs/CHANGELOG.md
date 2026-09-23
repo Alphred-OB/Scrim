@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Sharper recordings: encoder settings tuned for screen content (GPU encoders on their high quality setting instead of low latency, CPU fallback on superfast instead of ultrafast, lower quantizer), exact BT.709 color conversion with full chroma, and color tags so nothing looks washed out.
+- Sharper exports: higher bitrates for every quality level, new projects export at Original size (every recorded pixel kept), and the recording is scaled with the highest quality filter.
+- New: click sounds. Pick one of 8 (Mouse, Soft tick, Trackpad, Mechanical, Pop, Wood tap, Digital, Shutter), set the volume, or turn them off. You hear them in the preview and they go into the export. Clicks cut out of the video stay silent.
+- Transitions: drop one anywhere on the video and it lands on the nearest cut, start or end (the round buttons light up to show where). Drop it on the Transitions line for a transition in the middle of a shot. The line only shows when it's in use.
 - New timeline. It shows the video the way it will export: cut parts disappear and everything after slides left, faster clips are shorter. Pull a clip's edge to trim, pull it back out to restore.
 - The video track comes first and shows thumbnails; voice and PC sound show waveforms per clip.
 - Only tracks with something on them are shown. Drag media, text, transitions or effects anywhere on the timeline and the right track appears.

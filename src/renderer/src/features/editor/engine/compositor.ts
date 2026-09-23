@@ -472,6 +472,9 @@ export class Renderer {
         drawFit(ctx, src.src, src.w, src.h, L.view, inFrame.fit)
         ctx.globalAlpha = 1
       } else if (inp.drawFrame) {
+        // best quality scaling for the recording itself (text stays crisp when zoomed or shrunk)
+        ctx.imageSmoothingEnabled = true
+        ctx.imageSmoothingQuality = 'high'
         inp.drawFrame(
           ctx,
           L.crop.x + vp.x * L.crop.w,

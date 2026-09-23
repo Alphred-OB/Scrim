@@ -5,7 +5,7 @@ import { Icon, Section, Seg, Select, Slider, openContextMenu } from '@/ui'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
-import { addEffectAt, addTransitionAt } from '../state/actions'
+import { addEffectAt, addTransitionAt, addTransitionItem } from '../state/actions'
 import { effectFilter, paintTransition, type TransitionBuffers } from '../engine/compositor'
 
 export const TRANSITIONS: { v: TransitionType; l: string }[] = [
@@ -193,7 +193,8 @@ function TransitionsTab() {
 
   const pick = (e: React.MouseEvent, type: TransitionType, name: string) =>
     openContextMenu(e, [
-      { label: 'Add at playhead', onClick: () => addTransitionAt(type, timeBus.get()) },
+      { label: 'Put on the nearest cut', onClick: () => addTransitionAt(type, timeBus.get()) },
+      { label: 'Add on the Transitions line at the playhead', onClick: () => addTransitionItem(type, timeBus.get()) },
       { label: 'Use at every cut', disabled: cuts === 0, onClick: () => update((ed) => (ed.transitions.cut = { type, duration: ed.transitions.cut.duration || 0.6 })) },
       { label: 'Use at the start', onClick: () => update((ed) => (ed.transitions.intro = { type, duration: ed.transitions.intro.duration || 0.6 })) },
       { label: 'Use at the end', onClick: () => update((ed) => (ed.transitions.outro = { type, duration: ed.transitions.outro.duration || 0.6 })) },

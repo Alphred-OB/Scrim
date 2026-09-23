@@ -3,6 +3,7 @@ import {
   getFirstEncodableVideoCodec, type StreamTargetChunk, type VideoCodec
 } from 'mediabunny'
 import type { CursorData, ExportSettings, Project } from '@shared/types'
+import { audibleClicks, clickTrackWav } from '@shared/clickSounds'
 import { api, mediaUrl, type MuxJobIn } from '@/lib/api'
 import { Renderer, computeLayout, outputSize } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
@@ -10,7 +11,8 @@ import { outputDuration, outputToSource, sortedClips } from '../engine/timeMap'
 
 export interface ExportProgress { phase: 'prepare' | 'render' | 'audio' | 'done'; progress: number; frame?: number; frames?: number; speed?: number; eta?: number }
 
-const BITRATE_PER_PIXEL: Record<ExportSettings['quality'], number> = { low: 0.05, medium: 0.08, high: 0.12, max: 0.2 }
+// bits per pixel per frame; screen recordings are mostly sharp text, which needs more than camera video
+const BITRATE_PER_PIXEL: Record<ExportSettings['quality'], number> = { low: 0.07, medium: 0.12, high: 0.2, max: 0.32 }
 
 export const GIF_MAX_RES = 720
 export const GIF_MAX_FPS = 30
@@ -300,6 +302,16 @@ export async function exportProject(
     if (!as || as.kind !== 'video' || !as.hasAudio || o.muted || o.volume <= 0 || !edit.tracks.media) continue
     tracks.push({ path: as.path, offset: o.start - o.trimStart, volume: o.volume, window: [o.start, o.end], fadeIn: 0.05, fadeOut: 0.05 })
   }
+  // click sounds: one WAV with a click at every click, cut and sped up along with the video
+  let clickWav = ''
+  const cl = audibleClicks(cursorData, edit.cursor)
+  if (cl.length && edit.cursor.clickVolume > 0) {
+    clickWav = outPath.replace(/\.(mp4|gif|webm|mov)$/i, '') + `.clicks-${Date.now()}.wav`
+    await api.fileOpen(clickWav)
+    await api.fileWrite(clickWav, clickTrackWav(edit.cursor.clickSound, cl, media.screen.duration, 1), 0)
+    await api.fileClose(clickWav)
+    tracks.push({ path: clickWav, offset: 0, volume: edit.cursor.clickVolume })
+  }
   const off = api.on('export:progress', (p: number) => onProgress({ phase: 'audio', progress: p }))
   try {
     await api.mux({
@@ -316,6 +328,7 @@ export async function exportProject(
   } finally {
     off()
     await api.fileRemove(tmpVideo).catch(() => {})
+    if (clickWav) await api.fileRemove(clickWav).catch(() => {})
   }
   onProgress({ phase: 'done', progress: 1 })
 }

@@ -6,7 +6,7 @@ import type { CaptureSource, CursorData, Project, RecordOptions, RecorderStatus,
 import { defaultEdit } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { CursorTracker, Rect } from './cursorTracker'
-import { detectEncoder, encoderArgs, probeVideo, runFfmpeg, spawnFfmpeg } from './ffmpeg'
+import { colorFilter, detectEncoder, encoderArgs, probeVideo, runFfmpeg, spawnFfmpeg } from './ffmpeg'
 import { makeThumb, newProjectDir, saveProject } from './projects'
 import { callRenderer } from './rpc'
 import { getSettings, toAccelerator } from './settings'
@@ -123,6 +123,20 @@ function runPowerShell(body: string): Promise<string> {
 function nativeMonitors(): Rect[] {
   if (process.platform !== 'win32') return []
   return screen.getAllDisplays().map((d) => physRect(d.bounds))
+}
+
+/**
+ * Windows display scaling makes Electron's pixel sizes off by a pixel or two (2560 x 1600 at 150% comes back as
+ * 2560 x 1602). The GPU capture reports the true size of every screen, so monitor sizes are corrected to match it.
+ */
+function snapToOutputs(monitors: Rect[], outputs: { width: number; height: number }[]): Rect[] {
+  const used = new Set<number>()
+  return monitors.map((m) => {
+    const i = outputs.findIndex((o, k) => !used.has(k) && Math.abs(o.width - m.width) <= 6 && Math.abs(o.height - m.height) <= 6)
+    if (i < 0) return m
+    used.add(i)
+    return { ...m, width: outputs[i].width, height: outputs[i].height }
+  })
 }
 
 function overlap(a: Rect, b: Rect): number {
@@ -326,7 +340,9 @@ class Recorder {
     try {
       // 1. figure out what to capture (physical pixels)
       let displayRect: Rect
-      const monitors = nativeMonitors()
+      // true pixel sizes of the screens (corrected with what the GPU capture sees)
+      const monitors = snapToOutputs(nativeMonitors(), await probeDdaOutputs())
+      console.log('[rec] screens', JSON.stringify(monitors))
       const desktop = monitors.length ? unionRect(monitors) : virtualDesktop()
       if (opts.kind === 'window' && process.platform === 'win32') {
         const wr = await windowRect(opts.sourceId)
@@ -448,7 +464,7 @@ class Recorder {
       const full = r.x === m.x && r.y === m.y && r.width === m.width && r.height === m.height
       const crop = full ? '' : `:video_size=${r.width}x${r.height}:offset_x=${r.x - m.x}:offset_y=${r.y - m.y}`
       grab = ['-v', 'verbose', '-f', 'lavfi', '-i', `ddagrab=output_idx=${this.engine.output}:framerate=${opts.fps}:draw_mouse=0${crop}`]
-      vf = ['-vf', 'hwdownload,format=bgra']
+      vf = ['-vf', `hwdownload,format=bgra,${colorFilter(enc)}`]
     } else if (this.engine.kind === 'gdi') {
       grab = ['-f', 'gdigrab', '-framerate', String(opts.fps), '-draw_mouse', '0',
         '-offset_x', String(r.x), '-offset_y', String(r.y), '-video_size', `${r.width}x${r.height}`, '-thread_queue_size', '512', '-i', 'desktop']
@@ -456,6 +472,7 @@ class Recorder {
       grab = ['-f', 'x11grab', '-framerate', String(opts.fps), '-draw_mouse', '0', '-video_size', `${r.width}x${r.height}`,
         '-thread_queue_size', '512', '-i', `${process.env.DISPLAY || ':0'}+${r.x},${r.y}`]
     }
+    if (!vf.length) vf = ['-vf', colorFilter(enc)]
     return [...grab, ...vf, ...encoderArgs(enc, opts.fps), '-fps_mode', 'cfr', '-movflags', '+frag_keyframe+empty_moov+default_base_moof', out]
   }
 

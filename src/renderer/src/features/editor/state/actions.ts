@@ -5,6 +5,7 @@ import { autoZoomFromClicks } from '@shared/autozoom'
 import { api } from '@/lib/api'
 import { flushSave, useEditor } from './store'
 import { timeBus } from './timeBus'
+import { outputDuration, sortedClips, sourceToOutput } from '../engine/timeMap'
 
 const st = () => useEditor.getState()
 const dur = () => st().project?.media.screen.duration ?? 0
@@ -208,13 +209,44 @@ export async function joinVideoAt(where: 'start' | 'end', file?: string): Promis
   }
 }
 
-/** Places a transition centered at `at` on the Transitions track. */
-export function addTransitionAt(type: TransitionType, at: number, length = 0.8, lane = 0): void {
+export type Joint = 'intro' | 'outro' | string // a clip id = the cut just before that clip
+
+/** Where transitions can go, in output time: the start, every cut, and the end. */
+export function joints(): { key: Joint; at: number }[] {
+  const e = st().project!.edit
+  const cs = sortedClips(e.clips)
+  const ld = e.leadIn ?? 0
+  const out: { key: Joint; at: number }[] = [{ key: 'intro', at: ld }]
+  cs.slice(1).forEach((c) => out.push({ key: c.id, at: sourceToOutput(cs, c.start, ld) }))
+  out.push({ key: 'outro', at: outputDuration(cs, ld) })
+  return out
+}
+
+/** Puts a transition on the start, a cut or the end: whichever is nearest to output time T. */
+export function setTransitionAtJoint(type: TransitionType, T: number): Joint {
+  const j = joints().reduce((a, b) => (Math.abs(b.at - T) < Math.abs(a.at - T) ? b : a))
+  st().update((e) => {
+    const tr = e.transitions
+    if (j.key === 'intro') tr.intro = { ...tr.intro, type, duration: tr.intro.duration || 0.6 }
+    else if (j.key === 'outro') tr.outro = { ...tr.outro, type, duration: tr.outro.duration || 0.6 }
+    else tr.perCut[j.key] = { ...(tr.perCut[j.key] ?? tr.cut), type, duration: tr.perCut[j.key]?.duration ?? (tr.cut.duration || 0.6) }
+  })
+  return j.key
+}
+
+/** A transition on its own line, centered at source time `at` (for a flourish in the middle of a shot). */
+export function addTransitionItem(type: TransitionType, at: number, length = 0.8, lane = 0): void {
   const start = Math.max(-lead(), at - length / 2)
   const end = Math.min(dur(), at + length / 2)
   const it = { id: uid('tr'), type, start, end, lane: freeLane(st().project!.edit.transitions.items, start, end, lane) }
   st().update((e) => e.transitions.items.push(it))
   st().select({ kind: 'transition', id: it.id })
+}
+
+/** Transitions live between shots: this puts one on the cut (or start or end) nearest to source time `at`. */
+export function addTransitionAt(type: TransitionType, at: number): void {
+  const e = st().project!.edit
+  setTransitionAtJoint(type, sourceToOutput(sortedClips(e.clips), at, e.leadIn ?? 0))
 }
 
 /** Adds an effect to part of the video on the Effects track (next free layer if something's there). */

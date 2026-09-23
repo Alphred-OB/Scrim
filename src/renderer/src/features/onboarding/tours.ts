@@ -65,8 +65,8 @@ export const TOURS: Record<TourName, TourStep[]> = {
       task: { todo: 'Split the video with S', done: (n, b) => n.clips.length > b.clips.length, doIt: () => { ed().setPlaying(false); ed().setTime(4.4); timeBus.emit(4.4); setTimeout(splitAtPlayhead, 60) } }
     },
     {
-      target: 'tool-effects', title: 'Add a transition', body: 'Open Transitions and drag one onto the Transitions track, right on a cut if you like. Hover a tile to preview it.', place: 'right',
-      task: { todo: 'Add a transition', done: (n, b) => n.transitions.items.length > b.transitions.items.length || Object.keys(n.transitions.perCut).length > Object.keys(b.transitions.perCut).length || n.transitions.intro.type !== b.transitions.intro.type, doIt: () => { ed().setPanel('effects'); addTransitionAt('zoom', Math.max(0.5, timeBus.get()), 0.8) } }
+      target: 'tool-effects', title: 'Add a transition', body: 'Open Transitions and drag one onto a cut in the video (the round buttons between shots). Hover a tile to preview it.', place: 'right',
+      task: { todo: 'Add a transition', done: (n, b) => n.transitions.items.length > b.transitions.items.length || Object.keys(n.transitions.perCut).length > Object.keys(b.transitions.perCut).length || n.transitions.intro.type !== b.transitions.intro.type, doIt: () => { ed().setPanel('effects'); addTransitionAt('zoom', Math.max(0.5, timeBus.get())) } }
     },
     {
       target: 'track-video', title: 'Make room for an intro', body: 'Grab the video and drag it to the right. The empty space in front is yours: drop a title or a picture there for an intro.', place: 'top',

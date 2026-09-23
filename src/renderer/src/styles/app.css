@@ -1092,3 +1092,14 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .tl2 .tl-playhead .knob { left: -7px; top: 2px; width: 14px; height: 18px; border-radius: 4px 4px 7px 7px; background: #ff3b30; }
 .tl2 .tl-playhead .line { left: -1px; top: 18px; width: 2px; background: #ff3b30; }
 .tl2 .tl-drop { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--accent-soft) !important; }
+/* click sounds */
+.sound-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; transition: opacity 0.2s; }
+.sound-grid.off { opacity: 0.5; }
+.sound-tile { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 10px; border: 1.5px solid transparent; background: var(--card); color: var(--text-2); cursor: pointer; font: inherit; text-align: left; transition: all 0.15s; }
+.sound-tile b { font-size: 12px; font-weight: 600; }
+.sound-tile:hover { background: var(--card-hi); color: var(--text); }
+.sound-tile.on { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }
+.sound-ico { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--card-hi); flex-shrink: 0; }
+.sound-tile.on .sound-ico { background: var(--accent); color: var(--on-accent); animation: soundBump 0.3s var(--ease); }
+@keyframes soundBump { 50% { transform: scale(1.2); } }
+.tl-joint.hot { transform: scale(1.45); background: var(--accent); color: var(--on-accent); box-shadow: 0 0 0 4px var(--accent-soft); opacity: 1; }
