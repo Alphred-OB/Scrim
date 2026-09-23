@@ -1,7 +1,8 @@
 import { app } from 'electron'
 import { promises as fs, existsSync } from 'fs'
 import { join, extname, basename } from 'path'
-import type { Asset, Preset, Project, ProjectSummary } from '@shared/types'
+import type { Asset, CursorData, Preset, Project, ProjectSummary } from '@shared/types'
+import { autoZoomFromClicks } from '@shared/autozoom'
 import { defaultEdit, migrateProject, uid } from '@shared/defaults'
 import { spawn } from 'child_process'
 import { ffmpegPath, probeVideo, runFfmpeg } from './ffmpeg'
@@ -237,4 +238,39 @@ export async function audioPeaks(file: string): Promise<number[]> {
   }
   await fs.writeFile(cache, JSON.stringify(out)).catch(() => {})
   return out
+}
+
+/** Folder for the practice project. Starting again replaces the old one, so there is only ever one. */
+export async function sampleBegin(): Promise<{ dir: string; video: string }> {
+  const dir = join(await ensureRoot(), 'sample-project')
+  await fs.rm(dir, { recursive: true, force: true })
+  await fs.mkdir(dir, { recursive: true })
+  return { dir, video: join(dir, 'raw.mp4') }
+}
+
+/** Finishes the practice project: seek friendly video, cursor data, thumbnail and a nice starting look. */
+export async function sampleFinish(dir: string, cursor: CursorData, duration: number): Promise<string> {
+  const raw = join(dir, 'raw.mp4')
+  const target = join(dir, 'screen.mp4')
+  const r = await runFfmpeg(['-i', raw, '-c', 'copy', '-movflags', '+faststart', target])
+  if (r.code !== 0) await fs.rename(raw, target)
+  else await fs.rm(raw, { force: true })
+  const info = await probeVideo(target)
+  await fs.writeFile(join(dir, 'cursor.json'), JSON.stringify(cursor))
+  await makeThumb(target, dir).catch(() => {})
+  const dur = info.duration || duration
+  const edit = defaultEdit(dur)
+  edit.zoom.segments = autoZoomFromClicks(cursor, dur)
+  const p: Project = {
+    version: 1,
+    id: 'sample-project',
+    name: 'Sample project',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    dir,
+    media: { screen: { path: target, ...info, duration: dur }, cursor: join(dir, 'cursor.json') },
+    edit
+  }
+  await saveProject(p)
+  return dir
 }

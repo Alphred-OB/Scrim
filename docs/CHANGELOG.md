@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- New: home and projects screens redesigned. Animated cards, a live glow, R and E shortcuts, quick actions, sorting, relative dates and hover previews.
+- New: Practice on a sample. Scrim makes a short sample recording and walks you through a real edit with small hands on tasks (play, zooms, background, title, cut, transition, intro). Every step has a Show me button.
+- Fixed: the webcam flickered in the preview. Small drift is now corrected smoothly instead of seeking, and the last good frame is kept while it buffers.
+- Fixed: the Export button covered the window buttons on Windows.
+- Fixed: the playhead was drawn in the wrong place after adding intro space.
 - New: drag the whole video right to make empty space before it, like CapCut. Fill it with text, pictures or a video for an intro over the background. Drag it back to the start to remove the space.
 - New: transitions, effects, media and audio all get layers. Things at the same time stack on their own layer, and you can drag them between layers.
 - New: guided tour of the editor and home screen that points at each part of the interface. Runs the first time, and again from the ? button.

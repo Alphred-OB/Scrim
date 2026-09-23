@@ -4,7 +4,7 @@ import { uid } from '@shared/defaults'
 import { api } from '@/lib/api'
 import { useSettings, matches } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
-import { maybeAutoStart, startTour } from '@/features/onboarding/tours'
+import { maybeAutoStart, startTour, takeQueuedTour, useTour } from '@/features/onboarding/tours'
 import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { useEditor, flushSave, Panel } from './state/store'
@@ -98,7 +98,11 @@ function EditorView() {
   // first visit to the editor: show the guided tour of the interface
   const loadedDir = useEditor((s) => s.project?.dir)
   useEffect(() => {
-    if (loadedDir) maybeAutoStart('editor')
+    if (!loadedDir) return
+    // the practice project opens with the hands on tour instead
+    const queued = takeQueuedTour()
+    if (queued) setTimeout(() => startTour(queued), 700)
+    else maybeAutoStart('editor')
   }, [loadedDir])
 
   // picking a transition or effect on the timeline opens its settings
@@ -125,6 +129,7 @@ function EditorView() {
         const st = useEditor.getState()
         return estimateExportSeconds(st.project!, st.cursorData, st.project!.edit.export)
       },
+      tour: () => ({ active: useTour.getState().active, seen: useSettings.getState().settings.toursSeen, onboarded: useSettings.getState().settings.onboarded }),
       state: () => {
         const e = useEditor.getState().project!.edit
         const st = useEditor.getState()
@@ -258,7 +263,7 @@ function EditorView() {
       onDrop={onDrop}
     >
       {/* title bar */}
-      <header className="drag surface" style={{ height: 48, display: 'flex', alignItems: 'center', gap: 4, padding: '0 150px 0 10px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <header className="drag surface win-head" style={{ height: 48, display: 'flex', alignItems: 'center', gap: 4, padding: '0 150px 0 10px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <button className="icon-btn" title="Back to home" onClick={async () => { await flushSave(); location.hash = '/' }}><Icon name="back" /></button>
         <button className="icon-btn" title="Show project folder" onClick={() => api.showItem(project.media.screen.path)}><Icon name="folder" /></button>
         <div style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 6px' }} />
@@ -315,7 +320,7 @@ function EditorView() {
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <nav data-tour="rail" className="surface" style={{ width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, borderRight: '1px solid var(--line)' }}>
           {RAIL.map((r) => (
-            <button key={r.id} className={`icon-btn ${panel === r.id ? 'active' : ''}`} style={{ width: 40, height: 40, borderRadius: 11, position: 'relative' }} title={r.title} onClick={() => setPanel(r.id)}>
+            <button key={r.id} data-tour={`tool-${r.id}`} className={`icon-btn ${panel === r.id ? 'active' : ''}`} style={{ width: 40, height: 40, borderRadius: 11, position: 'relative' }} title={r.title} onClick={() => setPanel(r.id)}>
               <Icon name={r.icon} size={19} />
               {r.soon && <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, background: 'var(--warn)' }} />}
             </button>

@@ -10,6 +10,7 @@ import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost } from '@/ui'
 import Onboarding from '@/features/onboarding/Onboarding'
+import { PracticeLoader } from '@/features/onboarding/practice'
 import CoachMarks from '@/features/onboarding/CoachMarks'
 
 function useHashRoute(): string {
@@ -74,6 +75,7 @@ export default function App() {
       <ContextMenuHost />
       {settingsLoaded && !settings.onboarded && <Onboarding />}
       <CoachMarks />
+      <PracticeLoader />
     </>
   )
 }

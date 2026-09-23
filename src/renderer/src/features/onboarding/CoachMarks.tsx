@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { EditState } from '@shared/types'
+import { useEditor } from '@/features/editor/state/store'
 import { TOURS, useTour } from './tours'
 
 type Rect = { x: number; y: number; w: number; h: number }
@@ -16,6 +18,30 @@ export default function CoachMarks() {
   const step = steps[i]
 
   useEffect(() => setI(0), [active])
+
+  // hands on steps: remember how things were when the step started, then watch for the change
+  const before = useRef<EditState | null>(null)
+  const [done, setDone] = useState(false)
+  const task = step?.task
+  useEffect(() => {
+    setDone(false)
+    if (!task) return
+    const snap = () => JSON.parse(JSON.stringify(useEditor.getState().project?.edit ?? null)) as EditState | null
+    before.current = snap()
+    let finished = false
+    const id = setInterval(() => {
+      const st = useEditor.getState()
+      const now = st.project?.edit
+      if (finished || !now || !before.current) return
+      if (task.done(now, before.current, { playing: st.playing, panel: st.panel })) {
+        finished = true
+        setDone(true)
+        // a moment to see the tick, then on to the next step
+        setTimeout(() => setI((x) => (x === i ? Math.min(x + 1, steps.length - 1) : x)), 1300)
+      }
+    }, 200)
+    return () => clearInterval(id)
+  }, [active, i])
 
   // find the element; skip steps that aren't available on this screen
   useLayoutEffect(() => {
@@ -45,6 +71,7 @@ export default function CoachMarks() {
     if (!active) return
     const on = (e: KeyboardEvent) => {
       if (e.key === 'Escape') stop()
+      else if (steps[i]?.task) return // hands on step: keys belong to the editor (Space, S, T...)
       else if (e.key === 'ArrowRight' || e.key === 'Enter') i < steps.length - 1 ? setI(i + 1) : stop()
       else if (e.key === 'ArrowLeft') setI(Math.max(0, i - 1))
       else return
@@ -70,8 +97,9 @@ export default function CoachMarks() {
   top = Math.max(12, Math.min(vh - 190, top))
   const last = i === steps.length - 1
 
+  const hands = !!task
   return (
-    <div className="coach" onMouseDown={(e) => e.stopPropagation()}>
+    <div className={`coach ${hands ? 'hands' : ''}`} onMouseDown={(e) => !hands && e.stopPropagation()}>
       <svg className="coach-dim" width={vw} height={vh}>
         <defs>
           <mask id="coach-hole">
@@ -79,18 +107,26 @@ export default function CoachMarks() {
             <rect x={hole.x} y={hole.y} width={hole.w} height={hole.h} rx={12} fill="#000" />
           </mask>
         </defs>
-        <rect width={vw} height={vh} fill="rgba(0,0,0,.6)" mask="url(#coach-hole)" />
+        <rect width={vw} height={vh} fill={hands ? 'rgba(0,0,0,.28)' : 'rgba(0,0,0,.6)'} mask="url(#coach-hole)" />
         <rect className="coach-ring" x={hole.x} y={hole.y} width={hole.w} height={hole.h} rx={12} />
       </svg>
       <div className="coach-card" style={{ left, top, width: cardW }} key={i}>
-        <div className="coach-count">{i + 1} of {steps.length}</div>
+        <div className="coach-count">{active === 'pro' ? 'Practice' : 'Tour'} · {i + 1} of {steps.length}</div>
+        <div className="coach-bar"><span style={{ width: `${((i + (done ? 1 : 0)) / steps.length) * 100}%` }} /></div>
         <b>{step.title}</b>
         <p>{step.body}</p>
+        {task && (
+          <div className={`coach-task ${done ? 'done' : ''}`}>
+            <span className="coach-check">{done ? <svg viewBox="0 0 12 12" width="11" height="11"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}</span>
+            <span>{done ? 'Nice one' : task.todo}</span>
+            {!done && task.doIt && <button className="link" onClick={() => task.doIt!()}>Show me</button>}
+          </div>
+        )}
         <div className="coach-foot">
-          <button className="link" onClick={stop}>{last ? '' : 'Skip'}</button>
+          <button className="link" onClick={stop}>{last ? '' : active === 'pro' ? 'End practice' : 'Skip'}</button>
           <div style={{ display: 'flex', gap: 6 }}>
             {i > 0 && <button className="btn sm" onClick={() => setI(i - 1)}>Back</button>}
-            <button className="btn sm primary" onClick={() => (last ? stop() : setI(i + 1))}>{last ? 'Done' : 'Next'}</button>
+            <button className={`btn sm ${task && !done ? '' : 'primary'}`} onClick={() => (last ? stop() : setI(i + 1))}>{last ? 'Done' : task && !done ? 'Skip step' : 'Next'}</button>
           </div>
         </div>
       </div>

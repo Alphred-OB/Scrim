@@ -125,7 +125,7 @@ export default function Timeline() {
     }
     move(timeBus.get())
     return timeBus.on(move)
-  }, [pps])
+  }, [pps, lead])
 
   const timeAt = (clientX: number) => {
     const sc = scrollRef.current!

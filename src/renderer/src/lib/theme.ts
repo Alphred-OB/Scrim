@@ -106,6 +106,8 @@ export function applyTheme(s: AppSettings, systemLight: boolean, isMainWindow: b
     }
   }
   root.style.setProperty('--font', `'${s.uiFont || 'Inter'}'`)
+  // room for the Windows minimize / maximize / close buttons, which don't scale with the UI size
+  root.style.setProperty('--wc', `${Math.ceil(176 / (s.uiScale || 1))}px`)
   if (isMainWindow) {
     api.setTheme(luminance(colors.bg) < 0.4 ? 'dark' : 'light').catch(() => {})
     api.setZoom(s.uiScale || 1)

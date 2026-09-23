@@ -7,6 +7,7 @@ import SettingsModal from '@/features/settings/SettingsModal'
 import { matches, useSettings } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
 import { maybeAutoStart } from '@/features/onboarding/tours'
+import { startPractice } from '@/features/onboarding/practice'
 
 const LS = 'df.recordPrefs'
 interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; webcam: WebcamRecordOptions }
@@ -30,6 +31,7 @@ export default function Launcher() {
   // start on a simple choice: record something new, or edit what you have
   const [tab, setTab] = useState<'home' | 'record' | 'projects'>('home')
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'recent' | 'name' | 'long'>('recent')
   const [dropping, setDropping] = useState(false)
   const [kind, setKind] = useState<'screen' | 'window'>('screen')
   const [sources, setSources] = useState<CaptureSource[]>([])
@@ -201,11 +203,36 @@ export default function Launcher() {
     }
   }
 
+  const q = query.trim().toLowerCase()
+  const shown = projects
+    .filter((p) => p.name.toLowerCase().includes(q))
+    .sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'long' ? b.duration - a.duration : b.updatedAt - a.updatedAt))
+  const projectMenu = (p: ProjectSummary) => [
+    { label: 'Open', onClick: () => api.openEditor(p.dir) },
+    { label: 'Show in folder', onClick: () => api.showItem(p.dir) },
+    { sep: true },
+    { label: 'Delete', danger: true, onClick: async () => { if (confirm(`Delete "${p.name}"? This can't be undone.`)) { await api.deleteProject(p.dir); loadProjects() } } }
+  ]
+
+  // R and E on the home screen
+  useEffect(() => {
+    if (tab !== 'home') return
+    const on = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || document.querySelector('.modal-back, .ob-back, .coach')) return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'r' || e.key === 'R') setTab('record')
+      else if (e.key === 'e' || e.key === 'E') setTab('projects')
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [tab])
+
   const camRadius = cam.shape === 'circle' ? '50%' : cam.shape === 'rounded' ? '22%' : '6px'
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <header className="drag surface" style={{ height: 52, display: 'flex', alignItems: 'center', gap: 16, padding: '0 150px 0 18px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <header className="drag surface win-head" style={{ height: 52, display: 'flex', alignItems: 'center', gap: 16, padding: '0 150px 0 18px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         {tab !== 'home' ? (
           <button className="icon-btn" title="Back" onClick={() => setTab('home')} disabled={recBusy && tab === 'record'}><Icon name="back" /></button>
         ) : null}
@@ -237,32 +264,74 @@ export default function Launcher() {
       )}
 
       {tab === 'home' && (
-        <div className="home fade-in">
-          <h1>What would you like to do?</h1>
+        <div className="home">
+          <div className="home-aurora" aria-hidden><i /><i /><i /></div>
+          <div className="home-dots" aria-hidden />
+          <div className="home-hero">
+            <span className="home-eyebrow"><span className="pulse-dot" /> {greeting()}</span>
+            <h1>Turn your screen into a <em>story</em>.</h1>
+            <p>Record once. Scrim adds the zooms, the smooth cursor and the polish, so it looks like you spent hours on it.</p>
+          </div>
           <div className="home-choices">
-            <button data-tour="home-record" className="home-card rec" onClick={() => setTab('record')}>
-              <span className="home-icon"><Icon name="record" size={26} /></span>
-              <b>Record</b>
-              <span>Your screen, a window or a browser tab, with your mic and webcam.</span>
+            <button data-tour="home-record" className="home-card rec" onMouseMove={spot} onClick={() => setTab('record')}>
+              <div className="hc-art rec-art" aria-hidden>
+                <div className="ra-screen">
+                  <div className="ra-bar"><i /><i /><i /></div>
+                  <div className="ra-body"><span /><span /><span /><span /></div>
+                  <span className="ra-cursor" />
+                  <span className="ra-ripple" />
+                </div>
+                <span className="ra-rec"><span /> REC 0:12</span>
+              </div>
+              <div className="hc-body">
+                <span className="home-icon"><Icon name="record" size={22} /></span>
+                <div>
+                  <b>Record</b>
+                  <span>Your screen, a window or a browser tab, with mic and webcam.</span>
+                </div>
+                <kbd>R</kbd>
+              </div>
             </button>
-            <button data-tour="home-edit" className="home-card edit" onClick={() => setTab('projects')}>
-              <span className="home-icon"><Icon name="scissors" size={24} /></span>
-              <b>Edit</b>
-              <span>Open a recent project, or bring in a video to polish.</span>
+            <button data-tour="home-edit" className="home-card edit" onMouseMove={spot} onClick={() => setTab('projects')}>
+              <div className="hc-art edit-art" aria-hidden>
+                <div className="ea-preview"><span /></div>
+                <div className="ea-tracks">
+                  <div><span style={{ left: '2%', width: '60%' }} /><span style={{ left: '64%', width: '34%' }} /></div>
+                  <div><span style={{ left: '14%', width: '22%' }} /><span style={{ left: '58%', width: '18%' }} /></div>
+                  <div><span style={{ left: '30%', width: '40%' }} /></div>
+                  <i className="ea-head" />
+                </div>
+              </div>
+              <div className="hc-body">
+                <span className="home-icon"><Icon name="scissors" size={20} /></span>
+                <div>
+                  <b>Edit</b>
+                  <span>Open a project, or bring in any video to polish.</span>
+                </div>
+                <kbd>E</kbd>
+              </div>
             </button>
+          </div>
+          <div className="home-quick">
+            <button onClick={() => doImport()}><Icon name="upload" size={14} /> Import a video</button>
+            <button onClick={() => openProjectFromDialog()}><Icon name="folder" size={14} /> Open a project <kbd>Ctrl O</kbd></button>
+            <button data-tour="home-practice" className="accent" onClick={() => startPractice()}><Icon name="sparkles" size={14} /> Practice on a sample</button>
           </div>
           {projects.length > 0 && (
             <div className="home-recent" data-tour="home-recent">
               <div className="section-head">
-                <span className="section-title">Continue where you left off</span>
-                <button className="link" onClick={() => setTab('projects')}>See all {projects.length}</button>
+                <span className="section-title">Jump back in</span>
+                <button className="link" onClick={() => setTab('projects')}>See all {projects.length} <Icon name="arrowRight" size={12} /></button>
               </div>
               <div className="home-recent-row">
-                {projects.slice(0, 4).map((p) => (
-                  <button key={p.dir} className="recent-tile" onClick={() => api.openEditor(p.dir)}>
-                    <div style={{ backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }} />
+                {projects.slice(0, 4).map((p, k) => (
+                  <button key={p.dir} className="recent-tile" style={{ animationDelay: `${k * 60}ms` }} onClick={() => api.openEditor(p.dir)}>
+                    <div className="rt-thumb" style={{ backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }}>
+                      <span className="rt-dur">{fmtTime(p.duration)}</span>
+                      <span className="rt-play"><Icon name="play" size={14} /></span>
+                    </div>
                     <b>{p.name}</b>
-                    <span>{fmtTime(p.duration)}</span>
+                    <span>{ago(p.updatedAt)}</span>
                   </button>
                 ))}
               </div>
@@ -391,7 +460,7 @@ export default function Launcher() {
         </div>
       ) : tab === 'projects' ? (
         <div
-          style={{ flex: 1, overflow: 'auto', padding: 22, position: 'relative' }}
+          className="projects-page fade-in"
           onDragOver={(e) => {
             if (!e.dataTransfer.types.includes('Files')) return
             e.preventDefault()
@@ -406,48 +475,61 @@ export default function Launcher() {
             await doImport(api.pathForFile(f))
           }}
         >
-          <div className="projects-bar">
-            <input className="search" placeholder="Search projects" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <div className="projects-head">
+            <div>
+              <h2>Projects <span className="count-pill">{projects.length}</span></h2>
+              <span className="hint">Right click a project for more. Drop a video anywhere to import it.</span>
+            </div>
             <div style={{ flex: 1 }} />
+            <div className="search-wrap">
+              <Icon name="search" size={15} />
+              <input className="search" placeholder="Search projects" value={query} onChange={(e) => setQuery(e.target.value)} />
+            </div>
+            <div style={{ width: 230 }}>
+              <Seg options={[{ v: 'recent', l: 'Recent' }, { v: 'name', l: 'Name' }, { v: 'long', l: 'Longest' }]} value={sort} onChange={(v) => setSort(v as typeof sort)} />
+            </div>
             <button className="btn" onClick={() => openProjectFromDialog()} title="Ctrl+O"><Icon name="folder" size={15} /> Open…</button>
             <button className="btn primary" onClick={() => doImport()}><Icon name="upload" size={15} /> Import a video</button>
           </div>
-          {!projects.length && (
-            <div className="empty-state">
-              <Icon name="film" size={34} />
-              <b>No projects yet</b>
-              <span>Import a video, drop one here, or record something new.</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" onClick={() => setTab('record')}><Icon name="record" size={14} /> Record</button>
-                <button className="btn primary" onClick={() => doImport()}><Icon name="upload" size={15} /> Import a video</button>
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 16 }}>
-            {projects.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())).map((p) => (
+          <div className="proj-grid">
+            <button className="proj-new" onClick={() => setTab('record')}>
+              <span className="pn-icon"><Icon name="record" size={20} /></span>
+              <b>New recording</b>
+              <span>Screen, window or tab</span>
+            </button>
+            {shown.map((p, k) => (
               <div
                 key={p.dir}
-                className="glass fade-in"
-                style={{ borderRadius: 16, overflow: 'hidden', boxShadow: 'none', cursor: 'pointer' }}
+                className="proj-card"
+                style={{ animationDelay: `${Math.min(k, 12) * 35}ms` }}
                 onClick={() => api.openEditor(p.dir)}
-                onContextMenu={(e) =>
-                  openContextMenu(e, [
-                    { label: 'Open', onClick: () => api.openEditor(p.dir) },
-                    { label: 'Show in folder', onClick: () => api.showItem(p.dir) },
-                    { sep: true },
-                    { label: 'Delete', danger: true, onClick: async () => { if (confirm(`Delete "${p.name}"? This can't be undone.`)) { await api.deleteProject(p.dir); loadProjects() } } }
-                  ])
-                }
+                onContextMenu={(e) => openContextMenu(e, projectMenu(p))}
               >
-                <div style={{ aspectRatio: '16/9', background: `#000 center/cover no-repeat`, backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }} />
-                <div style={{ padding: '10px 12px' }}>
-                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                  <div className="hint">{new Date(p.createdAt).toLocaleString()} · {fmtTime(p.duration)}</div>
+                <div className="pc-thumb" style={{ backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }}>
+                  <span className="rt-dur">{fmtTime(p.duration)}</span>
+                  <span className="rt-play"><Icon name="play" size={16} /></span>
+                </div>
+                <div className="pc-meta">
+                  <div>
+                    <b>{p.name}</b>
+                    <span>Edited {ago(p.updatedAt)}</span>
+                  </div>
+                  <button className="icon-btn pc-more" title="More" onClick={(e) => { e.stopPropagation(); openContextMenu(e, projectMenu(p)) }}>
+                    <Icon name="more" size={16} />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-          {projects.length > 0 && <div className="hint" style={{ marginTop: 14 }}>Right click a project for more options. Drop a video anywhere here to import it.</div>}
+          {!shown.length && projects.length > 0 && <div className="hint" style={{ marginTop: 20, textAlign: 'center' }}>Nothing matches "{query}".</div>}
+          {!projects.length && (
+            <div className="empty-state" style={{ marginTop: 18 }}>
+              <Icon name="film" size={30} />
+              <b>No projects yet</b>
+              <span>Import a video, drop one here, or try the practice project.</span>
+              <button className="btn primary" onClick={() => startPractice()}><Icon name="sparkles" size={14} /> Practice on a sample</button>
+            </div>
+          )}
           {dropping && <div className="drop-veil">Drop to import</div>}
         </div>
       ) : null}
@@ -455,4 +537,27 @@ export default function Launcher() {
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   )
+}
+
+/** Hover glow that follows the mouse on the big home cards. */
+function spot(e: React.MouseEvent<HTMLElement>) {
+  const r = e.currentTarget.getBoundingClientRect()
+  e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`)
+  e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
+}
+
+function greeting(): string {
+  const h = new Date().getHours()
+  return h < 5 ? 'Up late? Let\'s make something' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+}
+
+/** "just now", "5 min ago", "yesterday", then a date. */
+function ago(ms: number): string {
+  const s = (Date.now() - ms) / 1000
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
+  if (s < 172800) return 'yesterday'
+  if (s < 604800) return `${Math.floor(s / 86400)} days ago`
+  return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }

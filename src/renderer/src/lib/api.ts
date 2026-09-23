@@ -42,6 +42,9 @@ export interface Api {
   openPath(p: string): Promise<string>
   tmpDir(): Promise<string>
   fileOpen(p: string): Promise<void>
+  /** Practice project for the guided tour: makes its folder, then saves it once the video is written. */
+  sampleBegin(): Promise<{ dir: string; video: string }>
+  sampleFinish(dir: string, cursor: CursorData, duration: number): Promise<string>
   fileWrite(p: string, d: Uint8Array, pos: number): Promise<void>
   fileClose(p: string): Promise<void>
   fileRemove(p: string): Promise<void>

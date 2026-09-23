@@ -116,7 +116,8 @@ export default function Preview() {
       const el = f.el
       el.volume = Math.max(0, Math.min(1, f.volume))
       el.muted = f.muted
-      if (el.playbackRate !== f.rate) el.playbackRate = f.rate
+      if (!isPlaying && el.playbackRate !== f.rate) el.playbackRate = f.rate
+      else if (isPlaying && Math.abs(el.playbackRate / f.rate - 1) > 0.15) el.playbackRate = f.rate
       if (f.key === 'music') {
         if (isPlaying && el.paused) el.play().catch(() => {})
         if (!isPlaying && !el.paused) el.pause()
@@ -129,7 +130,11 @@ export default function Preview() {
         if (inRange && Math.abs(el.currentTime - want!) > 0.04) el.currentTime = want!
         continue
       }
-      if (Math.abs(el.currentTime - want!) > 0.15) el.currentTime = want!
+      // Small drift is fixed by nudging the speed instead of seeking. Every seek blanks the
+      // element for a moment (webcam recordings seek slowly), which is what made it flicker.
+      const drift = want! - el.currentTime
+      if (Math.abs(drift) > 0.6) el.currentTime = want!
+      else if (Math.abs(drift) > 0.03) el.playbackRate = f.rate * (1 + Math.max(-0.12, Math.min(0.12, drift * 0.8)))
       if (el.paused) el.play().catch(() => {})
     }
     const bgv = pool.current.get('bg') as HTMLVideoElement | undefined
@@ -140,6 +145,8 @@ export default function Preview() {
   // The editor's own clock. Usually the video's time, but it also runs through the lead-in
   // (empty space before the recording), where the video element can't go.
   const logical = useRef(time)
+  const camCache = useRef<HTMLCanvasElement | null>(null)
+  const camHas = useRef(false)
 
   // Adaptive preview quality: if frames take too long to draw (big full screen, low end GPU),
   // render smaller while playing and scale up. The export is always full quality.
@@ -188,6 +195,23 @@ export default function Preview() {
       }
     }
     const camWant = project.media.webcam ? t - project.media.webcam.offset - L.edit.audio.syncOffset : -1
+    // keep the last good webcam frame, and show it while the element is seeking or buffering
+    let camSrc: { src: CanvasImageSource; w: number; h: number } | null = null
+    if (cam && camWant >= 0 && L.edit.webcam.show) {
+      if (cam.readyState >= 2 && !cam.seeking && cam.videoWidth) {
+        const k = Math.min(1, 720 / Math.max(cam.videoWidth, cam.videoHeight))
+        const cw = Math.round(cam.videoWidth * k)
+        const ch = Math.round(cam.videoHeight * k)
+        const cc = (camCache.current ??= document.createElement('canvas'))
+        if (cc.width !== cw || cc.height !== ch) {
+          cc.width = cw
+          cc.height = ch
+        }
+        cc.getContext('2d')!.drawImage(cam, 0, 0, cw, ch)
+        camHas.current = true
+      }
+      if (camHas.current && camCache.current) camSrc = { src: camCache.current, w: camCache.current.width, h: camCache.current.height }
+    }
     const t0 = performance.now()
     renderer.render(ctx, W, H, {
       edit: L.edit,
@@ -201,7 +225,7 @@ export default function Preview() {
       clicks: L.clicks,
       bgImage: L.bgImage,
       bgVideo: L.edit.background.type === 'video' && bgv && bgv.readyState >= 2 ? bgv : null,
-      webcam: cam && cam.readyState >= 2 && camWant >= 0 ? { src: cam, w: cam.videoWidth, h: cam.videoHeight } : null,
+      webcam: camSrc,
       overlays
     })
     if (useEditor.getState().playing) adapt(performance.now() - t0)

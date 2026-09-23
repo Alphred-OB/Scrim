@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Icon } from '@/ui'
 import { useSettings } from '@/lib/settings'
+import { startPractice } from './practice'
 
 interface Step { title: string; body: string; art: ReactNode; points?: string[] }
 
@@ -98,10 +99,10 @@ const STEPS: Step[] = [
     points: ['You can keep working while it exports', 'A sound and a notification when it is done']
   },
   {
-    title: "You're all set",
-    body: 'Start a recording or open a video. You can take this tour again any time from the ? button on the home screen.',
+    title: 'Try a real edit',
+    body: 'We made a short sample video for you. Open it and we will walk you through a real edit, one small task at a time. It takes about two minutes.',
     art: Art.done,
-    points: ['Ctrl+S save, Ctrl+O open, Ctrl+E export', 'Space to play, F for full screen preview']
+    points: ['Zooms, backgrounds, titles, cuts, transitions and an intro', 'Every step has a Show me button if you get stuck', 'Practice again any time from the home screen']
   }
 ]
 
@@ -118,7 +119,7 @@ export default function Onboarding() {
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.key === 'Escape') done()
-      else if (e.key === 'ArrowRight' || e.key === 'Enter') last ? done() : setI((x) => x + 1)
+      else if (e.key === 'ArrowRight' || e.key === 'Enter') { if (!last) setI((x) => x + 1) }
       else if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1))
       else return
       e.preventDefault()
@@ -153,8 +154,9 @@ export default function Onboarding() {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {i > 0 && <button className="btn" onClick={() => setI(i - 1)}>Back</button>}
-            <button className="btn primary" onClick={() => (last ? done() : setI(i + 1))}>{i === 0 ? 'Show me around' : last ? 'Get started' : 'Next'}</button>
+            {i > 0 && !last && <button className="btn" onClick={() => setI(i - 1)}>Back</button>}
+            {last && <button className="btn" onClick={done}>I'll explore myself</button>}
+            <button className="btn primary" onClick={() => (last ? (done(), startPractice()) : setI(i + 1))}>{i === 0 ? 'Show me around' : last ? 'Practice on a sample' : 'Next'}</button>
           </div>
         </div>
       </div>

@@ -2,12 +2,12 @@ import { app, BrowserWindow, screen, dialog, ipcMain, session, shell, desktopCap
 import { basename, dirname, join } from 'path'
 import { tmpdir } from 'os'
 import { existsSync, promises as fs } from 'fs'
-import type { AppSettings, Asset, Preset, Project, RecordOptions, WebcamRecordOptions } from '@shared/types'
+import type { CursorData, AppSettings, Asset, Preset, Project, RecordOptions, WebcamRecordOptions } from '@shared/types'
 import { registerSchemes, handleMediaProtocol } from './protocol'
 import { recorder, listSources, probeDdaOutputs } from './recorder'
 import { stopHookOnQuit, Rect } from './cursorTracker'
 import {
-  audioPeaks, copyAsset, deleteProject, importAsset, importVideo, listProjects, loadPresets, loadProject, projectsRoot, savePresets, saveProject
+  audioPeaks, copyAsset, sampleBegin, sampleFinish, deleteProject, importAsset, importVideo, listProjects, loadPresets, loadProject, projectsRoot, savePresets, saveProject
 } from './projects'
 import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
@@ -254,6 +254,8 @@ function registerIpc(): void {
   ipcMain.handle('shell:open', (_e, p: string) => shell.openPath(p))
   ipcMain.handle('app:tmp', () => tmpdir())
 
+  ipcMain.handle('sample:begin', () => sampleBegin())
+  ipcMain.handle('sample:finish', (_e, dir: string, cursor: CursorData, duration: number) => sampleFinish(dir, cursor, duration))
   ipcMain.handle('file:open', (_e, p: string) => openWrite(p))
   ipcMain.handle('file:write', (_e, p: string, data: Uint8Array, pos: number) => writeAt(p, data, pos))
   ipcMain.handle('file:close', (_e, p: string) => closeWrite(p))
