@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import { startMedia, stopMedia, cancelMedia } from '@/lib/mediaCapture'
+import { startMedia, stopMedia, cancelMedia, pauseMedia, resumeMedia } from '@/lib/mediaCapture'
 import { useSettings } from '@/lib/settings'
 import Launcher from '@/features/launcher/Launcher'
 import Toolbar from '@/features/recording/Toolbar'
@@ -30,6 +30,8 @@ function registerRpc(): void {
     if (method === 'media:start') return startMedia(arg)
     if (method === 'media:stop') return stopMedia(arg.dir)
     if (method === 'media:cancel') return cancelMedia()
+    if (method === 'media:pause') return pauseMedia()
+    if (method === 'media:resume') return resumeMedia()
     throw new Error('Unknown method ' + method)
   })
 }

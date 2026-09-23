@@ -1,4 +1,4 @@
-import { BrowserWindow, desktopCapturer, screen, globalShortcut, Tray, Menu, nativeImage } from 'electron'
+import { BrowserWindow, desktopCapturer, dialog, screen, globalShortcut, Tray, Menu, nativeImage } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { promises as fs, existsSync } from 'fs'
 import { join } from 'path'
@@ -232,6 +232,15 @@ class Recorder {
   private engine: Engine = { kind: 'gdi' }
   private tray: Tray | null = null
   private stopKey = ''
+  private pauseKey = ''
+  // pause support: every resume starts a new capture file, joined when recording stops
+  private segments: string[] = []
+  private gaps: [number, number][] = [] // wall clock ms ranges that were paused
+  private pausedAt = 0
+  private activeMs = 0 // recorded time before the current segment
+  private frames = { total: 0, dup: 0 } // ffmpeg frame stats of finished segments
+  private busy = false // pausing/resuming in progress
+  private firstStart = 0 // wall clock ms when the first segment's frames began
 
   init(h: RecorderHooks): void {
     this.hooks = h
@@ -249,8 +258,31 @@ class Recorder {
 
   private updateTray(): void {
     if (!this.tray) return
-    const rec = this.status.state === 'recording'
-    this.tray.setToolTip(rec ? `Scrim, recording ${Math.floor(this.status.elapsed)}s (click to stop)` : 'Scrim')
+    const st = this.status.state
+    this.tray.setToolTip(
+      st === 'recording' ? `Scrim, recording ${Math.floor(this.status.elapsed)}s (click to stop)` : st === 'paused' ? 'Scrim, paused (click to stop)' : 'Scrim'
+    )
+    this.buildTrayMenu()
+  }
+
+  private buildTrayMenu(): void {
+    if (!this.tray) return
+    const paused = this.status.state === 'paused'
+    this.tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: 'Stop recording', click: () => void this.stop() },
+        { label: paused ? 'Resume' : 'Pause', click: () => void (paused ? this.resume() : this.pause()) },
+        { type: 'separator' },
+        { label: 'Restart…', click: () => void this.confirmThen('Restart the recording?', 'What you recorded so far will be deleted.', () => this.restart()) },
+        { label: 'Discard…', click: () => void this.confirmThen('Discard this recording?', 'It will be deleted and cannot be recovered.', () => this.cancel()) }
+      ])
+    )
+  }
+
+  /** Destructive actions always ask first, so a recording is never lost by a slip of the mouse. */
+  private async confirmThen(title: string, detail: string, fn: () => Promise<void>): Promise<void> {
+    const r = await dialog.showMessageBox({ type: 'warning', buttons: ['Cancel', 'Delete recording'], defaultId: 0, cancelId: 0, title: 'Scrim', message: title, detail })
+    if (r.response === 1) await fn()
   }
 
   private showTray(): void {
@@ -258,13 +290,7 @@ class Recorder {
     try {
       const img = nativeImage.createFromPath(this.hooks.iconPath).resize({ width: 16, height: 16 })
       this.tray = new Tray(img)
-      this.tray.setContextMenu(
-        Menu.buildFromTemplate([
-          { label: 'Stop recording', click: () => void this.stop() },
-          { label: 'Restart', click: () => void this.restart() },
-          { label: 'Discard', click: () => void this.cancel() }
-        ])
-      )
+      this.buildTrayMenu()
       this.tray.on('click', () => void this.stop())
       this.updateTray()
     } catch (e) {
@@ -283,6 +309,13 @@ class Recorder {
     this.cancelled = false
     this.stderr = ''
     this.media = {}
+    this.segments = []
+    this.gaps = []
+    this.pausedAt = 0
+    this.activeMs = 0
+    this.frames = { total: 0, dup: 0 }
+    this.busy = false
+    this.firstStart = 0
     try {
       // 1. figure out what to capture (physical pixels)
       let displayRect: Rect
@@ -345,12 +378,21 @@ class Recorder {
       this.tracker.setRect(this.rect)
 
       this.set({ state: 'recording', elapsed: 0, countdown: undefined, engine: this.engine.kind })
-      this.tick = setInterval(() => this.set({ elapsed: (Date.now() - this.startWall) / 1000 }), 500)
-      this.stopKey = toAccelerator(getSettings().shortcuts.stopRecording || 'Alt+Shift+S')
+      this.tick = setInterval(() => {
+        if (this.status.state === 'recording') this.set({ elapsed: this.elapsedSec() })
+      }, 500)
+      const sc = getSettings().shortcuts
+      this.stopKey = toAccelerator(sc.stopRecording || 'Alt+Shift+S')
+      this.pauseKey = toAccelerator(sc.pauseRecording || 'Alt+Shift+P')
       try {
         globalShortcut.register(this.stopKey, () => void this.stop())
       } catch {
         /* invalid accelerator, tray still works */
+      }
+      try {
+        globalShortcut.register(this.pauseKey, () => void (this.status.state === 'paused' ? this.resume() : this.pause()))
+      } catch {
+        /* invalid accelerator */
       }
     } catch (e) {
       this.fail(e instanceof Error ? e.message : String(e))
@@ -394,10 +436,84 @@ class Recorder {
     return [...grab, ...vf, ...encoderArgs(enc, opts.fps), '-fps_mode', 'cfr', '-movflags', '+frag_keyframe+empty_moov+default_base_moof', out]
   }
 
+  private elapsedSec(): number {
+    const live = this.status.state === 'recording' ? Date.now() - (this.videoStartMs || this.startWall) : 0
+    return (this.activeMs + live) / 1000
+  }
+
+  /** Adds the finished segment's frame counters (for the honest frame rate). */
+  private collectFrames(): void {
+    const lines = this.stderr.split(/[\r\n]+/).filter((l) => /frame=\s*\d+/.test(l))
+    const last = lines[lines.length - 1]
+    if (last) {
+      this.frames.total += Number(/frame=\s*(\d+)/.exec(last)![1])
+      this.frames.dup += Number(/dup=\s*(\d+)/.exec(last)?.[1] ?? 0)
+    }
+  }
+
+  /** Ends the current capture segment cleanly. */
+  private async endSegment(): Promise<void> {
+    const proc = this.proc
+    this.proc = null
+    if (!proc) return
+    const closed = new Promise<void>((r) => (proc.exitCode !== null ? r() : proc.on('close', () => r())))
+    try {
+      proc.stdin?.write('q\n')
+      proc.stdin?.end()
+    } catch {
+      /* ignore */
+    }
+    const killTimer = setTimeout(() => proc.kill('SIGKILL'), 10000)
+    await closed
+    clearTimeout(killTimer)
+    this.collectFrames()
+  }
+
+  /** Pause: stop capturing now; nothing on screen is recorded until resume. */
+  async pause(): Promise<void> {
+    if (this.status.state !== 'recording' || this.busy) return
+    this.busy = true
+    try {
+      this.pausedAt = Date.now()
+      this.activeMs += this.pausedAt - (this.videoStartMs || this.startWall)
+      this.set({ state: 'paused', elapsed: this.activeMs / 1000 })
+      // stop audio/webcam and the screen at the same moment so they stay in sync
+      const win = this.hooks.mainWindow()
+      const media = win && (this.media.mic || this.media.system || this.media.webcam) ? callRenderer(win.webContents, 'media:pause').catch(() => {}) : null
+      await Promise.all([media, this.endSegment()])
+    } finally {
+      this.busy = false
+    }
+  }
+
+  async resume(): Promise<void> {
+    if (this.status.state !== 'paused' || this.busy || !this.opts) return
+    this.busy = true
+    try {
+      // audio/webcam resume the moment the first new frame is captured, not when ffmpeg is fully up
+      const win = this.hooks.mainWindow()
+      let resumed = false
+      const resumeMedia = () => {
+        if (resumed) return
+        resumed = true
+        if (win && (this.media.mic || this.media.system || this.media.webcam)) callRenderer(win.webContents, 'media:resume').catch(() => {})
+      }
+      await this.launchCapture(this.opts, resumeMedia)
+      resumeMedia()
+      const startedAt = this.videoStartMs || Date.now()
+      this.gaps.push([this.pausedAt, startedAt])
+      this.set({ state: 'recording', elapsed: this.activeMs / 1000 })
+    } catch (e) {
+      this.fail(e instanceof Error ? e.message : String(e))
+    } finally {
+      this.busy = false
+    }
+  }
+
   /** Starts ffmpeg, waits for frames, retries with fixes (area rounding, DDA -> GDI fallback). */
-  private async launchCapture(opts: RecordOptions): Promise<void> {
+  private async launchCapture(opts: RecordOptions, onStarted?: () => void): Promise<void> {
     const enc = await detectEncoder()
-    const out = join(this.dir, 'screen.rec.mp4')
+    const out = join(this.dir, `screen.rec${this.segments.length}.mp4`)
     for (let attempt = 0; attempt < 4; attempt++) {
       if (this.cancelled) throw new Error('Cancelled')
       this.stderr = ''
@@ -411,13 +527,19 @@ class Recorder {
         if (this.videoStartMs) return
         if (this.engine.kind === 'dda') {
           // DDA frames start right after the output is opened
-          if (chunk.includes('Opened dxgi output')) this.videoStartMs = Date.now()
+          if (chunk.includes('Opened dxgi output')) {
+            this.videoStartMs = Date.now()
+            onStarted?.()
+          }
         } else {
           // gdigrab/x11grab stamp frames with wall clock time: "start: 1790100982.460000"
           const m = /start:\s*(\d{9,}\.\d+)/.exec(this.stderr)
           if (m) {
             const t = parseFloat(m[1]) * 1000
-            if (Math.abs(t - this.startWall) < 5000) this.videoStartMs = t
+            if (Math.abs(t - this.startWall) < 5000) {
+              this.videoStartMs = t
+              onStarted?.()
+            }
           }
         }
       })
@@ -437,6 +559,8 @@ class Recorder {
         proc.once('error', done)
       })
       if (result === 'ok' && proc.exitCode === null) {
+        this.segments.push(out)
+        if (!this.firstStart) this.firstStart = this.videoStartMs || this.startWall
         proc.on('close', (code) => {
           if (this.status.state === 'recording' && this.proc === proc) {
             this.fail(`Recording stopped unexpectedly (code ${code}).\n${this.stderr.split('\n').slice(-6).join('\n')}`)
@@ -484,7 +608,9 @@ class Recorder {
     if (this.tick) clearInterval(this.tick)
     this.tick = null
     if (this.stopKey) globalShortcut.unregister(this.stopKey)
+    if (this.pauseKey) globalShortcut.unregister(this.pauseKey)
     this.stopKey = ''
+    this.pauseKey = ''
     this.hideTray()
   }
 
@@ -512,25 +638,19 @@ class Recorder {
   }
 
   async stop(): Promise<void> {
-    if (this.status.state !== 'recording' || !this.proc || !this.opts) return
+    if ((this.status.state !== 'recording' && this.status.state !== 'paused') || !this.opts) return
+    while (this.busy) await new Promise((r) => setTimeout(r, 50))
     const opts = this.opts
+    const wasPaused = this.status.state === 'paused'
     this.set({ state: 'stopping' })
     this.cleanupRuntime()
-    const proc = this.proc
-    this.proc = null
-    const videoStart = this.videoStartMs || this.startWall + 250
-    const cursor = this.tracker?.stop(videoStart)
+    const endedAt = wasPaused ? this.pausedAt : Date.now()
+    const videoStart = this.firstStart || this.startWall + 250
+    let cursor = this.tracker?.stop(videoStart)
     this.tracker = null
+    if (cursor) cursor = removePaused(cursor, this.gaps, videoStart, endedAt)
     this.hooks.hideBubble()
-
-    const closed = new Promise<void>((r) => proc.on('close', () => r()))
-    try {
-      proc.stdin?.write('q\n')
-      proc.stdin?.end()
-    } catch {
-      /* ignore */
-    }
-    const killTimer = setTimeout(() => proc.kill('SIGKILL'), 10000)
+    const ending = this.endSegment()
 
     const win = this.hooks.mainWindow()
     let files: { mic?: string; system?: string; webcam?: string } = {}
@@ -541,8 +661,7 @@ class Recorder {
         console.warn('[rec] media stop failed', e)
       }
     }
-    await closed
-    clearTimeout(killTimer)
+    await ending
     this.hooks.hideToolbar()
 
     try {
@@ -561,15 +680,25 @@ class Recorder {
     files: { mic?: string; system?: string; webcam?: string }
   ): Promise<Project> {
     const dir = this.dir
-    const rec = join(dir, 'screen.rec.mp4')
     const final = join(dir, 'screen.mp4')
-    if (!existsSync(rec)) throw new Error('No video was captured. ' + this.stderr.split('\n').slice(-4).join(' '))
-    const r = await runFfmpeg(['-i', rec, '-c', 'copy', '-movflags', '+faststart', final])
+    const parts = this.segments.filter((f) => existsSync(f))
+    if (!parts.length) throw new Error('No video was captured. ' + this.stderr.split('\n').slice(-4).join(' '))
+    // one file per recorded stretch (pauses split them); join without re-encoding
+    let r
+    if (parts.length === 1) r = await runFfmpeg(['-i', parts[0], '-c', 'copy', '-movflags', '+faststart', final])
+    else {
+      const list = join(dir, 'segments.txt')
+      await fs.writeFile(list, parts.map((f) => `file '${f.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'))
+      r = await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', final])
+      await fs.rm(list, { force: true })
+    }
     if (r.code !== 0) throw new Error('Could not finalize the recording.')
-    await fs.rm(rec, { force: true })
+    for (const f of parts) await fs.rm(f, { force: true })
 
     const info = await probeVideo(final)
-    const media: Project['media'] = { screen: { path: final, ...info, fps: opts.fps, realFps: measuredFps(this.stderr, info.duration, opts.fps) }, engine: this.engine.kind }
+    const unique = this.frames.total - this.frames.dup
+    const realFps = this.frames.total && info.duration > 0.5 ? Math.max(1, Math.min(opts.fps, Math.round((unique / info.duration) * 10) / 10)) : opts.fps
+    const media: Project['media'] = { screen: { path: final, ...info, fps: opts.fps, realFps }, engine: this.engine.kind }
 
     // remux MediaRecorder webm files so they get a proper duration + seek index
     for (const kind of ['mic', 'system', 'webcam'] as const) {
@@ -624,15 +753,30 @@ class Recorder {
 export const recorder = new Recorder()
 
 /**
- * How many unique frames per second the capture really delivered. ffmpeg runs in constant frame
- * rate mode, so when the PC can't keep up it repeats frames ("dup="). Those repeats aren't real
- * motion, so the export dialog uses this number to avoid offering frame rates we never captured.
+ * Drops cursor samples and clicks from paused stretches and closes the gaps, so cursor time
+ * matches the joined video. Times are seconds from the first segment's start.
  */
-export function measuredFps(stderr: string, duration: number, target: number): number {
-  const stats = [...stderr.matchAll(/frame=\s*(\d+)[^\n\r]*?dup=\s*(\d+)/g)]
-  const last = stats[stats.length - 1]
-  if (!last || duration <= 0.5) return target
-  const unique = Number(last[1]) - Number(last[2])
-  const fps = unique / duration
-  return Math.max(1, Math.min(target, Math.round(fps * 10) / 10))
+export function removePaused(c: CursorData, gaps: [number, number][], videoStart: number, endedAt: number): CursorData {
+  if (!gaps.length) return c
+  const g = gaps.map(([a, b]) => [(a - videoStart) / 1000, (b - videoStart) / 1000] as [number, number])
+  const map = (t: number): number | null => {
+    let shift = 0
+    for (const [a, b] of g) {
+      if (t >= a && t < b) return null
+      if (t >= b) shift += b - a
+    }
+    return t - shift
+  }
+  const end = map((endedAt - videoStart) / 1000) ?? Infinity
+  const samples = c.samples.flatMap((s) => {
+    const t = map(s.t)
+    return t === null || t > end ? [] : [{ ...s, t }]
+  })
+  const clicks = c.clicks.flatMap((k) => {
+    const t = map(k.t)
+    if (t === null) return []
+    const up = k.up !== undefined ? map(k.up) ?? t + 0.1 : undefined
+    return [{ ...k, t, up }]
+  })
+  return { ...c, samples, clicks }
 }

@@ -14,6 +14,10 @@ export interface MuxJobIn {
 }
 
 export interface Api {
+  pauseRecording(): Promise<void>
+  resumeRecording(): Promise<void>
+  /** Ctrl+O dialog. Returns the project folder to open, or null if cancelled. */
+  openProjectDialog(): Promise<string | null>
   setTheme(t: 'dark' | 'light'): Promise<void>
   listSources(): Promise<CaptureSource[]>
   startRecording(o: RecordOptions): Promise<void>

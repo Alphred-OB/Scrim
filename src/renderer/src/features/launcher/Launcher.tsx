@@ -4,6 +4,8 @@ import { api, mediaUrl } from '@/lib/api'
 import { webcamConstraints } from '@/lib/mediaCapture'
 import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu } from '@/ui'
 import SettingsModal from '@/features/settings/SettingsModal'
+import { matches, useSettings } from '@/lib/settings'
+import { openProjectFromDialog } from '@/lib/openProject'
 
 const LS = 'df.recordPrefs'
 interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; webcam: WebcamRecordOptions }
@@ -37,7 +39,7 @@ export default function Launcher() {
   const [busy, setBusy] = useState('')
   const [level, setLevel] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const recBusy = status.state === 'recording' || status.state === 'countdown' || status.state === 'stopping'
+  const recBusy = status.state === 'recording' || status.state === 'paused' || status.state === 'countdown' || status.state === 'stopping'
   const cam = prefs.webcam
   const setCam = (p: Partial<WebcamRecordOptions>) => setPrefs((s) => ({ ...s, webcam: { ...s.webcam, ...p } }))
 
@@ -73,6 +75,19 @@ export default function Launcher() {
       navigator.mediaDevices.removeEventListener('devicechange', devices)
     }
   }, [refresh, loadProjects])
+
+  // Ctrl+O opens a project or video from anywhere on the home screen
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (document.querySelector('.modal-back')) return
+      if (matches(e, useSettings.getState().settings.shortcuts.open || 'Ctrl+O')) {
+        e.preventDefault()
+        openProjectFromDialog()
+      }
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [])
 
   useEffect(() => {
     try {

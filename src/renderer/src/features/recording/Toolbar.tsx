@@ -7,6 +7,7 @@ import { useSettings } from '@/lib/settings'
 export default function Toolbar() {
   const [s, setS] = useState<RecorderStatus>({ state: 'idle', elapsed: 0 })
   const stopKey = useSettings((x) => x.settings.shortcuts.stopRecording)
+  const pauseKey = useSettings((x) => x.settings.shortcuts.pauseRecording ?? 'Alt+Shift+P')
   useEffect(() => {
     document.body.style.background = 'transparent'
     document.documentElement.style.background = 'transparent'
@@ -41,16 +42,20 @@ export default function Toolbar() {
   }
 
   const stopping = s.state === 'stopping'
+  const paused = s.state === 'paused'
   return (
     <div style={bar}>
-      <span style={{ width: 10, height: 10, borderRadius: 5, background: stopping ? '#888' : '#ff4d5e', animation: stopping ? '' : 'blink 1.2s infinite' }} />
+      <span style={{ width: 10, height: 10, borderRadius: 5, background: stopping || paused ? '#8b8f9c' : '#ff4d5e', animation: stopping || paused ? '' : 'blink 1.2s infinite' }} />
       <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 52 }}>{stopping ? 'Saving' : fmtTime(s.elapsed)}</span>
-      <span style={{ flex: 1, fontSize: 11, color: '#8b8f9c' }}>{stopping ? '' : stopKey}</span>
-      <button className="icon-btn" style={noDrag} title="Restart" disabled={stopping} onClick={() => api.restartRecording()}>
-        <Icon name="restart" />
-      </button>
-      <button className="icon-btn" style={noDrag} title="Discard" disabled={stopping} onClick={() => api.cancelRecording()}>
-        <Icon name="trash" />
+      <span style={{ flex: 1, fontSize: 11, color: paused ? '#ffd60a' : '#8b8f9c', fontWeight: paused ? 600 : 400 }}>{stopping ? '' : paused ? 'Paused' : stopKey}</span>
+      <button
+        className="icon-btn"
+        style={noDrag}
+        title={paused ? `Resume (${pauseKey})` : `Pause (${pauseKey})`}
+        disabled={stopping}
+        onClick={() => (paused ? api.resumeRecording() : api.pauseRecording())}
+      >
+        <Icon name={paused ? 'record' : 'pause'} />
       </button>
       <button className="btn danger sm" style={{ ...noDrag, height: 36 }} disabled={stopping} onClick={() => api.stopRecording()}>
         {stopping ? <span className="spin" /> : <Icon name="stop" size={14} />} Stop

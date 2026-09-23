@@ -5,7 +5,7 @@
  * Env vars:
  *   SCRIM_TEST_DIR     project folder to open (required to run at all)
  *   SCRIM_TEST_OUT     where screenshots and the export go
- *   SCRIM_TEST_RECORD  record the screen for 4 seconds instead of the editor checks
+ *   SCRIM_TEST_RECORD  record 3s, pause 3s, record 3s more, then open the result (instead of the editor checks)
  *   SCRIM_TEST_IMPORT  comma separated files to import into the media library
  *   SCRIM_TEST_FORMAT  export format (mp4, webm, mov, gif)
  *   SCRIM_TEST_NAME    export file name
@@ -65,7 +65,13 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         const scr = srcs.find((s) => s.kind === 'screen')
         log('sources', srcs.length, scr?.name)
         await recorder.start({ sourceId: scr?.id ?? 'screen:0:0', sourceName: 'Self test', kind: 'screen', fps: 30, mic: true, systemAudio: true, countdown: 1 })
-        await wait(4000)
+        await wait(3000)
+        await recorder.pause()
+        log('paused', JSON.stringify(recorder.getStatus()))
+        await wait(3000)
+        await recorder.resume()
+        log('resumed', JSON.stringify(recorder.getStatus()))
+        await wait(3000)
         await recorder.stop()
         log('after stop', JSON.stringify(recorder.getStatus()))
         await wait(2500)

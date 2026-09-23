@@ -3,6 +3,7 @@ import type { Aspect, CursorData, Preset } from '@shared/types'
 import { uid } from '@shared/defaults'
 import { api } from '@/lib/api'
 import { useSettings, matches } from '@/lib/settings'
+import { openProjectFromDialog } from '@/lib/openProject'
 import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { useEditor, flushSave, Panel } from './state/store'
@@ -152,7 +153,13 @@ function EditorView() {
         export: () => setExporting(true),
         import: () => importMedia(project.dir),
         settings: () => setSettingsOpen(true),
-        fullscreen: togglePreviewFullscreen
+        fullscreen: togglePreviewFullscreen,
+        save: async () => {
+          await flushSave()
+          setToast('Saved')
+          setTimeout(() => setToast((t) => (t === 'Saved' ? '' : t)), 1500)
+        },
+        open: () => openProjectFromDialog(flushSave)
       }
       for (const [id, fn] of Object.entries(actions)) {
         if (sc[id] && matches(e, sc[id])) {

@@ -292,7 +292,7 @@ export interface Preset {
 }
 
 export interface RecorderStatus {
-  state: 'idle' | 'countdown' | 'recording' | 'stopping' | 'error'
+  state: 'idle' | 'countdown' | 'recording' | 'paused' | 'stopping' | 'error'
   elapsed: number
   countdown?: number
   error?: string

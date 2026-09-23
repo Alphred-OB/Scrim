@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell, desktopCapturer, Menu, globalShortcut, Notification } from 'electron'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import { tmpdir } from 'os'
-import { promises as fs } from 'fs'
+import { existsSync, promises as fs } from 'fs'
 import type { AppSettings, Asset, Preset, Project, RecordOptions, WebcamRecordOptions } from '@shared/types'
 import { registerSchemes, handleMediaProtocol } from './protocol'
 import { recorder, listSources, probeDdaOutputs } from './recorder'
@@ -146,6 +146,8 @@ function registerIpc(): void {
   ipcMain.handle('recorder:stop', () => recorder.stop())
   ipcMain.handle('recorder:cancel', () => recorder.cancel())
   ipcMain.handle('recorder:restart', () => recorder.restart())
+  ipcMain.handle('recorder:pause', () => recorder.pause())
+  ipcMain.handle('recorder:resume', () => recorder.resume())
   ipcMain.handle('recorder:status', () => recorder.getStatus())
   ipcMain.handle('encoder:detect', () => detectEncoder())
 
@@ -162,6 +164,26 @@ function registerIpc(): void {
     })
     if (r.canceled || !r.filePaths[0]) return null
     return importVideo(r.filePaths[0])
+  })
+
+  // Ctrl+O: open a Scrim project (its folder's project.json or screen.mp4) or turn any video into a project
+  ipcMain.handle('projects:open', async () => {
+    const r = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Open a project or video',
+      defaultPath: projectsRoot(),
+      properties: ['openFile'],
+      filters: [
+        { name: 'Scrim projects and videos', extensions: ['json', 'mp4', 'mov', 'webm', 'mkv', 'm4v', 'avi'] },
+        { name: 'Scrim project', extensions: ['json'] },
+        { name: 'Video', extensions: ['mp4', 'mov', 'webm', 'mkv', 'm4v', 'avi'] }
+      ]
+    })
+    const file = r.canceled ? null : r.filePaths[0]
+    if (!file) return null
+    const dir = dirname(file)
+    if (existsSync(join(dir, 'project.json')) && (basename(file) === 'project.json' || /^screen(-\d+)?\.mp4$/.test(basename(file)))) return dir
+    if (file.toLowerCase().endsWith('.json')) throw new Error('That file is not a Scrim project.')
+    return (await importVideo(file)).dir
   })
 
   ipcMain.handle('dialog:open', async (_e, opts: { title: string; filters: Electron.FileFilter[] }) => {

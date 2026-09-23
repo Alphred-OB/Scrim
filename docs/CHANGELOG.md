@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+- New: pause and resume while recording (floating bar, tray, or Alt+Shift+P). Paused time is left out of the video, audio, webcam and cursor.
+- New: Ctrl+S saves the project, Ctrl+O opens a project or any video
+- Changed: the floating bar no longer has Discard or Restart, so a recording can't be deleted by a stray click. Both are still in the tray menu and ask before deleting.
+- New: join videos. Drop a video from the library on the Video track (left half puts it before, right half after), or use Add > Join a video before/after, or right click the Video track. Another Scrim recording brings its cursor, clicks, zooms, mic and system audio along. Other videos get their audio on the Audio track and the cursor is hidden over them.
+- Fixed: editor preview froze while the cursor and zoom kept moving, then sped up at the end
+
 ## 0.3.0
 - Renamed to **Scrim**. Settings, presets and old projects carry over automatically.
 - New: light theme, dark theme, or follow Windows (Settings, Appearance)

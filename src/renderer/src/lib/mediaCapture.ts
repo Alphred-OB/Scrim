@@ -110,6 +110,14 @@ export async function stopMedia(dir: string): Promise<Partial<Record<Kind, strin
   return out
 }
 
+/** Pausing keeps the tracks in step with the screen video, which also skips paused time. */
+export function pauseMedia(): void {
+  for (const t of Object.values(tracks)) if (t?.rec.state === 'recording') t.rec.pause()
+}
+export function resumeMedia(): void {
+  for (const t of Object.values(tracks)) if (t?.rec.state === 'paused') t.rec.resume()
+}
+
 export async function cancelMedia(): Promise<void> {
   for (const kind of ['mic', 'system', 'webcam'] as const) {
     const t = tracks[kind]

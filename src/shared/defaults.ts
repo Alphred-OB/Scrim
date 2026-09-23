@@ -148,7 +148,10 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'import', label: 'Import media', def: 'Ctrl+I' },
   { id: 'settings', label: 'Open settings', def: 'Ctrl+,' },
   { id: 'fullscreen', label: 'Full screen preview', def: 'F' },
-  { id: 'stopRecording', label: 'Stop recording (works in any app)', def: 'Alt+Shift+S', global: true }
+  { id: 'save', label: 'Save project', def: 'Ctrl+S' },
+  { id: 'open', label: 'Open a project or video', def: 'Ctrl+O' },
+  { id: 'stopRecording', label: 'Stop recording (works in any app)', def: 'Alt+Shift+S', global: true },
+  { id: 'pauseRecording', label: 'Pause or resume recording (works in any app)', def: 'Alt+Shift+P', global: true }
 ]
 
 export function defaultSettings(): AppSettings {

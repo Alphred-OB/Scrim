@@ -5,7 +5,8 @@
 2. Audio: microphone (with a live level meter) and system audio. They're saved as separate tracks.
 3. Webcam: turn on **Record webcam** to see a live preview. Choose the camera, shape (circle, rounded, square), size, corner and quality. Turn on **Show bubble while recording** to see yourself while you record.
 4. Pick 30 or 60 fps and a countdown, then **Start recording**.
-5. Stop with the floating bar, the tray icon, or **Alt+Shift+S** (you can change this in Settings).
+5. Pause and resume with the floating bar, the tray menu or **Alt+Shift+P**. Paused time is left out of the video.
+6. Stop with the floating bar, the tray icon, or **Alt+Shift+S** (you can change this in Settings). Discard and Restart are only in the tray menu and always ask first.
 
 The real cursor is hidden in the video. Scrim logs where it goes and every click, then draws a smooth cursor in the editor. That's what makes the zooms, ripples and restyling possible.
 
@@ -45,6 +46,9 @@ Add from the Text panel, the Text track or **T**. Drag on the preview to move it
 ## Media
 Import with the button, **Ctrl+I**, or by dragging files onto the editor. Supports mp4, mov, webm, mkv, avi, mp3, wav, m4a, ogg, png, jpg, webp and gif. Anything the editor can't play directly is converted automatically. The library is split into Videos, Audio and Images. Drag any item anywhere onto the timeline: audio lands on the Audio track, videos and images on the Media track. Or double click to add at the playhead.
 
+## Joining videos
+Put another video before or after your recording: drag it from the library onto the Video track (drop on the left half to put it before, right half to put it after), use **Add > Join a video before/after**, or right click the Video track. Pick the `screen.mp4` of another Scrim recording and its cursor, clicks, zooms and audio come along. Other videos are fitted to your frame size, their sound goes on the Audio track, and the cursor is hidden while they play.
+
 ## Webcam (editing)
 Move it by dragging on the preview, resize it with the corner handle, and change the shape, border, shadow and mirror in the Webcam panel.
 
@@ -77,4 +81,7 @@ MP4 (H.264), WebM (VP9 + Opus), MOV, or GIF. Pick the resolution (with the real 
 | Import media | Ctrl+I |
 | Settings | Ctrl+, |
 | Full screen preview | F |
+| Save project | Ctrl+S |
+| Open a project or video | Ctrl+O |
 | Stop recording | Alt+Shift+S |
+| Pause / resume recording | Alt+Shift+P |

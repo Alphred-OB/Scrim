@@ -8,6 +8,8 @@ const api = {
   stopRecording: () => invoke('recorder:stop'),
   cancelRecording: () => invoke('recorder:cancel'),
   restartRecording: () => invoke('recorder:restart'),
+  pauseRecording: () => invoke('recorder:pause'),
+  resumeRecording: () => invoke('recorder:resume'),
   recorderStatus: () => invoke('recorder:status'),
   detectEncoder: () => invoke('encoder:detect'),
 
@@ -16,6 +18,7 @@ const api = {
   saveProject: (p: unknown) => invoke('projects:save', p),
   deleteProject: (dir: string) => invoke('projects:delete', dir),
   importVideo: () => invoke('projects:import'),
+  openProjectDialog: () => invoke('projects:open'),
   projectsRoot: () => invoke('projects:root'),
 
   openFile: (title: string, filters: { name: string; extensions: string[] }[]) => invoke('dialog:open', { title, filters }),
