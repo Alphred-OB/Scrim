@@ -1,0 +1,68 @@
+# Scrim architecture
+
+Electron 44 + React 19 + TypeScript, built with electron-vite. Everything runs locally.
+
+```
+src/main        Electron main process (Node)
+  index.ts        windows (main, floating bar, webcam bubble), IPC
+  selftest.ts     automated UI + export checks (dev only)
+  recorder.ts     capture engines, window/monitor geometry, start/stop/finalize, tray
+  cursorTracker   60 Hz cursor sampling + global mouse hook (uiohook-napi)
+  projects.ts     project folders, import video, import media assets, waveform peaks
+  exporter.ts     streaming file writer + FFmpeg audio mix / container mux / GIF
+  ffmpeg.ts       bundled FFmpeg path, GPU encoder detection, probing
+  settings.ts     app settings (userData/settings.json)
+  protocol.ts     media:// protocol with HTTP range support (fast seeking)
+src/preload     contextBridge API (window.api)
+src/renderer/src   React UI
+  ui/             shared building blocks: Icon, Select, ContextMenu, fields (Slider, Toggle, Seg...)
+  lib/            api bridge, media capture (mic/system/webcam), settings store + theme
+  styles/         tokens.css (dark and light theme colors), app.css (components)
+  features/
+    launcher/     home screen: record options + projects
+    recording/    floating record bar and webcam bubble
+    settings/     settings modal
+    editor/
+      Editor.tsx  layout, shortcuts, file drop
+      state/      store (undo/redo), actions, timeBus, dragAsset
+      engine/     compositor, cursors, backgrounds (wallpapers + live), cursorTrack, timeMap, thumbnails
+      preview/    live preview with on-canvas handles and full screen
+      timeline/   tracks, waveforms, drag and drop
+      panels/     one file per side panel
+      export/     export dialog + exporter
+src/shared      data model (types.ts), defaults + migration, auto zoom
+```
+
+## Recording pipeline
+1. **Geometry.** Monitor bounds come from Windows (PowerShell + WinForms, per monitor DPI aware). Window bounds come from DWM extended frame bounds. Everything is in physical pixels.
+2. **Engine.** It probes `ddagrab` outputs at startup, then matches the monitor by size to a DDA output. GPU Desktop Duplication (`ddagrab`, `draw_mouse=0`) is the first choice. It's fast, and it respects `WDA_EXCLUDEFROMCAPTURE`, so the floating bar and webcam bubble stay out of the video. If it fails to start, the recorder falls back to `gdigrab`. In GDI mode the bar and bubble hide, because GDI capture freezes or slows down with protected see-through windows on screen. That was the v0.1 frozen full screen bug.
+3. **Encoding.** NVENC, then QuickSync, then AMF, then libx264 ultrafast. Keyframes come every second so the editor can seek fast, and a fragmented MP4 means a crash never loses the file.
+4. **Sync.** gdigrab stamps frames with wall clock time, which gets parsed from ffmpeg's `start:`. DDA uses the moment the output opens. Mic, system and webcam MediaRecorders report their wall clock start. The cursor tracker uses wall clock too. All of them are converted to offsets against the video, and the user can fine tune with the sync slider.
+5. **Finalize.** Remux to faststart MP4, remux the webm tracks (for proper duration and cues), write `cursor.json`, create auto zooms, save `project.json`, and open the editor.
+
+## Project format
+`Documents\Scrim\recording-<ms>\` (projects from the old `Documents\Demo Frame` folder are still listed): `project.json`, `screen.mp4`, `mic.webm`, `system.webm`, `webcam.webm`, `cursor.json`, `thumb.jpg`, `assets/`.
+Every time in the edit state is **source time** (seconds in screen.mp4), so cutting the video never moves text, zooms or media. `migrateProject()` fills in new fields, so old projects keep opening.
+
+## Compositor (engine/compositor.ts)
+One pure function draws a frame for both the preview and the export. The layers are:
+background (cached, or a live animated scene drawn at up to 960px), shadow (cached sprite), window with the zoomed video, cursor and clicks, border, media overlays, webcam, text.
+Blur is done by downscaling and upscaling instead of per pixel filters, which keeps low end PCs smooth. The preview renders at the size you see on screen, never at full 1080p.
+
+## Export (export/exporter.ts)
+Frames are decoded with WebCodecs through mediabunny (the screen, webcam, overlays and background video each get their own sink), drawn to an OffscreenCanvas, and encoded with hardware H.264 (MP4/MOV) or VP9 (WebM). Chunks stream to disk through IPC. Then FFmpeg mixes the audio: each track is aligned by its offset, silenced outside its window, faded, cut by the clip list, sped up with atempo, and mixed with amix. The result is muxed into the final container, or turned into a GIF with palettegen.
+
+The export dialog only offers settings that are real. The recorder measures the unique frames per second it actually captured (`screen.realFps`, from ffmpeg's frame and dup counters), so frame rates above that are turned off with the reason shown. "Original" resolution is measured from the real layout (crop, padding, aspect), sizes far above it are turned off, small upscales are labelled, and every size is checked against the PC's encoder before it can be picked.
+
+## Performance choices
+- GPU capture and GPU encoding while recording
+- The cursor is tracked separately, so 30 fps recordings still get a smooth cursor
+- Preview playback drives a tiny event bus instead of React state (the playhead and time label don't re-render the app)
+- Cached background and shadow layers, and blur by downscaling
+- Reduce transparency setting turns off backdrop blur
+
+## Themes
+All colors are CSS variables in `styles/tokens.css`. `data-theme` on `<html>` switches dark and light, and System follows Windows. The main process updates the title bar buttons to match.
+
+## Testing
+`npx tsx test/make-project.ts a` makes a test project. `SCRIM_TEST_DIR=<project> SCRIM_TEST_OUT=<dir> electron .` then runs `src/main/selftest.ts`. It clicks through the UI with real mouse input and prints PASS or FAIL for: the track eye toggles, dragging media onto the timeline, settings and theme switching, live backgrounds, the export dialog and full screen preview. It saves screenshots and finishes with a real export (`SCRIM_TEST_FORMAT`). `SCRIM_TEST_IMPORT` imports files first, `SCRIM_TEST_RECORD=1` runs a real record, stop and editor cycle instead.

@@ -1,0 +1,25 @@
+appId: com.eruditeafrican.scrim
+productName: Scrim
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - resources/**
+  - package.json
+  - "!**/.vscode/*"
+  - "!src/*"
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+  - node_modules/uiohook-napi/**
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  artifactName: Scrim-Setup-${version}.exe
+npmRebuild: false
