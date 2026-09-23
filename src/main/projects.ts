@@ -249,11 +249,34 @@ export async function getSampleDir(reset = false): Promise<string | null> {
     if (existsSync(projPath) && existsSync(videoPath)) {
       const p = await loadProject(dir)
       if (p.edit?.texts?.length && p.edit?.transitions?.items?.length) {
-        // practice always starts from the untouched sample
         const original = join(dir, 'project.original.json')
+        // practice always starts from the untouched sample
         if (reset) {
           if (!existsSync(original)) return null // an old sample without a clean copy: make a new one
           await fs.copyFile(original, projPath)
+        }
+        // tidy older samples: no emojis in the titles, and a zoom instead of the slide that showed a black gap.
+        // Done on the clean copy (never saving someone's practice edits as the new clean copy).
+        if (existsSync(original)) {
+          const raw = JSON.parse(await fs.readFile(original, 'utf8')) as Project
+          let changed = false
+          for (const t of raw.edit?.texts ?? []) {
+            const clean = t.text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1FA00}-\u{1FAFF}\u{FE0F}]/gu, '').trim()
+            if (clean !== t.text) {
+              t.text = clean
+              changed = true
+            }
+          }
+          for (const k of Object.keys(raw.edit?.transitions?.perCut ?? {})) {
+            if (raw.edit.transitions.perCut[k]?.type === 'slide-left') {
+              raw.edit.transitions.perCut[k].type = 'zoom'
+              changed = true
+            }
+          }
+          if (changed) {
+            await fs.writeFile(original, JSON.stringify(raw, null, 1))
+            if (reset) await fs.copyFile(original, projPath)
+          }
         }
         return dir
       }
@@ -301,7 +324,7 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
     outro: { type: 'fade', duration: 0.6, ease: 'smooth' },
     cut: { type: 'zoom', duration: 0.45, ease: 'smooth' },
     perCut: {
-      [clip2Id]: { type: 'slide-left', duration: 0.5, ease: 'snappy' }
+      [clip2Id]: { type: 'zoom', duration: 0.45, ease: 'smooth' }
     },
     items: [
       { id: uid('trans'), type: 'wipe', start: Math.min(7.2, +(dur * 0.68).toFixed(2)), end: Math.min(7.9, +(dur * 0.74).toFixed(2)), direction: 'right', ease: 'snappy' }
@@ -315,7 +338,7 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
       start: 0.4,
       end: 3.2,
       lane: 0,
-      text: '⚡ Instant Workflow Demo',
+      text: 'Instant Workflow Demo',
       x: 0.5,
       y: 0.18,
       font: 'Inter',
@@ -343,7 +366,7 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
       start: 4.6,
       end: 7.4,
       lane: 0,
-      text: '🎯 Dynamic Cut & Transition',
+      text: 'Dynamic Cut & Transition',
       x: 0.5,
       y: 0.84,
       font: 'Inter',
@@ -371,7 +394,7 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
       start: 7.8,
       end: Math.max(8.5, +(dur - 0.2).toFixed(2)),
       lane: 0,
-      text: '✨ Studio Quality Polish',
+      text: 'Studio Quality Polish',
       x: 0.5,
       y: 0.84,
       font: 'Inter',

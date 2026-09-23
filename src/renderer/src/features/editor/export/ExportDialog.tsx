@@ -176,12 +176,6 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
             <span className="hint">
               Recorded at {project.media.screen.width} x {project.media.screen.height}, {choices.realFps} real frames per second. Options your video can't really reach are turned off.
             </span>
-            {s.format !== 'gif' && (
-              <>
-                <span className="section-title" style={{ marginTop: 6 }}>Quality</span>
-                <Seg options={[{ v: 'low', l: 'Small' }, { v: 'medium', l: 'Good' }, { v: 'high', l: 'High' }, { v: 'max', l: 'Max' }]} value={s.quality} onChange={(v) => set({ quality: v as ExportSettings['quality'] })} />
-              </>
-            )}
             <div className="glass" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, boxShadow: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
               <Icon name="restart" size={16} />
               <span style={{ flex: 1 }}>Estimated time</span>

@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react'
-import type { ClickEffect, SpotlightMode, SpotlightWhen } from '@shared/types'
+import type { ClickEffect, ClickSound, SpotlightMode, SpotlightWhen } from '@shared/types'
+import { CLICK_SOUNDS } from '@shared/clickSounds'
+import { playClick } from '../preview/clickPlayer'
 import { defaultEdit } from '@shared/defaults'
-import { ColorRow, Section, Seg, Slider, Toggle } from '@/ui'
+import { ColorRow, Icon, Section, Seg, Slider, Toggle } from '@/ui'
 import { useEditor } from '../state/store'
 import { CURSORS, cursorDef } from '../engine/cursors'
 import { cursorThumb } from '../engine/thumbnails'
+
+/** the sound picked before switching sounds off, so turning them back on brings it back */
+let lastSound: ClickSound | '' = ''
 
 const EFFECTS: { id: ClickEffect; name: string; svg: ReactNode }[] = [
   { id: 'none', name: 'None', svg: <><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth={1.6} /><path d="M6.5 17.5l11-11" stroke="currentColor" strokeWidth={1.6} /></> },
@@ -141,7 +146,39 @@ export default function CursorPanel() {
           <ColorRow label="Effect color" value={c.clickColor} onChange={(v) => update((e) => (e.cursor.clickColor = v), 'cclr')} />
           <Slider label="Click bounce" value={c.clickBounce} min={1} max={3} step={0.05} def={d.clickBounce} format={(v) => `${v.toFixed(2)}x`} onChange={(v) => update((e) => (e.cursor.clickBounce = v), 'cbounce')} />
           <Slider label="Bounce speed" value={c.bounceMs} min={100} max={800} step={10} def={d.bounceMs} format={(v) => `${Math.round(v)} ms`} onChange={(v) => update((e) => (e.cursor.bounceMs = v), 'cbms')} />
-          <span className="hint">Turn single clicks on or off on the Clicks track of the timeline.</span>
+        </Section>
+
+        <Section title="Click sound">
+          <Toggle
+            label="Play a sound on every click"
+            value={c.clickSound !== 'none'}
+            onChange={(v) => {
+              const pick = v ? lastSound || 'mouse' : 'none'
+              if (v) playClick(pick as ClickSound, c.clickVolume)
+              update((e) => (e.cursor.clickSound = pick as ClickSound))
+            }}
+          />
+          <div className={`sound-grid ${c.clickSound === 'none' ? 'off' : ''}`}>
+            {CLICK_SOUNDS.map((snd) => (
+              <button
+                key={snd.id}
+                className={`sound-tile ${c.clickSound === snd.id ? 'on' : ''}`}
+                title={`${snd.hint}. Click to hear it.`}
+                onClick={() => {
+                  lastSound = snd.id
+                  playClick(snd.id, c.clickVolume || 0.6)
+                  update((e) => (e.cursor.clickSound = snd.id))
+                }}
+              >
+                <span className="sound-ico"><Icon name="volume" size={14} /></span>
+                <b>{snd.name}</b>
+              </button>
+            ))}
+          </div>
+          {c.clickSound !== 'none' && (
+            <Slider label="Click volume" value={c.clickVolume} min={0.05} max={1} step={0.05} def={0.6} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.cursor.clickVolume = v), 'cvol')} />
+          )}
+          <span className="hint">Plays in the preview and goes into the export. Clicks cut out of the video stay silent.</span>
         </Section>
       </div>
     </div>

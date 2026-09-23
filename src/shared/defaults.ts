@@ -50,7 +50,9 @@ export function defaultEdit(duration: number): EditState {
       highlightDimColor: '#000000',
       highlightRing: 1,
       highlightWhen: 'always',
-      hiddenClicks: []
+      hiddenClicks: [],
+      clickSound: 'none',
+      clickVolume: 0.6
     },
     zoom: { enabled: true, auto: true, autoScale: 1.6, master: 1, ease: 0.6, segments: [] },
     clips: [{ id: uid('c'), start: 0, end: duration, speed: 1 }],
@@ -161,13 +163,14 @@ export function migrateProject(p: Project): Project {
   return p
 }
 
-/** Texts from before in/out animations: turn the single animation into an in and an out. */
+/** Texts migration: cleans emojis and ensures in/out animations. */
 function migrateText(t: TextItem): TextItem {
-  if (t.animIn) return t
+  const text = t.text ? t.text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1FA00}-\u{1FAFF}\u{FE0F}]/gu, '').trim() : t.text
+  if (t.animIn) return { ...t, text }
   const a = t.anim ?? 'fade'
   const animIn: TextMotion = a
   const animOut: TextMotion = a === 'typewriter' || a === 'pop' ? 'fade' : a
-  return { ...t, animIn, animOut, inDur: a === 'typewriter' ? Math.max(0.4, t.text.length * 0.04) : 0.35, outDur: 0.35, loop: 'none' }
+  return { ...t, text, animIn, animOut, inDur: a === 'typewriter' ? Math.max(0.4, text.length * 0.04) : 0.35, outDur: 0.35, loop: 'none' }
 }
 
 /** First layer where [start, end] doesn't overlap anything, starting from `from`. */

@@ -250,6 +250,19 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         }
       })
 
+      await step('click sounds', async () => {
+        await click('[data-tour="tool-cursor"]')
+        await wait(400)
+        await js(`document.querySelector('.sound-grid').scrollIntoView({ block: 'center' })`)
+        await wait(200)
+        await clickText('.sound-tile', 'Pop')
+        await wait(300)
+        await shot('click-sounds.png')
+        const snd = await js<string>('window.__scrim.clickSound()')
+        log('click sound', snd)
+        if (snd !== 'pop') throw new Error('sound not picked: ' + snd)
+      })
+
       await step('zoom eye toggle', async () => {
         const before = (await state()).zoomEnabled
         await js(`document.querySelectorAll('.tl-head').forEach((h) => h.textContent.includes('Zoom') && h.querySelector('.tl-eye')?.setAttribute('id', 'eye-zoom'))`)
@@ -380,13 +393,15 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
           return 'ok'
         })()`
         log('drop transition', await js(dropOn('Glitch', 'Transitions', 0.15)))
+        // and one on its own line in the middle of a shot
+        await js(`window.__scrim.addTransitionItem('flash', 1.5)`)
         await clickText('.fx-tabs button', 'Effects')
         await wait(300)
         log('drop effect', await js(dropOn('Cyberpunk', 'Effects', 0.3)))
         await wait(500)
         const st = await state()
-        log('items', JSON.stringify({ transitions: st.transitionItems, effects: st.effectClips }))
-        if (st.transitionItems !== 1 || st.effectClips !== 1) throw new Error('drops did not land')
+        log('items', JSON.stringify({ transitions: st.transitionTypes, onLine: st.transitionItems, effects: st.effectClips }))
+        if (!(st.transitionTypes as string[]).includes('glitch') || st.transitionItems !== 1 || st.effectClips !== 1) throw new Error('drops did not land')
         await shot('tab-effects.png')
       })
 

@@ -24,7 +24,7 @@ import ClipPanel from './panels/ClipPanel'
 import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
-import { addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
+import { addTextAt, addTransitionItem, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
 const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boolean }[] = [
@@ -122,6 +122,8 @@ function EditorView() {
       seek: (t: number) => useEditor.getState().setTime(t),
       play: (on: boolean) => useEditor.getState().setPlaying(on),
       addText: (t: number) => addTextAt(t),
+      addTransitionItem: (type: string, at: number) => addTransitionItem(type as import('@shared/types').TransitionType, at),
+      clickSound: () => useEditor.getState().project!.edit.cursor.clickSound,
       lastText: () => { const ts = useEditor.getState().project!.edit.texts; return ts[ts.length - 1] },
       patchText: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.texts[e.texts.length - 1], patch)),
       lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
@@ -135,7 +137,7 @@ function EditorView() {
       state: () => {
         const e = useEditor.getState().project!.edit
         const st = useEditor.getState()
-        return { transitionItems: e.transitions.items.length, effectClips: e.effectClips.length, time: st.time, duration: st.project!.media.screen.duration, leadIn: e.leadIn ?? 0, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
+        return { transitionTypes: [e.transitions.intro.type, e.transitions.outro.type, ...Object.values(e.transitions.perCut).map((x) => x.type)], transitionItems: e.transitions.items.length, effectClips: e.effectClips.length, time: st.time, duration: st.project!.media.screen.duration, leadIn: e.leadIn ?? 0, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
       },
       export: async (out: string, patch?: Partial<import('@shared/types').ExportSettings>) => {
         const st = useEditor.getState()

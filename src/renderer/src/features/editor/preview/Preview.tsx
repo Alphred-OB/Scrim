@@ -7,6 +7,7 @@ import { Renderer, computeLayout, measureText, outputSize, overlayRect, webcamRe
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
 import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips } from '../engine/timeMap'
 import { Icon, openContextMenu } from '@/ui'
+import { playClick } from './clickPlayer'
 
 type Box = { x: number; y: number; w: number; h: number }
 type Handle = { kind: 'text' | 'overlay' | 'webcam'; id: string; box: Box } // box in CSS px relative to canvas
@@ -340,6 +341,8 @@ export default function Preview() {
     let shown: number | null = null
     let vfc = 0
     let lastLoop = 0
+    // click sounds: play every click the playhead passed since the last frame
+    let clickFrom = logical.current
     const onFrame = (_now: number, meta: { mediaTime: number }) => {
       shown = meta.mediaTime
       vfc = v.requestVideoFrameCallback(onFrame)
@@ -366,13 +369,21 @@ export default function Preview() {
       if (!cur) {
         const n = nextClip(cs, t)
         if (n) v.currentTime = n.start
-        else return useEditor.getState().setPlaying(false)
+        else {
+          v.pause()
+          return useEditor.getState().setPlaying(false)
+        }
       } else {
         if (v.playbackRate !== cur.speed) v.playbackRate = cur.speed
+        const idx = cs.indexOf(cur)
+        const next = idx >= 0 && idx < cs.length - 1 ? cs[idx + 1] : undefined
         if (t >= cur.end - 0.03) {
-          const n = nextClip(cs, cur.end + 0.001)
-          if (n) v.currentTime = n.start
-          else {
+          if (next) {
+            // If the next clip does not immediately follow in the source recording, jump to it
+            if (Math.abs(next.start - cur.end) > 0.04) {
+              v.currentTime = next.start
+            }
+          } else {
             v.pause()
             return useEditor.getState().setPlaying(false)
           }
@@ -384,6 +395,19 @@ export default function Preview() {
       const now = performance.now()
       if (lastLoop && now - lastLoop > 30) adapt(now - lastLoop - 16)
       lastLoop = now
+      {
+        const cur = live.current.edit.cursor
+        const cd = useEditor.getState().cursorData
+        if (cur.clickSound !== 'none' && cd && at > clickFrom && at - clickFrom < 0.5) {
+          const off = new Set(cur.hiddenClicks ?? [])
+          for (const c of cd.clicks) {
+            if (off.has(Math.round(c.t * 1000))) continue
+            if (c.t > clickFrom && c.t <= at) playClick(cur.clickSound, cur.clickVolume)
+            if ((cur.clickSound === 'mouse' || cur.clickSound === 'mechanical' || cur.clickSound === 'trackpad') && c.up !== undefined && c.up - c.t > 0.03 && c.up - c.t < 0.6 && c.up > clickFrom && c.up <= at) playClick(cur.clickSound, cur.clickVolume, 0, true)
+          }
+        }
+        clickFrom = at
+      }
       logical.current = at
       draw.current(at)
       timeBus.emit(at)

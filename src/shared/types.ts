@@ -131,7 +131,11 @@ export interface CursorSettings {
   highlightRing: number // ring thickness multiplier (ring mode)
   highlightWhen: SpotlightWhen
   hiddenClicks: number[] // click times (rounded ms) whose effect is switched off
+  clickSound: ClickSound // sound played on every click ('none' = silent)
+  clickVolume: number // 0..1
 }
+
+export type ClickSound = 'none' | 'mouse' | 'soft' | 'trackpad' | 'mechanical' | 'pop' | 'tap' | 'digital' | 'camera'
 
 export interface ZoomSegment {
   id: string

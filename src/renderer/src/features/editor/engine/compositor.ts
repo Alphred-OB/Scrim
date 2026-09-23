@@ -765,10 +765,12 @@ export function paintTransition(
     case 'slide-right':
     case 'slide-up':
     case 'slide-down': {
-      // the old shot leaves one way and the new one arrives from the other side
+      // dynamic push with motion blur so the cut is punchy and never drops to an empty black frame
       const horiz = type === 'slide-left' || type === 'slide-right'
       const sign = type === 'slide-left' || type === 'slide-up' ? -1 : 1
-      const d = (out ? sign : -sign) * e * (horiz ? W : H)
+      const d = (out ? sign : -sign) * (e * 0.45) * (horiz ? W : H)
+      ctx.filter = `blur(${Math.round(e * 10 * k)}px)`
+      ctx.globalAlpha = Math.max(0.25, 1 - e * 0.5)
       ctx.drawImage(img, horiz ? d : 0, horiz ? 0 : d)
       break
     }
