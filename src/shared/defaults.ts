@@ -62,7 +62,7 @@ export function defaultEdit(duration: number): EditState {
     audioClips: [],
     webcam: { show: true, shape: 'circle', size: 0.24, x: 0.86, y: 0.8, border: 4, borderColor: '#ffffff', shadow: true, mirror: true },
     audio: { micMuted: false, micVolume: 1, systemMuted: false, systemVolume: 0.8, webcamMuted: true, musicVolume: 0.25, musicMuted: false, syncOffset: 0 },
-    export: { resolution: 1080, fps: 30, quality: 'high', format: 'mp4' },
+    export: { resolution: 0, fps: 30, quality: 'high', format: 'mp4' }, // 0 = original: every recorded pixel is kept
     transitions: {
       intro: { type: 'none', duration: 0.6 },
       outro: { type: 'none', duration: 0.6 },

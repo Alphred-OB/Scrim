@@ -6,7 +6,7 @@ import type { CaptureSource, CursorData, Project, RecordOptions, RecorderStatus,
 import { defaultEdit } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { CursorTracker, Rect } from './cursorTracker'
-import { detectEncoder, encoderArgs, probeVideo, runFfmpeg, spawnFfmpeg } from './ffmpeg'
+import { colorFilter, detectEncoder, encoderArgs, probeVideo, runFfmpeg, spawnFfmpeg } from './ffmpeg'
 import { makeThumb, newProjectDir, saveProject } from './projects'
 import { callRenderer } from './rpc'
 import { getSettings, toAccelerator } from './settings'
@@ -435,7 +435,7 @@ class Recorder {
       const full = r.x === m.x && r.y === m.y && r.width === m.width && r.height === m.height
       const crop = full ? '' : `:video_size=${r.width}x${r.height}:offset_x=${r.x - m.x}:offset_y=${r.y - m.y}`
       grab = ['-v', 'verbose', '-f', 'lavfi', '-i', `ddagrab=output_idx=${this.engine.output}:framerate=${opts.fps}:draw_mouse=0${crop}`]
-      vf = ['-vf', 'hwdownload,format=bgra']
+      vf = ['-vf', `hwdownload,format=bgra,${colorFilter(enc)}`]
     } else if (this.engine.kind === 'gdi') {
       grab = ['-f', 'gdigrab', '-framerate', String(opts.fps), '-draw_mouse', '0',
         '-offset_x', String(r.x), '-offset_y', String(r.y), '-video_size', `${r.width}x${r.height}`, '-thread_queue_size', '512', '-i', 'desktop']
@@ -443,6 +443,7 @@ class Recorder {
       grab = ['-f', 'x11grab', '-framerate', String(opts.fps), '-draw_mouse', '0', '-video_size', `${r.width}x${r.height}`,
         '-thread_queue_size', '512', '-i', `${process.env.DISPLAY || ':0'}+${r.x},${r.y}`]
     }
+    if (!vf.length) vf = ['-vf', colorFilter(enc)]
     return [...grab, ...vf, ...encoderArgs(enc, opts.fps), '-fps_mode', 'cfr', '-movflags', '+frag_keyframe+empty_moov+default_base_moof', out]
   }
 

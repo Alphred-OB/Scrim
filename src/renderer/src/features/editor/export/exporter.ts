@@ -11,7 +11,8 @@ import { outputDuration, outputToSource, sortedClips } from '../engine/timeMap'
 
 export interface ExportProgress { phase: 'prepare' | 'render' | 'audio' | 'done'; progress: number; frame?: number; frames?: number; speed?: number; eta?: number }
 
-const BITRATE_PER_PIXEL: Record<ExportSettings['quality'], number> = { low: 0.05, medium: 0.08, high: 0.12, max: 0.2 }
+// bits per pixel per frame; screen recordings are mostly sharp text, which needs more than camera video
+const BITRATE_PER_PIXEL: Record<ExportSettings['quality'], number> = { low: 0.07, medium: 0.12, high: 0.2, max: 0.32 }
 
 export const GIF_MAX_RES = 720
 export const GIF_MAX_FPS = 30

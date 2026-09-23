@@ -64,16 +64,37 @@ export async function detectEncoder(): Promise<string> {
   return encoderCache[0]
 }
 
+/** Pixel format each encoder takes in. */
+export function encoderPixFmt(enc: string): string {
+  return enc === 'h264_qsv' ? 'nv12' : 'yuv420p'
+}
+
+/**
+ * Screen to video color conversion: exact BT.709 (what players assume for HD), sharp chroma for text,
+ * done in one place so colors don't shift or wash out.
+ */
+export function colorFilter(enc: string): string {
+  return `scale=out_color_matrix=bt709:out_range=tv:flags=lanczos+accurate_rnd+full_chroma_int,format=${encoderPixFmt(enc)}`
+}
+
+/** Tags the video as BT.709 so the editor, browsers and YouTube show the right colors. */
+export const COLOR_TAGS = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv']
+
+/**
+ * Encoder settings tuned for screen content: crisp text and UI edges matter more than file size.
+ * The editor trims and re-encodes on export anyway, so the recording keeps as much detail as it can.
+ */
 export function encoderArgs(enc: string, fps: number): string[] {
   const gop = String(fps) // keyframe every second = fast seeking in the editor
   switch (enc) {
     case 'h264_nvenc':
-      return ['-c:v', enc, '-preset', 'p4', '-tune', 'll', '-rc', 'vbr', '-cq', '21', '-b:v', '0', '-g', gop, '-pix_fmt', 'yuv420p']
+      return ['-c:v', enc, '-preset', 'p5', '-tune', 'hq', '-rc', 'vbr', '-cq', '16', '-b:v', '0', '-maxrate', '80M', '-bufsize', '160M', '-spatial-aq', '1', '-aq-strength', '8', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
     case 'h264_qsv':
-      return ['-c:v', enc, '-preset', 'veryfast', '-global_quality', '22', '-g', gop, '-pix_fmt', 'nv12']
+      return ['-c:v', enc, '-preset', 'medium', '-global_quality', '17', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
     case 'h264_amf':
-      return ['-c:v', enc, '-quality', 'speed', '-rc', 'cqp', '-qp_i', '20', '-qp_p', '22', '-g', gop, '-pix_fmt', 'yuv420p']
+      return ['-c:v', enc, '-quality', 'balanced', '-rc', 'cqp', '-qp_i', '16', '-qp_p', '18', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
     default:
-      return ['-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency', '-crf', '20', '-g', gop, '-pix_fmt', 'yuv420p']
+      // superfast keeps up in real time on most CPUs and looks far better than ultrafast (no blocky text)
+      return ['-c:v', 'libx264', '-preset', 'superfast', '-tune', 'zerolatency', '-crf', '16', '-profile:v', 'high', '-g', gop, '-pix_fmt', encoderPixFmt(enc), ...COLOR_TAGS]
   }
 }
