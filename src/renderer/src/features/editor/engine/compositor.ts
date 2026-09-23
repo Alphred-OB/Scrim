@@ -1,4 +1,4 @@
-import type { ClickEvent, EditState, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition } from '@shared/types'
+import type { ClickEvent, EditState, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
 import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
 import { drawLive, drawWallpaper } from './backgrounds'
@@ -333,7 +333,7 @@ export class Renderer {
   private bufs: TransitionBuffers = { scratch: null, tiny: null }
   private applyTransition(ctx: Ctx, W: number, H: number, t: number, edit: EditState, k: number): void {
     const tr = transitionAt(edit, t)
-    if (tr) paintTransition(ctx, W, H, tr.type, tr.amount, tr.side, k, t, this.bufs)
+    if (tr) paintTransition(ctx, W, H, tr.type, tr.amount, tr.side, k, t, this.bufs, tr.direction, tr.ease)
   }
 
   /** Animated backgrounds are drawn at a reduced size and scaled up: cheap, and the softness looks intentional. */
@@ -660,28 +660,47 @@ function drawSpotlight(ctx: Ctx, cs: EditState['cursor'], inp: RenderInputs, px:
 export interface TransitionBuffers { scratch: AnyCanvas | null; tiny: AnyCanvas | null }
 
 /** Draws a transition over the finished frame. Also used by the small previews in the Transitions tab. */
-export function paintTransition(ctx: Ctx, W: number, H: number, type: string, amount: number, side: 'in' | 'out', k: number, t: number, bufs: TransitionBuffers): void {
+export function paintTransition(
+  ctx: Ctx, W: number, H: number, type: string, amount: number, side: 'in' | 'out', k: number, t: number, bufs: TransitionBuffers,
+  direction: TransitionDir = 'none', ease: TransitionEase = 'smooth'
+): void {
   if (amount <= 0.001) return
   const a = Math.min(1, amount)
-  const e = a * a * (3 - 2 * a) // smoothstep
+  // speed curve: how the effect builds toward the cut
+  const e = ease === 'linear' ? a : ease === 'snappy' ? 1 - (1 - a) ** 3 : ease === 'gentle' ? a * a : a * a * (3 - 2 * a)
+  // unit vector the transition travels along (left = moves toward the left)
+  const dx = direction === 'left' ? -1 : direction === 'right' ? 1 : 0
+  const dy = direction === 'up' ? -1 : direction === 'down' ? 1 : 0
   const out = side === 'out'
-  if (type === 'fade' || type === 'fade-white' || type === 'flash') {
+  const color = type === 'fade-white' || type === 'flash' ? '255,255,255' : '0,0,0'
+  // fades and wipes can sweep in a direction: the color covers the frame from one edge
+  // going out, and uncovers it toward the same side coming in
+  const sweep = (soft: number) => {
+    const dir = direction === 'none' ? 'right' : direction
+    const [x0, y0, x1, y1] = dir === 'right' ? [0, 0, W, 0] : dir === 'left' ? [W, 0, 0, 0] : dir === 'down' ? [0, 0, 0, H] : [0, H, 0, 0]
+    const g = ctx.createLinearGradient(x0, y0, x1, y1)
+    const s = Math.max(0.001, soft)
+    const front = out ? e * (1 + s) : (1 - e) * (1 + s) - s
+    for (let i = 0; i <= 20; i++) {
+      const u = i / 20
+      const al = out ? (front - u) / s : (u - front) / s
+      g.addColorStop(u, `rgba(${color},${Math.max(0, Math.min(1, al))})`)
+    }
     ctx.save()
-    ctx.fillStyle = type === 'fade' ? '#000' : '#fff'
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+    ctx.restore()
+  }
+  if (type === 'fade' || type === 'fade-white' || type === 'flash') {
+    if (direction !== 'none' && type !== 'flash') return sweep(0.35)
+    ctx.save()
+    ctx.fillStyle = `rgb(${color})`
     ctx.globalAlpha = type === 'flash' ? e * e * e : e
     ctx.fillRect(0, 0, W, H)
     ctx.restore()
     return
   }
-  if (type === 'wipe') {
-    // a black edge sweeps across: covers left to right going out, uncovers left to right coming in
-    ctx.save()
-    ctx.fillStyle = '#000'
-    if (out) ctx.fillRect(0, 0, W * e, H)
-    else ctx.fillRect(W * (1 - e), 0, W * e, H)
-    ctx.restore()
-    return
-  }
+  if (type === 'wipe') return sweep(0.02)
   // the rest reshape the finished frame, so copy it first
   if (!bufs.scratch || bufs.scratch.width !== W || bufs.scratch.height !== H) bufs.scratch = makeCanvas(W, H)
   const sc = bufs.scratch.getContext('2d') as Ctx
@@ -723,11 +742,15 @@ export function paintTransition(ctx: Ctx, W: number, H: number, type: string, am
       })
       break
     case 'whip': {
-      const dir = out ? -1 : 1
+      // quick pan with motion smear, leaving toward the direction and arriving from the other side
+      const ux = direction === 'none' ? -1 : dx
+      const uy = direction === 'none' ? 0 : dy
+      const s = out ? 1 : -1
       ctx.filter = `blur(${Math.round(e * 14 * k)}px)`
       for (let i = 0; i < 4; i++) {
         ctx.globalAlpha = i === 0 ? 1 : 0.35
-        ctx.drawImage(img, dir * e * W * 0.35 - dir * i * e * W * 0.04, 0)
+        const m = s * e * 0.35 - s * i * e * 0.04
+        ctx.drawImage(img, ux * m * W, uy * m * H)
       }
       break
     }
@@ -881,7 +904,8 @@ export function activeEffect(edit: EditState, t: number): EffectSettings {
 }
 
 /** Which transition is playing at source time t, and how far into it (amount peaks at the cut). */
-export function transitionAt(edit: EditState, t: number): { type: string; amount: number; side: 'in' | 'out' } | null {
+export interface ActiveTransition { type: string; amount: number; side: 'in' | 'out'; direction: TransitionDir; ease: TransitionEase }
+export function transitionAt(edit: EditState, t: number): ActiveTransition | null {
   const tr = edit.transitions
   const clips = [...edit.clips].sort((a, b) => a.start - b.start)
   const i = clips.findIndex((c) => t >= c.start - 1e-6 && t <= c.end + 1e-6)
@@ -894,24 +918,24 @@ export function transitionAt(edit: EditState, t: number): { type: string; amount
   const before = i === 0 ? pick(tr.intro) : pick(tr.perCut[c.id] ?? tr.cut)
   const after = i === clips.length - 1 ? pick(tr.outro) : pick(tr.perCut[clips[i + 1].id] ?? tr.cut)
   // intro/outro use their full length; a cut shares its length between both sides
-  let best: { type: string; amount: number; side: 'in' | 'out' } | null = null
-  const consider = (type: string, amount: number, side: 'in' | 'out') => {
-    if (amount > 0 && (!best || amount > best.amount)) best = { type, amount, side }
+  let best: ActiveTransition | null = null
+  const consider = (x: { type: string; direction?: TransitionDir; ease?: TransitionEase }, amount: number, side: 'in' | 'out') => {
+    if (amount > 0 && (!best || amount > best.amount)) best = { type: x.type, amount, side, direction: x.direction ?? 'none', ease: x.ease ?? 'smooth' }
   }
   if (before) {
     const d = i === 0 ? before.duration : before.duration / 2
-    if (fromStart < d) consider(before.type, 1 - fromStart / d, 'in')
+    if (fromStart < d) consider(before, 1 - fromStart / d, 'in')
   }
   if (after) {
     const d = i === clips.length - 1 ? after.duration : after.duration / 2
-    if (toEnd < d) consider(after.type, 1 - toEnd / d, 'out')
+    if (toEnd < d) consider(after, 1 - toEnd / d, 'out')
   }
   // transitions placed anywhere on the Transitions track
   for (const it of tr.items ?? []) {
     if (it.type === 'none' || t < it.start || t > it.end) continue
     const at = (it.start + it.end) / 2
     const half = Math.max(0.01, (it.end - it.start) / 2)
-    consider(it.type, 1 - Math.abs(t - at) / half, t < at ? 'out' : 'in')
+    consider(it, 1 - Math.abs(t - at) / half, t < at ? 'out' : 'in')
   }
   return best
 }

@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- New: splash screen while Scrim starts
+- New: welcome tour on first run (7 short steps, skippable). Take it again from the ? button on the home screen or Settings, General.
+- New: home screen asks what you want to do: Record, or Edit (recent projects, search, import a video, open a project, drop a video to import)
+- New: transitions have a speed (slow, normal, fast or custom length), a feel (smooth, snappy, gentle, even) and a direction for fades, wipes and whip pans
+- Fixed: full screen preview lag. The preview now lowers its render size while playing if the PC can't keep up (the export is always full quality), and the hidden media players no longer cover the whole screen.
+- Removed: the Clicks track (click effects are set in the Cursor panel) and the Background music section (add music from the Media library)
 - Fixed: pausing jumped the playhead back to where playback started
 - New: Transitions and Effects tracks on the timeline. Drag a transition onto a cut or anywhere on its track (drag its edges for the length); drag a look onto the Effects track to use it on just part of the video. Start, end and cut transitions show as pills you can click.
 - New: Transitions and Effects are separate tabs, with animated previews of each transition (hover) and look swatches made from your own video

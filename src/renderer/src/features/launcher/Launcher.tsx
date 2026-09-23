@@ -26,7 +26,10 @@ function loadPrefs(): Prefs {
 }
 
 export default function Launcher() {
-  const [tab, setTab] = useState<'record' | 'projects'>('record')
+  // start on a simple choice: record something new, or edit what you have
+  const [tab, setTab] = useState<'home' | 'record' | 'projects'>('home')
+  const [query, setQuery] = useState('')
+  const [dropping, setDropping] = useState(false)
   const [kind, setKind] = useState<'screen' | 'window'>('screen')
   const [sources, setSources] = useState<CaptureSource[]>([])
   const [selected, setSelected] = useState<string>('')
@@ -41,6 +44,9 @@ export default function Launcher() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const recBusy = status.state === 'recording' || status.state === 'paused' || status.state === 'countdown' || status.state === 'stopping'
   const cam = prefs.webcam
+  useEffect(() => {
+    if (recBusy) setTab('record')
+  }, [recBusy])
   const setCam = (p: Partial<WebcamRecordOptions>) => setPrefs((s) => ({ ...s, webcam: { ...s.webcam, ...p } }))
 
   const refresh = useCallback(async () => {
@@ -177,10 +183,10 @@ export default function Launcher() {
     })
   }
 
-  const doImport = async () => {
+  const doImport = async (file?: string) => {
     setBusy('Importing video…')
     try {
-      const p = await api.importVideo()
+      const p = await api.importVideo(file)
       if (p) api.openEditor(p.dir)
     } catch (e) {
       alert(String(e))
@@ -194,21 +200,57 @@ export default function Launcher() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <header className="drag surface" style={{ height: 52, display: 'flex', alignItems: 'center', gap: 16, padding: '0 150px 0 18px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,#0a84ff,#9b5cff)', boxShadow: '0 4px 14px rgba(10,132,255,.35)' }} />
-          <b style={{ fontSize: 14.5, letterSpacing: '-.01em' }}>Scrim</b>
-        </div>
-        <div style={{ width: 250, marginLeft: 16 }}>
-          <Seg options={[{ v: 'record', l: 'Record' }, { v: 'projects', l: `Projects · ${projects.length}` }]} value={tab} onChange={(v) => setTab(v as 'record' | 'projects')} />
-        </div>
+        {tab !== 'home' ? (
+          <button className="icon-btn" title="Back" onClick={() => setTab('home')} disabled={recBusy && tab === 'record'}><Icon name="back" /></button>
+        ) : null}
+        <button className="brand" onClick={() => setTab('home')} title="Home">
+          <span className="brand-mark" />
+          <b>Scrim</b>
+        </button>
+        {tab !== 'home' && <span className="crumb">{tab === 'record' ? 'New recording' : 'Your projects'}</span>}
         <div style={{ flex: 1 }} />
-        <button className="btn sm" onClick={doImport}><Icon name="upload" size={15} /> Import video</button>
+        <button className="icon-btn" title="Take the tour" onClick={() => useSettings.getState().save({ onboarded: false })}><Icon name="help" /></button>
         <button className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
       </header>
 
       {status.state === 'error' && (
         <div className="fade-in" style={{ margin: '14px 22px 0', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,69,58,.12)', border: '1px solid rgba(255,69,58,.3)', whiteSpace: 'pre-wrap', fontSize: 12.5 }}>
           <b>Recording failed.</b> {status.error}
+        </div>
+      )}
+
+      {tab === 'home' && (
+        <div className="home fade-in">
+          <h1>What would you like to do?</h1>
+          <div className="home-choices">
+            <button className="home-card rec" onClick={() => setTab('record')}>
+              <span className="home-icon"><Icon name="record" size={26} /></span>
+              <b>Record</b>
+              <span>Your screen, a window or a browser tab, with your mic and webcam.</span>
+            </button>
+            <button className="home-card edit" onClick={() => setTab('projects')}>
+              <span className="home-icon"><Icon name="scissors" size={24} /></span>
+              <b>Edit</b>
+              <span>Open a recent project, or bring in a video to polish.</span>
+            </button>
+          </div>
+          {projects.length > 0 && (
+            <div className="home-recent">
+              <div className="section-head">
+                <span className="section-title">Continue where you left off</span>
+                <button className="link" onClick={() => setTab('projects')}>See all {projects.length}</button>
+              </div>
+              <div className="home-recent-row">
+                {projects.slice(0, 4).map((p) => (
+                  <button key={p.dir} className="recent-tile" onClick={() => api.openEditor(p.dir)}>
+                    <div style={{ backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }} />
+                    <b>{p.name}</b>
+                    <span>{fmtTime(p.duration)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -330,10 +372,42 @@ export default function Launcher() {
             </div>
           </aside>
         </div>
-      ) : (
-        <div style={{ flex: 1, overflow: 'auto', padding: 22 }}>
+      ) : tab === 'projects' ? (
+        <div
+          style={{ flex: 1, overflow: 'auto', padding: 22, position: 'relative' }}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes('Files')) return
+            e.preventDefault()
+            setDropping(true)
+          }}
+          onDragLeave={(e) => e.currentTarget === e.target && setDropping(false)}
+          onDrop={async (e) => {
+            setDropping(false)
+            const f = e.dataTransfer.files[0]
+            if (!f) return
+            e.preventDefault()
+            await doImport(api.pathForFile(f))
+          }}
+        >
+          <div className="projects-bar">
+            <input className="search" placeholder="Search projects" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <div style={{ flex: 1 }} />
+            <button className="btn" onClick={() => openProjectFromDialog()} title="Ctrl+O"><Icon name="folder" size={15} /> Open…</button>
+            <button className="btn primary" onClick={() => doImport()}><Icon name="upload" size={15} /> Import a video</button>
+          </div>
+          {!projects.length && (
+            <div className="empty-state">
+              <Icon name="film" size={34} />
+              <b>No projects yet</b>
+              <span>Import a video, drop one here, or record something new.</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn" onClick={() => setTab('record')}><Icon name="record" size={14} /> Record</button>
+                <button className="btn primary" onClick={() => doImport()}><Icon name="upload" size={15} /> Import a video</button>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 16 }}>
-            {projects.map((p) => (
+            {projects.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())).map((p) => (
               <div
                 key={p.dir}
                 className="glass fade-in"
@@ -356,10 +430,10 @@ export default function Launcher() {
               </div>
             ))}
           </div>
-          {!projects.length && <div className="hint">No projects yet. Record something or import a video.</div>}
-          {projects.length > 0 && <div className="hint" style={{ marginTop: 14 }}>Right click a project for more options.</div>}
+          {projects.length > 0 && <div className="hint" style={{ marginTop: 14 }}>Right click a project for more options. Drop a video anywhere here to import it.</div>}
+          {dropping && <div className="drop-veil">Drop to import</div>}
         </div>
-      )}
+      ) : null}
       {busy && <div className="toast glass"><span className="spin" />{busy}</div>}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>

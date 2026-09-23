@@ -13,6 +13,7 @@ import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
 import { detectEncoder } from './ffmpeg'
 import { runSelfTest, selfTestDir } from './selftest'
+import { closeSplash, showSplash } from './splash'
 import { joinVideo, type JoinWhere } from './join'
 import './rpc'
 
@@ -51,7 +52,7 @@ function createMainWindow(): void {
       backgroundThrottling: false // audio keeps recording while hidden
     }
   })
-  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('ready-to-show', () => closeSplash(() => mainWindow?.show(), selfTestDir() ? 0 : 1200))
   mainWindow.on('closed', () => {
     mainWindow = null
     toolbar?.destroy()
@@ -204,7 +205,8 @@ function registerIpc(): void {
   ipcMain.handle('projects:save', (_e, p: Project) => saveProject(p))
   ipcMain.handle('projects:delete', (_e, dir: string) => deleteProject(dir))
   ipcMain.handle('projects:root', () => projectsRoot())
-  ipcMain.handle('projects:import', async () => {
+  ipcMain.handle('projects:import', async (_e, file?: string) => {
+    if (file) return importVideo(file)
     const r = await dialog.showOpenDialog(mainWindow!, {
       title: 'Import a video',
       properties: ['openFile'],
@@ -343,6 +345,7 @@ app.whenReady().then(() => {
 
   recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, showBorder, hideBorder, isOwnUi, iconPath: ICON, openEditor, broadcast })
   registerIpc()
+  if (!selfTestDir()) showSplash(ICON)
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast
   setTimeout(() => {

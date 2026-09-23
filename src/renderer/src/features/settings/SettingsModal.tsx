@@ -92,6 +92,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <span className="section-title">While recording</span>
               <Toggle label="Outline what's being recorded" value={settings.recordBorder ?? true} onChange={(v) => save({ recordBorder: v })} />
               <span className="hint">A blue outline shows for the first few seconds (and while paused) so you know exactly what's being recorded, then fades away. It never appears in your video.</span>
+              <span className="section-title" style={{ marginTop: 10 }}>Welcome tour</span>
+              <button className="btn" onClick={() => { save({ onboarded: false }); onClose() }}><Icon name="help" size={15} /> Show the welcome tour again</button>
               <span className="section-title" style={{ marginTop: 10 }}>Arrow keys in the editor</span>
               <Select
                 value={settings.arrowStep ?? 0.5}

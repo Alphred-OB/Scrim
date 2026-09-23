@@ -22,7 +22,7 @@ import ClipPanel from './panels/ClipPanel'
 import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
-import { joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
+import { addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
 const RAIL: { id: Panel; icon: string; title: string; soon?: boolean }[] = [

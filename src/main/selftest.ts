@@ -57,7 +57,31 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
   win.webContents.once('did-finish-load', async () => {
     try {
       await wait(2500)
+      await step('welcome tour shows and can be skipped', async () => {
+        const has = await js<boolean>('!!document.querySelector(".ob-card")')
+        if (has) {
+          await shot('onboarding-1.png')
+          await clickText('.ob-foot .btn', 'Show me around')
+          await wait(500)
+          await shot('onboarding-2.png')
+          await click('.ob-skip')
+          await wait(600)
+        }
+        if (await js<boolean>('!!document.querySelector(".ob-card")')) throw new Error('tour did not close')
+      })
       await shot('launcher.png')
+      await step('home: record and edit', async () => {
+        await clickText('.home-card', 'Record')
+        await wait(500)
+        await shot('home-record.png')
+        await click('.brand')
+        await wait(300)
+        await clickText('.home-card', 'Edit')
+        await wait(500)
+        await shot('home-edit.png')
+        await click('.brand')
+        await wait(300)
+      })
       log('projects', JSON.stringify(await js('Promise.all([window.api.listProjects().then(r=>r.length).catch(e=>String(e)), window.api.projectsRoot()])')))
 
       if (env.SCRIM_TEST_RECORD) {

@@ -9,6 +9,7 @@ import Bubble from '@/features/recording/Bubble'
 import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost } from '@/ui'
+import Onboarding from '@/features/onboarding/Onboarding'
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(() => location.hash.slice(1) || '/')
@@ -42,6 +43,7 @@ export default function App() {
   const route = useHashRoute()
   const reduce = useSettings((s) => s.settings.reduceTransparency)
   const settings = useSettings((s) => s.settings)
+  const settingsLoaded = useSettings((s) => s.loaded)
   useEffect(() => {
     useSettings.getState().load()
   }, [])
@@ -69,6 +71,7 @@ export default function App() {
         <Launcher />
       )}
       <ContextMenuHost />
+      {settingsLoaded && !settings.onboarded && <Onboarding />}
     </>
   )
 }

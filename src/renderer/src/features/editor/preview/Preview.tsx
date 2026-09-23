@@ -137,6 +137,18 @@ export default function Preview() {
     if (bgv && bgv.paused) bgv.play().catch(() => {})
   }
 
+  // Adaptive preview quality: if frames take too long to draw (big full screen, low end GPU),
+  // render smaller while playing and scale up. The export is always full quality.
+  const quality = useRef(1)
+  const frameMs = useRef(8)
+  const adapt = (ms: number) => {
+    frameMs.current = frameMs.current * 0.9 + ms * 0.1
+    if (frameMs.current > 14 && quality.current > 0.45) {
+      quality.current = Math.max(0.45, quality.current * 0.85)
+      frameMs.current = 10
+    } else if (frameMs.current < 6 && quality.current < 1) quality.current = Math.min(1, quality.current * 1.04)
+  }
+
   // extra seconds added to the background clock while paused, so live backgrounds keep moving
   const ambient = useRef(0)
   const draw = useRef<(at?: number) => void>(() => {})
@@ -145,7 +157,9 @@ export default function Preview() {
     const v = videoRef.current
     if (!c || !v) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const W = Math.min(ow, Math.round(box.w * dpr))
+    // while playing, render at a size this PC can keep up with (adaptive, see below); paused is always sharp
+    const q = useEditor.getState().playing ? quality.current : 1
+    const W = Math.max(320, Math.round((Math.min(ow, box.w * dpr) * q) / 16) * 16)
     const H = Math.round((W * oh) / ow)
     if (c.width !== W || c.height !== H) {
       c.width = W
@@ -170,6 +184,7 @@ export default function Preview() {
       }
     }
     const camWant = project.media.webcam ? t - project.media.webcam.offset - L.edit.audio.syncOffset : -1
+    const t0 = performance.now()
     renderer.render(ctx, W, H, {
       edit: L.edit,
       srcW,
@@ -185,6 +200,7 @@ export default function Preview() {
       webcam: cam && cam.readyState >= 2 && camWant >= 0 ? { src: cam, w: cam.videoWidth, h: cam.videoHeight } : null,
       overlays
     })
+    if (useEditor.getState().playing) adapt(performance.now() - t0)
     updateHandles(ctx, W, H, t)
   }
 
@@ -282,6 +298,7 @@ export default function Preview() {
     // zoom and text follow the visible frame instead of running ahead of a frozen picture.
     let shown: number | null = null
     let vfc = 0
+    let lastLoop = 0
     const onFrame = (_now: number, meta: { mediaTime: number }) => {
       shown = meta.mediaTime
       vfc = v.requestVideoFrameCallback(onFrame)
@@ -308,6 +325,10 @@ export default function Preview() {
       }
       if (v.ended) return useEditor.getState().setPlaying(false)
       const at = shown !== null && Math.abs(v.currentTime - shown) < 1 ? shown : v.currentTime
+      // frames arriving late (GPU busy) count as slow too, not just slow drawing
+      const now = performance.now()
+      if (lastLoop && now - lastLoop > 30) adapt(now - lastLoop - 16)
+      lastLoop = now
       draw.current(at)
       timeBus.emit(at)
       syncFollowers(true)

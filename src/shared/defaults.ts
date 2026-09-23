@@ -211,6 +211,7 @@ export function defaultSettings(): AppSettings {
     captureEngine: 'auto',
     arrowStep: 0.5,
     recordBorder: true,
+    onboarded: false,
     uiFont: 'Inter',
     uiScale: 1,
     exportProgress: 'wavy',

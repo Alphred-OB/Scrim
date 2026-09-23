@@ -1,6 +1,5 @@
 import { useEditor } from '../state/store'
 import { Icon, Section, Slider, Toggle } from '@/ui'
-import { api } from '@/lib/api'
 
 export default function AudioPanel() {
   const project = useEditor((s) => s.project)!
@@ -8,12 +7,7 @@ export default function AudioPanel() {
   const a = project.edit.audio
   const m = project.media
 
-  const pickMusic = async () => {
-    const f = await api.openFile('Choose background music', [{ name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'aac'] }])
-    if (!f) return
-    const p = await api.copyAsset(project.dir, f)
-    update((e) => (e.audio.musicPath = p))
-  }
+
 
   return (
     <div>
@@ -47,17 +41,19 @@ export default function AudioPanel() {
         </Section>
       )}
 
-      <Section title="Background music" action={a.musicPath ? <button className="link" style={{ color: 'var(--danger)' }} onClick={() => update((e) => (e.audio.musicPath = undefined))}>Remove</button> : undefined}>
-        <button className="btn" onClick={pickMusic}><Icon name="audio" size={16} /> {a.musicPath ? 'Replace music' : 'Add music'}</button>
-        {a.musicPath && (
-          <>
-            <div className="chip" style={{ maxWidth: '100%', overflow: 'hidden' }}>{a.musicPath.split(/[\\/]/).pop()}</div>
-            <Toggle label="Mute music" value={a.musicMuted} onChange={(v) => update((e) => (e.audio.musicMuted = v))} />
-            <Slider label="Volume" value={a.musicVolume} min={0} max={1} step={0.01} def={0.25} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.audio.musicVolume = v), 'musv')} />
-            <span className="hint">Music loops to fill the video and fades out at the end.</span>
-          </>
-        )}
-      </Section>
+      {a.musicPath && (
+        <Section title="Background music" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => update((e) => (e.audio.musicPath = undefined))}>Remove</button>}>
+          <div className="chip" style={{ maxWidth: '100%', overflow: 'hidden' }}>{a.musicPath.split(/[\\/]/).pop()}</div>
+          <Slider label="Volume" value={a.musicVolume} min={0} max={1} step={0.01} def={0.25} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.audio.musicVolume = v), 'musv')} />
+          <span className="hint">Music from an older version of Scrim. To add music now, import it in the Media library and drag it onto the Audio track.</span>
+        </Section>
+      )}
+      {!a.musicPath && (
+        <Section title="Music and sound effects">
+          <button className="btn" onClick={() => useEditor.getState().setPanel('media')}><Icon name="music" size={16} /> Open the media library</button>
+          <span className="hint">Import music or sounds in the Media library, then drag them onto the Audio track.</span>
+        </Section>
+      )}
     </div>
   )
 }

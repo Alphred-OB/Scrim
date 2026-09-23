@@ -31,7 +31,7 @@ export interface Api {
   loadProject(dir: string): Promise<Project>
   saveProject(p: Project): Promise<void>
   deleteProject(dir: string): Promise<void>
-  importVideo(): Promise<Project | null>
+  importVideo(file?: string): Promise<Project | null>
   projectsRoot(): Promise<string>
   openFile(title: string, filters: { name: string; extensions: string[] }[]): Promise<string | null>
   saveFile(defaultName: string, ext: string): Promise<string | null>

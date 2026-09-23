@@ -7,7 +7,7 @@ import { freeLane } from '@shared/defaults'
 import { useEditor, Selection } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
-import { addAssetAt, addEffectAt, addTransitionAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead, toggleClick } from '../state/actions'
+import { addAssetAt, addEffectAt, addTransitionAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from '../state/actions'
 import { sortedClips } from '../engine/timeMap'
 import Waveform from './Waveform'
 import { TRANSITIONS } from '../panels/EffectsPanel'
@@ -51,7 +51,7 @@ export default function Timeline() {
   const select = useEditor((s) => s.select)
   const setTime = useEditor((s) => s.setTime)
   const cursorData = useEditor((s) => s.cursorData)
-  const { zoom, setZoom, height, setHeight } = useTimelineView()
+  const { zoom, height, setHeight } = useTimelineView()
   const duration = project.media.screen.duration
   const edit = project.edit
   const media = project.media
@@ -410,11 +410,6 @@ export default function Timeline() {
     key: 'zoom', label: 'Zoom', icon: 'zoom', color: '#6a47c9', kind: 'zoom', hint: 'Click to add a zoom',
     toggle: { on: edit.zoom.enabled, set: () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), icon: ['eye', 'eyeOff'], title: 'Turn all zooms on or off' }
   })
-  if (cursorData)
-    rows.push({
-      key: 'clicks', label: 'Clicks', icon: 'click', color: '#0a84ff', hint: 'Click a marker to turn its effect off',
-      toggle: { on: edit.cursor.clickEffect !== 'none', set: () => update((e) => (e.cursor.clickEffect = e.cursor.clickEffect === 'none' ? 'ripple' : 'none')), icon: ['eye', 'eyeOff'], title: 'Click effects on or off' }
-    })
   const textToggle = { on: edit.tracks.text, set: () => update((e) => (e.tracks.text = !e.tracks.text)), icon: ['eye', 'eyeOff'] as [string, string], title: 'Show or hide all text' }
   // text always has one empty layer at the bottom, so two texts at the same time never have to overlap
   pushLanes('text', laneCount(edit.texts, true), { label: 'Text', icon: 'text', color: '#11806a', kind: 'text', hint: 'Click to add text', toggle: textToggle })
@@ -449,7 +444,6 @@ export default function Timeline() {
     last = c.end
   }
   if (last < duration - 0.01) gaps.push([last, duration])
-  const hidden = new Set(edit.cursor.hiddenClicks)
   const contentH = RULER_H + rows.length * TRACK_H + 8
 
   const resize = (e: React.PointerEvent) => {
@@ -629,27 +623,6 @@ export default function Timeline() {
               block('zoom', z, top('zoom'), z.auto ? 'linear-gradient(180deg,#6247b8,#48338c)' : 'linear-gradient(180deg,#8a5cf0,#6a3fd1)',
                 <>{z.auto ? 'Auto' : z.follow ? 'Follow' : 'Pinned'} · {z.scale.toFixed(1)}x</>)
             )}
-
-            {/* clicks */}
-            {cursorData &&
-              cursorData.clicks.map((c, i) => {
-                const off = hidden.has(Math.round(c.t * 1000))
-                return (
-                  <button
-                    key={i}
-                    className={`tl-click ${off || edit.cursor.clickEffect === 'none' ? 'off' : ''}`}
-                    title={`${off ? 'Effect off' : 'Effect on'} at ${fmtTime(c.t, true)}. Click to toggle.`}
-                    style={{ left: X(c.t) - 7, top: top('clicks') + TRACK_H / 2 - 7 }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => toggleClick(c.t)}
-                    onContextMenu={(e) => openContextMenu(e, [
-                      { label: off ? 'Turn effect on' : 'Turn effect off', onClick: () => toggleClick(c.t) },
-                      { label: 'Add zoom here', onClick: () => addZoomAt(Math.max(0, c.t - 0.6)) },
-                      { label: 'Go to click', onClick: () => setTime(c.t) }
-                    ])}
-                  />
-                )
-              })}
 
             {/* text */}
             {edit.texts.map((t) => block('text', t, laneTop('text', t.lane), 'linear-gradient(180deg,#17a086,#0f7462)', t.text.split('\n')[0] || 'Text'))}

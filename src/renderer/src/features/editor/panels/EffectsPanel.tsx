@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { EffectLook, EffectSettings, Transition, TransitionType } from '@shared/types'
+import type { EffectLook, EffectSettings, Transition, TransitionDir, TransitionEase, TransitionType } from '@shared/types'
 import { defaultEdit, defaultEffect } from '@shared/defaults'
-import { Icon, Section, Select, Slider, openContextMenu } from '@/ui'
+import { Icon, Section, Seg, Select, Slider, openContextMenu } from '@/ui'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
@@ -116,6 +116,52 @@ function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name
   )
 }
 
+const DIRECTIONAL: TransitionType[] = ['fade', 'fade-white', 'wipe', 'whip']
+const SPEEDS = [
+  { v: 1.2, l: 'Slow' },
+  { v: 0.6, l: 'Normal' },
+  { v: 0.3, l: 'Fast' }
+]
+
+/** Length (speed), feel and direction for any transition. */
+function TransitionOptions({ value, onChange }: { value: { type: TransitionType; duration: number; direction?: TransitionDir; ease?: TransitionEase }; onChange: (p: Partial<Transition>) => void }) {
+  if (value.type === 'none') return null
+  const speed = SPEEDS.find((x) => Math.abs(x.v - value.duration) < 0.01)?.v ?? -1
+  return (
+    <>
+      <Seg options={[...SPEEDS, { v: -1, l: 'Custom' }]} value={speed} onChange={(v) => v > 0 && onChange({ duration: v })} />
+      <Slider label="Length" value={value.duration} min={0.2} max={3} step={0.05} def={0.6} format={(v) => `${v.toFixed(2)}s`} onChange={(v) => onChange({ duration: v })} />
+      <div className="list-row" style={{ borderBottom: 'none', padding: '2px 0' }}>
+        <span style={{ flex: 1 }}>Feel</span>
+        <Select
+          width={170}
+          value={value.ease ?? 'smooth'}
+          options={[
+            { v: 'smooth', l: 'Smooth' },
+            { v: 'snappy', l: 'Snappy' },
+            { v: 'gentle', l: 'Gentle' },
+            { v: 'linear', l: 'Even' }
+          ]}
+          onChange={(v) => onChange({ ease: v as TransitionEase })}
+        />
+      </div>
+      {DIRECTIONAL.includes(value.type) && (
+        <Seg
+          options={[
+            ...(value.type === 'fade' || value.type === 'fade-white' ? [{ v: 'none', l: 'All over' }] : []),
+            { v: 'left', l: '←' },
+            { v: 'right', l: '→' },
+            { v: 'up', l: '↑' },
+            { v: 'down', l: '↓' }
+          ]}
+          value={value.direction ?? (value.type === 'fade' || value.type === 'fade-white' ? 'none' : value.type === 'whip' ? 'left' : 'right')}
+          onChange={(v) => onChange({ direction: v as TransitionDir })}
+        />
+      )}
+    </>
+  )
+}
+
 function TransitionRow({ label, value, onChange }: { label: string; value: Transition; onChange: (t: Transition) => void }) {
   return (
     <>
@@ -123,9 +169,7 @@ function TransitionRow({ label, value, onChange }: { label: string; value: Trans
         <span style={{ flex: 1 }}>{label}</span>
         <Select width={170} value={value.type} options={TRANSITIONS} onChange={(v) => onChange({ ...value, type: v })} />
       </div>
-      {value.type !== 'none' && (
-        <Slider label="Length" value={value.duration} min={0.2} max={2} step={0.05} def={0.6} format={(v) => `${v.toFixed(2)}s`} onChange={(v) => onChange({ ...value, duration: v })} />
-      )}
+      <TransitionOptions value={value} onChange={(p) => onChange({ ...value, ...p })} />
     </>
   )
 }
@@ -154,14 +198,21 @@ function TransitionsTab() {
       {sel && (
         <Section title="Selected transition" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((ed) => (ed.transitions.items = ed.transitions.items.filter((x) => x.id !== sel.id))); select(null) }}>Delete</button>}>
           <Select value={sel.type} options={TRANSITIONS.filter((x) => x.v !== 'none')} onChange={(v) => update((ed) => { const x = ed.transitions.items.find((i) => i.id === sel.id); if (x) x.type = v })} />
-          <Slider
-            label="Length"
-            value={sel.end - sel.start}
-            min={0.2}
-            max={3}
-            step={0.05}
-            format={(v) => `${v.toFixed(2)}s`}
-            onChange={(v) => update((ed) => { const x = ed.transitions.items.find((i) => i.id === sel.id); if (x) { const mid = (x.start + x.end) / 2; x.start = Math.max(0, mid - v / 2); x.end = mid + v / 2 } }, 'trlen')}
+          <TransitionOptions
+            value={{ type: sel.type, duration: sel.end - sel.start, direction: sel.direction, ease: sel.ease }}
+            onChange={(p) =>
+              update((ed) => {
+                const x = ed.transitions.items.find((i) => i.id === sel.id)
+                if (!x) return
+                if (p.direction) x.direction = p.direction
+                if (p.ease) x.ease = p.ease
+                if (p.duration) {
+                  const mid = (x.start + x.end) / 2
+                  x.start = Math.max(0, mid - p.duration / 2)
+                  x.end = mid + p.duration / 2
+                }
+              }, 'tritem')
+            }
           />
           <span className="hint">Drag its edges on the timeline to change the length, or drag it to move it.</span>
         </Section>

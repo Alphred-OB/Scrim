@@ -17,7 +17,7 @@ const api = {
   loadProject: (dir: string) => invoke('projects:load', dir),
   saveProject: (p: unknown) => invoke('projects:save', p),
   deleteProject: (dir: string) => invoke('projects:delete', dir),
-  importVideo: () => invoke('projects:import'),
+  importVideo: (file?: string) => invoke('projects:import', file),
   openProjectDialog: () => invoke('projects:open'),
   projectsRoot: () => invoke('projects:root'),
 

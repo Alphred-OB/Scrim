@@ -222,7 +222,9 @@ export type OverlayMode = 'pip' | 'frame' | 'full'
 export type TransitionType =
   | 'none' | 'fade' | 'fade-white' | 'flash' | 'blur' | 'morph' | 'zoom' | 'zoom-out' | 'spin'
   | 'whip' | 'slide-left' | 'slide-right' | 'slide-up' | 'slide-down' | 'iris' | 'wipe' | 'pixelate' | 'glitch'
-export interface Transition { type: TransitionType; duration: number }
+export type TransitionDir = 'none' | 'left' | 'right' | 'up' | 'down'
+export type TransitionEase = 'smooth' | 'linear' | 'snappy' | 'gentle'
+export interface Transition { type: TransitionType; duration: number; direction?: TransitionDir; ease?: TransitionEase }
 export interface TransitionSettings {
   intro: Transition // start of the video
   outro: Transition // end of the video
@@ -232,7 +234,7 @@ export interface TransitionSettings {
   items: TransitionItem[]
 }
 /** A transition placed on the Transitions track: it peaks in the middle of start..end. */
-export interface TransitionItem { id: string; type: TransitionType; start: number; end: number }
+export interface TransitionItem { id: string; type: TransitionType; start: number; end: number; direction?: TransitionDir; ease?: TransitionEase }
 
 export type EffectLook =
   | 'none' | 'vivid' | 'punchy' | 'warm' | 'cool' | 'cinematic' | 'cyberpunk' | 'dreamy' | 'faded' | 'matte'
@@ -379,4 +381,6 @@ export interface AppSettings {
   arrowStep: number
   /** animated line around the area being recorded */
   recordBorder: boolean
+  /** false until the welcome tour has been finished or skipped */
+  onboarded: boolean
 }
