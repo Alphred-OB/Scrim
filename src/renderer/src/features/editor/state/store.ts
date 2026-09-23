@@ -17,7 +17,10 @@ interface EditorStore {
   lastKey: string
   lastAt: number
   saving: boolean
+  /** message for long jobs like joining videos; empty when idle */
+  busy: string
 
+  setBusy(msg: string): void
   load(p: Project, cursor: CursorData | null): void
   update(fn: (e: EditState) => void, key?: string): void
   undo(): void
@@ -43,6 +46,11 @@ export const useEditor = create<EditorStore>((set, get) => ({
   lastKey: '',
   lastAt: 0,
   saving: false,
+  busy: '',
+
+  setBusy(msg) {
+    set({ busy: msg })
+  },
 
   load(p, cursor) {
     set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false })

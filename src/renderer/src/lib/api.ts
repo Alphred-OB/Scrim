@@ -1,5 +1,5 @@
 import type {
-  AppSettings, Asset, CaptureSource, Preset, Project, ProjectSummary, RecordOptions, RecorderStatus
+  AppSettings, Asset, CursorData, CaptureSource, Preset, Project, ProjectSummary, RecordOptions, RecorderStatus
 } from '@shared/types'
 
 export interface MuxJobIn {
@@ -47,6 +47,8 @@ export interface Api {
   getSettings(): Promise<AppSettings>
   saveSettings(s: AppSettings): Promise<AppSettings>
   importAssets(dir: string, paths?: string[]): Promise<{ assets: Asset[]; errors: string[] }>
+  /** Joins a video before or after the main video. No file = ask with a dialog. Null if cancelled. */
+  joinVideo(dir: string, where: 'start' | 'end', file?: string): Promise<{ project: Project; cursor: CursorData | null } | null>
   peaks(path: string): Promise<number[]>
   notify(title: string, body: string): Promise<void>
   engines(): Promise<{ dda: boolean; platform: string }>

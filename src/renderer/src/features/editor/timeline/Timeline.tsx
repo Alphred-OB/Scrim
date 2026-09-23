@@ -5,7 +5,7 @@ import { mediaUrl } from '@/lib/api'
 import { useEditor, Selection } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { dragAsset } from '../state/dragAsset'
-import { addAssetAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead, toggleClick } from '../state/actions'
+import { addAssetAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead, toggleClick } from '../state/actions'
 import { sortedClips } from '../engine/timeMap'
 import Waveform from './Waveform'
 
@@ -49,6 +49,7 @@ export default function Timeline() {
   const [width, setWidth] = useState(1000)
   const [ghost, setGhost] = useState<{ row: string; t: number } | null>(null)
   const [dropRow, setDropRow] = useState<string | null>(null)
+  const [joinHint, setJoinHint] = useState<'start' | 'end' | null>(null)
   const pps = (width / Math.max(0.5, duration)) * zoom
   const total = duration * pps
   const X = (t: number) => 12 + t * pps
@@ -248,12 +249,23 @@ export default function Timeline() {
   }
 
   // Media library items can be dropped anywhere on the timeline. The asset type picks the track.
+  // which track row is under the pointer
+  const rowAt = (clientY: number): string | null => {
+    const sc = scrollRef.current!
+    const y = clientY - sc.getBoundingClientRect().top + sc.scrollTop - RULER_H
+    return y < 0 ? null : rows[Math.floor(y / TRACK_H)]?.key ?? null
+  }
+  // dropping a video on the Video track joins it before or after the recording (nearest end)
+  const joinSide = (clientX: number): 'start' | 'end' => (timeAt(clientX) < duration / 2 ? 'start' : 'end')
+
   const onDragOver = (e: React.DragEvent) => {
     const a = dragAsset.get()
     if (a) {
       e.preventDefault()
       e.dataTransfer.dropEffect = 'copy'
-      setDropRow(a.kind === 'audio' ? 'audio' : 'overlay')
+      const onVideo = a.kind === 'video' && rowAt(e.clientY) === 'video'
+      setDropRow(onVideo ? 'video' : a.kind === 'audio' ? 'audio' : 'overlay')
+      setJoinHint(onVideo ? joinSide(e.clientX) : null)
       setGhost(null)
     } else if (e.dataTransfer.types.includes('Files')) {
       dragAsset.setDropTime(timeAt(e.clientX))
@@ -261,11 +273,13 @@ export default function Timeline() {
   }
   const onDrop = (e: React.DragEvent) => {
     setDropRow(null)
+    setJoinHint(null)
     const a = dragAsset.get()
     if (!a) return
     e.preventDefault()
     e.stopPropagation()
     dragAsset.set(null)
+    if (a.kind === 'video' && rowAt(e.clientY) === 'video') return void joinVideoAt(joinSide(e.clientX), a.path)
     const live = useEditor.getState().project!.edit.assets.find((x) => x.id === a.id)
     if (live) addAssetAt(live, timeAt(e.clientX))
   }
@@ -339,7 +353,11 @@ export default function Timeline() {
         style={{ flex: 1, overflow: 'auto', position: 'relative' }}
         ref={scrollRef}
         onDragOver={onDragOver}
-        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDropRow(null)}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node)) return
+          setDropRow(null)
+          setJoinHint(null)
+        }}
         onDrop={onDrop}
         onWheel={(e) => {
         if (e.ctrlKey) {
@@ -388,6 +406,11 @@ export default function Timeline() {
                   openContextMenu(e, [
                     ...(r.key === 'zoom' ? [{ label: 'Add zoom here', onClick: () => addZoomAt(timeAt(e.clientX)) }] : []),
                     ...(r.key === 'text' ? [{ label: 'Add text here', onClick: () => addTextAt(timeAt(e.clientX)) }] : []),
+                    ...(r.key === 'video' ? [
+                      { label: 'Add a video before this one…', onClick: () => joinVideoAt('start') },
+                      { label: 'Add a video after this one…', onClick: () => joinVideoAt('end') },
+                      { sep: true }
+                    ] : []),
                     ...(r.key === 'overlay' || r.key === 'audio' ? [{ label: 'Open media library', onClick: () => useEditor.getState().setPanel('media') }] : []),
                     ...(r.key === 'clicks' ? [
                       { label: 'Show all click effects', onClick: () => update((ed) => (ed.cursor.hiddenClicks = [])) },
@@ -400,6 +423,13 @@ export default function Timeline() {
                 {r.hint && !(r.kind && listFor(r.kind).length) && r.key !== 'clicks' && <span className="tl-hint">{r.hint}</span>}
               </div>
             ))}
+
+            {/* where a dragged video will be joined */}
+            {joinHint && (
+              <div className="tl-join" style={{ left: joinHint === 'start' ? X(0) : X(duration) - 4, top: top('video') + 2, height: TRACK_H - 4 }}>
+                <span style={{ [joinHint === 'start' ? 'left' : 'right']: 10 } as React.CSSProperties}>{joinHint === 'start' ? 'Join before' : 'Join after'}</span>
+              </div>
+            )}
 
             {/* ghost preview for click-to-add */}
             {ghost && (

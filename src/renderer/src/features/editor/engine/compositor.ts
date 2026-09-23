@@ -1,5 +1,5 @@
 import type { ClickEvent, EditState, GradientDef, OverlayClip, TextItem } from '@shared/types'
-import { Track, sampleTrack } from './cursorTrack'
+import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
 import { drawLive, drawWallpaper } from './backgrounds'
 import { drawCursor } from './cursors'
@@ -349,7 +349,7 @@ export class Renderer {
     }
 
     // 4. cursor + click effects (inside the window clip)
-    if (edit.cursor.show && inp.cursor) {
+    if (edit.cursor.show && inp.cursor && !cursorHiddenAt(inp.cursor, inp.t)) {
       ctx.save()
       ctx.beginPath()
       ctx.rect(L.view.x, L.view.y, L.view.w, L.view.h)

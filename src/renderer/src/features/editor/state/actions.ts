@@ -2,7 +2,8 @@
 import type { Asset, AudioClip, OverlayClip } from '@shared/types'
 import { newText, newZoom, uid } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
-import { useEditor } from './store'
+import { api } from '@/lib/api'
+import { flushSave, useEditor } from './store'
 import { timeBus } from './timeBus'
 
 const st = () => useEditor.getState()
@@ -156,4 +157,32 @@ export function toggleClick(t: number): void {
     else h.add(key)
     e.cursor.hiddenClicks = [...h]
   })
+}
+
+/**
+ * Joins another video before or after the main video (file dialog when no file is given).
+ * The project is rebuilt on disk, so undo history starts fresh afterwards.
+ */
+export async function joinVideoAt(where: 'start' | 'end', file?: string): Promise<void> {
+  const s = st()
+  const p = s.project
+  if (!p || s.busy) return
+  s.setPlaying(false)
+  await flushSave()
+  const off = api.on('join:progress', (v: number) => st().setBusy(`Joining videos… ${Math.round(v * 100)}%`))
+  try {
+    s.setBusy('Joining videos…')
+    const r = await api.joinVideo(p.dir, where, file)
+    if (!r) return
+    st().load(r.project, r.cursor)
+    st().setTime(where === 'start' ? 0 : p.media.screen.duration)
+    st().setBusy('Videos joined')
+    setTimeout(() => st().busy === 'Videos joined' && st().setBusy(''), 2000)
+  } catch (e) {
+    st().setBusy('Could not join: ' + (e instanceof Error ? e.message.split('\n')[0] : String(e)))
+    setTimeout(() => st().setBusy(''), 5000)
+  } finally {
+    off()
+    if (st().busy.startsWith('Joining')) st().setBusy('')
+  }
 }

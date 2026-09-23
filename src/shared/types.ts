@@ -44,6 +44,8 @@ export interface CursorData {
   height: number
   samples: CursorSample[]
   clicks: ClickEvent[]
+  /** Source time ranges with no cursor data (e.g. a joined video that wasn't recorded in Scrim). The cursor is hidden there. */
+  hidden?: [number, number][]
 }
 
 export interface MediaInfo {

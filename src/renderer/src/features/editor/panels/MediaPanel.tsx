@@ -3,7 +3,7 @@ import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { Icon, Section, Slider, Toggle, fmtTime, openContextMenu } from '@/ui'
 import { api, mediaUrl } from '@/lib/api'
-import { addAssetAt, removeAsset } from '../state/actions'
+import { addAssetAt, joinVideoAt, removeAsset } from '../state/actions'
 import { dragAsset } from '../state/dragAsset'
 import type { Asset } from '@shared/types'
 
@@ -45,7 +45,13 @@ function AssetTile({ a }: { a: Asset }) {
       onDoubleClick={() => addAssetAt(a, timeBus.get())}
       onContextMenu={(e) =>
         openContextMenu(e, [
-          { label: 'Add at playhead', onClick: () => addAssetAt(a, timeBus.get()) },
+          { label: a.kind === 'video' ? 'Add as overlay at playhead' : 'Add at playhead', onClick: () => addAssetAt(a, timeBus.get()) },
+          ...(a.kind === 'video'
+            ? [
+                { label: 'Join before the main video', onClick: () => joinVideoAt('start', a.path) },
+                { label: 'Join after the main video', onClick: () => joinVideoAt('end', a.path) }
+              ]
+            : []),
           { label: 'Show file', onClick: () => api.showItem(a.path) },
           { sep: true },
           { label: 'Remove from project', danger: true, onClick: () => confirm(`Remove "${a.name}" and its clips?`) && removeAsset(a.id) }
@@ -94,7 +100,7 @@ export default function MediaPanel() {
     <div>
       <Section title="Media library">
         <button className="btn primary" onClick={doImport} disabled={busy}>{busy ? <span className="spin" /> : <Icon name="upload" size={15} />} Import video, audio or image</button>
-        <span className="hint">You can also drag files from File Explorer straight onto the editor. Drag items onto the timeline. Audio lands on the Audio track, videos and images on the Media track.</span>
+        <span className="hint">You can also drag files from File Explorer straight onto the editor. Drag items onto the timeline. Audio lands on the Audio track, videos and images on the Media track. Drop a video on the Video track to join it before or after your recording.</span>
         {errors.map((er) => <div key={er} className="hint" style={{ color: 'var(--danger)' }}>{er}</div>)}
         {e.assets.length > 0 && (
           <div className="tab-chips">

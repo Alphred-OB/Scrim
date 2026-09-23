@@ -13,6 +13,7 @@ import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
 import { detectEncoder } from './ffmpeg'
 import { runSelfTest, selfTestDir } from './selftest'
+import { joinVideo, type JoinWhere } from './join'
 import './rpc'
 
 registerSchemes()
@@ -225,6 +226,19 @@ function registerIpc(): void {
       }
     }
     return { assets, errors }
+  })
+  ipcMain.handle('project:join', async (e, dir: string, where: JoinWhere, file?: string) => {
+    let src = file
+    if (!src) {
+      const r = await dialog.showOpenDialog(mainWindow!, {
+        title: where === 'start' ? 'Pick a video to put before this one' : 'Pick a video to add after this one',
+        properties: ['openFile'],
+        filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm', 'mkv', 'm4v', 'avi'] }]
+      })
+      if (r.canceled || !r.filePaths[0]) return null
+      src = r.filePaths[0]
+    }
+    return joinVideo(dir, src, where, (p) => e.sender.send('join:progress', p))
   })
   ipcMain.handle('media:peaks', (_e, p: string) => audioPeaks(p))
   ipcMain.handle('app:notify', (_e, title: string, body: string) => {

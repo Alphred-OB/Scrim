@@ -20,7 +20,7 @@ import AudioPanel from './panels/AudioPanel'
 import ClipPanel from './panels/ClipPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
-import { addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
+import { joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
 const RAIL: { id: Panel; icon: string; title: string; soon?: boolean }[] = [
@@ -90,6 +90,7 @@ function EditorView() {
   const [name, setName] = useState(project.name)
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
+  const busy = useEditor((s) => s.busy)
 
   useEffect(() => {
     api.loadPresets().then(setPresets)
@@ -105,7 +106,8 @@ function EditorView() {
       },
       state: () => {
         const e = useEditor.getState().project!.edit
-        return { zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
+        const st = useEditor.getState()
+        return { duration: st.project!.media.screen.duration, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
       },
       export: async (out: string, patch?: Partial<import('@shared/types').ExportSettings>) => {
         const st = useEditor.getState()
@@ -311,7 +313,10 @@ function EditorView() {
             <button className="btn sm" onClick={(e) => openContextMenu(e, [
               { label: 'Zoom at playhead', hint: kb('addZoom'), onClick: () => addZoomAt(timeBus.get()) },
               { label: 'Text at playhead', hint: kb('addText'), onClick: () => addTextAt(timeBus.get()) },
-              { label: 'Import media…', hint: kb('import'), onClick: () => importMedia(project.dir) }
+              { label: 'Import media…', hint: kb('import'), onClick: () => importMedia(project.dir) },
+              { sep: true },
+              { label: 'Join a video before…', onClick: () => joinVideoAt('start') },
+              { label: 'Join a video after…', onClick: () => joinVideoAt('end') }
             ])}><Icon name="plus" size={14} /> Add <Icon name="chevron" size={12} /></button>
             <div style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 6px' }} />
             <button className="icon-btn" title={`Add zoom (${kb('addZoom')})`} onClick={() => addZoomAt(timeBus.get())}><Icon name="zoom" /></button>
@@ -343,7 +348,12 @@ function EditorView() {
           Drop to add to your project
         </div>
       )}
-      {toast && <div className="toast glass"><span className="spin" />{toast}</div>}
+      {(busy || toast) && (
+        <div className="toast glass">
+          {(busy.startsWith('Joining') || (!busy && toast.startsWith('Importing'))) && <span className="spin" />}
+          {busy || toast}
+        </div>
+      )}
     </div>
   )
 }

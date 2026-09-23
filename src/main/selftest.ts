@@ -98,7 +98,8 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         const before = await state()
         const r = await js<string>(`(() => {
           const tile = document.querySelector('[draggable="true"]')
-          const rows = document.querySelector('.tl-row')
+          const heads = [...document.querySelectorAll('.tl-head')]
+          const rows = document.querySelectorAll('.tl-row')[heads.findIndex((h) => h.textContent.includes('Media'))]
           if (!tile || !rows) return 'missing'
           const dt = new DataTransfer()
           const b = rows.getBoundingClientRect()
@@ -113,6 +114,27 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         const after = await state()
         const added = (after.overlays as number) + (after.audioClips as number) - (before.overlays as number) - (before.audioClips as number)
         if (r !== 'ok' || added !== 1) throw new Error(`drop result ${r}, clips added ${added}`)
+      })
+      await step('join video by dropping on the Video track', async () => {
+        const before = await state()
+        await js(`(() => {
+          const tile = [...document.querySelectorAll('[draggable="true"]')].find((t) => t.textContent.includes('.mp4'))
+          const row = document.querySelector('.tl-row')
+          const b = row.getBoundingClientRect()
+          const at = { bubbles: true, cancelable: true, dataTransfer: new DataTransfer(), clientX: b.right - 60, clientY: b.y + 10 }
+          tile.dispatchEvent(new DragEvent('dragstart', at))
+          row.dispatchEvent(new DragEvent('dragover', at))
+          row.dispatchEvent(new DragEvent('drop', at))
+          tile.dispatchEvent(new DragEvent('dragend', at))
+        })()`)
+        await wait(400)
+        await shot('joining.png')
+        for (let i = 0; i < 120 && String((await state()).busy).startsWith('Joining'); i++) await wait(500)
+        const after = await state()
+        log('join', JSON.stringify({ before: before.duration, after: after.duration, clips: after.clips, busy: after.busy }))
+        if ((after.duration as number) <= (before.duration as number) + 1) throw new Error('duration did not grow')
+        await wait(1500)
+        await shot('joined.png')
       })
       await shot('editor2.png')
       log('estimate', await js('window.__scrim.estimate()'))

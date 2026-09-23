@@ -38,6 +38,7 @@ const api = {
   getSettings: () => invoke('settings:get'),
   saveSettings: (s: unknown) => invoke('settings:save', s),
   importAssets: (dir: string, paths?: string[]) => invoke('assets:import', dir, paths),
+  joinVideo: (dir: string, where: 'start' | 'end', file?: string) => invoke('project:join', dir, where, file),
   peaks: (p: string) => invoke('media:peaks', p),
   notify: (title: string, body: string) => invoke('app:notify', title, body),
   engines: () => invoke('app:engines'),

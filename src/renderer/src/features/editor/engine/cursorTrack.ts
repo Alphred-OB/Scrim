@@ -8,6 +8,12 @@ export interface Track {
   xs: Float32Array
   ys: Float32Array
   moving: Uint8Array // 1 if the raw cursor moved in the last ~0.25s
+  hidden?: [number, number][] // source ranges with no cursor (joined videos without cursor data)
+}
+
+/** True when the cursor should not be drawn at this source time. */
+export function cursorHiddenAt(tr: Track, t: number): boolean {
+  return !!tr.hidden?.some(([a, b]) => t >= a && t < b)
 }
 
 function resample(data: CursorData, duration: number): { xs: Float32Array; ys: Float32Array; moving: Uint8Array } {
@@ -93,7 +99,7 @@ function smooth(arr: Float32Array, amount: number): Float32Array {
 export function buildTrack(data: CursorData | null, duration: number, smoothing: number): Track | null {
   if (!data) return null
   const r = resample(data, duration)
-  return { hz: TRACK_HZ, xs: smooth(r.xs, smoothing), ys: smooth(r.ys, smoothing), moving: r.moving }
+  return { hz: TRACK_HZ, xs: smooth(r.xs, smoothing), ys: smooth(r.ys, smoothing), moving: r.moving, hidden: data.hidden }
 }
 
 /** Slow camera path used by "follow cursor" zooms. */
