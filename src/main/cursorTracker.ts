@@ -38,9 +38,18 @@ export class CursorTracker {
   private lastY = -1
   private onDown = (e: { button: unknown }) => this.press(Number(e.button) || 1)
   private onUp = () => this.release()
+  // presses on Scrim's own controls (record bar, webcam bubble): not clicks in the video,
+  // and the cursor is hidden while you drag them
+  private uiPress: number | null = null
+  private hiddenRanges: [number, number][] = []
 
-  constructor(rect: Rect) {
+  constructor(rect: Rect, private isOwnUi: (p: { x: number; y: number }) => boolean = () => false) {
     this.rect = rect
+  }
+
+  /** Forgets clicks made from `sinceMs` on (e.g. clicking the tray icon to pause or stop). */
+  dropClicksSince(sinceMs: number): void {
+    this.clicks = this.clicks.filter((c) => c.t < sinceMs)
   }
 
   setRect(rect: Rect): void {
@@ -81,11 +90,22 @@ export class CursorTracker {
   }
 
   private press(button: number): void {
-    const n = this.norm(physicalCursor())
+    const p = physicalCursor()
+    if (this.isOwnUi(p)) {
+      this.uiPress = Date.now()
+      return
+    }
+    const n = this.norm(p)
+    if (n.x < 0 || n.y < 0 || n.x > 1 || n.y > 1) return // outside what's being recorded
     this.clicks.push({ t: Date.now(), x: n.x, y: n.y, button })
   }
 
   private release(): void {
+    if (this.uiPress !== null) {
+      this.hiddenRanges.push([this.uiPress - 150, Date.now() + 250])
+      this.uiPress = null
+      return
+    }
     for (let i = this.clicks.length - 1; i >= 0; i--) {
       if (this.clicks[i].up === undefined) {
         this.clicks[i].up = Date.now()
@@ -105,7 +125,9 @@ export class CursorTracker {
       h.uIOhook.off('mouseup', this.onUp)
     }
     const rel = (t: number) => Math.round(t - videoStartMs) / 1000
+    if (this.uiPress !== null) this.hiddenRanges.push([this.uiPress - 150, Date.now()])
     return {
+      hidden: this.hiddenRanges.map(([a, b]) => [rel(a), rel(b)] as [number, number]),
       width: this.rect.width,
       height: this.rect.height,
       samples: this.samples.map((s) => ({ t: rel(s.t), x: +s.x.toFixed(5), y: +s.y.toFixed(5) })),

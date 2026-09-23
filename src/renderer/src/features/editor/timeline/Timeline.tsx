@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, ReactNode } from 'react'
 import { create } from 'zustand'
+import type { OverlayMode, Transition } from '@shared/types'
 import { Icon, fmtTime, openContextMenu, MenuItem } from '@/ui'
 import { mediaUrl } from '@/lib/api'
 import { useEditor, Selection } from '../state/store'
@@ -8,6 +9,7 @@ import { dragAsset } from '../state/dragAsset'
 import { addAssetAt, joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead, toggleClick } from '../state/actions'
 import { sortedClips } from '../engine/timeMap'
 import Waveform from './Waveform'
+import { TRANSITIONS } from '../panels/EffectsPanel'
 
 const TRACK_H = 36
 const RULER_H = 28
@@ -249,9 +251,13 @@ export default function Timeline() {
       ]
     }
     if (kind === 'overlay') {
-      const o = it as unknown as { muted: boolean; fullscreen: boolean }
+      const o = it as unknown as { muted: boolean; mode: OverlayMode }
+      const setMode = (m: OverlayMode) => update((e) => { const x = e.overlays.find((y) => y.id === it.id); if (x) x.mode = m })
       return [
-        { label: 'Full screen (b-roll)', checked: o.fullscreen, onClick: () => update((e) => { const x = e.overlays.find((y) => y.id === it.id); if (x) x.fullscreen = !x.fullscreen }) },
+        { label: 'Play in the video', checked: o.mode === 'frame', onClick: () => setMode('frame') },
+        { label: 'On top (picture in picture)', checked: o.mode === 'pip', onClick: () => setMode('pip') },
+        { label: 'Full screen', checked: o.mode === 'full', onClick: () => setMode('full') },
+        { sep: true },
         { label: 'Mute', checked: o.muted, onClick: () => update((e) => { const x = e.overlays.find((y) => y.id === it.id); if (x) x.muted = !x.muted }) },
         { sep: true },
         ...base,
@@ -477,6 +483,40 @@ export default function Timeline() {
             {/* video clips */}
             <div className="tl-hatch" style={{ left: X(0), width: total, top: top('video') + 4, height: TRACK_H - 8 }} />
             {edit.clips.map((c) => block('clip', c, top('video'), 'linear-gradient(180deg,#3563d6,#2849a8)', <>Clip{c.speed !== 1 ? ` · ${c.speed}x` : ''}</>))}
+
+            {/* transition on each cut between clips (dot sits in the middle of the cut) */}
+            {clips.slice(1).map((c, i) => {
+              const prev = clips[i]
+              const own = edit.transitions.perCut[c.id]
+              const eff = own ?? edit.transitions.cut
+              const at = (prev.end + c.start) / 2
+              const pick = (t: Transition | null) =>
+                update((e) => {
+                  if (t) e.transitions.perCut[c.id] = t
+                  else delete e.transitions.perCut[c.id]
+                })
+              return (
+                <button
+                  key={'tr' + c.id}
+                  className={`tl-trans ${eff.type !== 'none' ? 'on' : ''}`}
+                  style={{ left: X(at), top: top('video') + TRACK_H / 2 - 10 }}
+                  title={`Transition: ${TRANSITIONS.find((x) => x.v === eff.type)?.l}${own ? '' : ' (from Every cut)'}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) =>
+                    openContextMenu(e, [
+                      ...TRANSITIONS.map((x) => ({ label: x.l, checked: eff.type === x.v, onClick: () => pick({ type: x.v, duration: eff.duration || 0.5 }) })),
+                      { sep: true },
+                      ...[0.3, 0.5, 0.8, 1.2].map((d) => ({ label: `${d}s long`, checked: Math.abs(eff.duration - d) < 0.01, disabled: eff.type === 'none', onClick: () => pick({ type: eff.type, duration: d }) })),
+                      { sep: true },
+                      { label: 'Same as every cut', checked: !own, onClick: () => pick(null) },
+                      { label: 'Transition settings…', onClick: () => useEditor.getState().setPanel('effects') }
+                    ])
+                  }
+                >
+                  <Icon name="transition" size={11} />
+                </button>
+              )
+            })}
 
             {/* webcam */}
             {media.webcam && (

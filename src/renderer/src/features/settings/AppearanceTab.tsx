@@ -26,6 +26,13 @@ export default function AppearanceTab({ settings, save }: { settings: AppSetting
   const current = resolveTheme(settings, light).colors
   const custom: ThemeColors = settings.customTheme ?? { ...current }
   const setCustom = (patch: Partial<ThemeColors>) => save({ theme: 'custom', customTheme: { ...custom, ...patch } })
+  // switching base swaps in matching background, panel and text colors (the accent is kept),
+  // otherwise "Dark base" with light colors would look broken
+  const switchBase = (base: ThemeColors['base']) => {
+    if (base === custom.base) return
+    const ref = THEMES.find((t) => t.id === base)!.colors
+    setCustom({ base, bg: ref.bg, panel: ref.panel, text: ref.text })
+  }
   const dark = THEMES[0].colors
   const lightC = THEMES[1].colors
 
@@ -61,7 +68,7 @@ export default function AppearanceTab({ settings, save }: { settings: AppSetting
               Reset
             </button>
           </div>
-          <Seg options={[{ v: 'dark', l: 'Dark base' }, { v: 'light', l: 'Light base' }]} value={custom.base} onChange={(v) => setCustom({ base: v as ThemeColors['base'] })} />
+          <Seg options={[{ v: 'dark', l: 'Dark base' }, { v: 'light', l: 'Light base' }]} value={custom.base} onChange={(v) => switchBase(v as ThemeColors['base'])} />
           <ColorRow label="Accent (buttons, selection)" value={custom.accent} onChange={(v) => setCustom({ accent: v })} />
           <ColorRow label="Background" value={custom.bg} onChange={(v) => setCustom({ bg: v })} />
           <ColorRow label="Panels and menus" value={custom.panel} onChange={(v) => setCustom({ panel: v })} />

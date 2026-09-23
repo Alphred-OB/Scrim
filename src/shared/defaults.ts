@@ -60,7 +60,14 @@ export function defaultEdit(duration: number): EditState {
     audioClips: [],
     webcam: { show: true, shape: 'circle', size: 0.24, x: 0.86, y: 0.8, border: 4, borderColor: '#ffffff', shadow: true, mirror: true },
     audio: { micMuted: false, micVolume: 1, systemMuted: false, systemVolume: 0.8, webcamMuted: true, musicVolume: 0.25, musicMuted: false, syncOffset: 0 },
-    export: { resolution: 1080, fps: 30, quality: 'high', format: 'mp4' }
+    export: { resolution: 1080, fps: 30, quality: 'high', format: 'mp4' },
+    transitions: {
+      intro: { type: 'none', duration: 0.6 },
+      outro: { type: 'none', duration: 0.6 },
+      cut: { type: 'none', duration: 0.5 },
+      perCut: {}
+    },
+    effects: { look: 'none', brightness: 1, contrast: 1, saturation: 1, vignette: 0, grain: 0 }
   }
 }
 
@@ -113,9 +120,12 @@ export function migrateProject(p: Project): Project {
     webcam: { ...d.webcam, ...e.webcam },
     audio: { ...d.audio, ...e.audio },
     assets: e.assets ?? [],
-    overlays: e.overlays ?? [],
+    // older projects had a fullscreen flag instead of a mode
+    overlays: (e.overlays ?? []).map((o) => ({ ...o, mode: o.mode ?? (o.fullscreen ? 'full' : 'pip'), fit: o.fit ?? 'contain' })),
     audioClips: e.audioClips ?? [],
     export: { ...d.export, ...e.export },
+    transitions: { ...d.transitions, ...e.transitions, perCut: { ...(e.transitions?.perCut ?? {}) } },
+    effects: { ...d.effects, ...e.effects },
     clips: e.clips?.length ? e.clips : d.clips,
     texts: e.texts ?? []
   }

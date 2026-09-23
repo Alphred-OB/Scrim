@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { CursorData, EditState, Project } from '@shared/types'
 import { api } from '@/lib/api'
 
-export type Panel = 'background' | 'cursor' | 'zoom' | 'text' | 'media' | 'webcam' | 'audio' | 'settings' | 'ai'
+export type Panel = 'background' | 'cursor' | 'zoom' | 'text' | 'media' | 'effects' | 'webcam' | 'audio' | 'settings' | 'ai'
 export type Selection = { kind: 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip'; id: string } | null
 
 interface EditorStore {

@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- New: transitions for the start, the end and every cut (fade through black or white, blur, zoom, whip pan, flash), with a dot on each cut in the Video track to set its own
+- New: effects panel with 10 looks (vivid, punchy, warm, cool, matte, vintage, sepia, black & white, noir) plus brightness, contrast, saturation, vignette and film grain
+- New: media placement: play a video inside your recording's frame (default for videos), on top as picture in picture, or full screen, with fit or fill
+- Fixed: clicks on the record bar and webcam bubble no longer show up as clicks in the video, and the cursor hides while you drag them. The click that pauses or stops (tray, taskbar) is dropped too.
+- Fixed: custom theme "Dark base" now switches to dark colors
+- Fixed: the timeline zoom slider dot sits on its track
+- Changed: removed the Add button and the zoom, text and split buttons under the preview (use the timeline, right click menus or Z, T, S)
 - New: a moving blue border around what's being recorded (amber while paused). It never shows up in the video. Turn it off in Settings, General.
 - New: redesigned floating record bar: timer, status, pause/resume and stop
 - New: media library tabs for Videos, Audio and Pictures

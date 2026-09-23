@@ -138,6 +138,16 @@ function hideBorder(): void {
   border?.hide()
 }
 
+/** Is this physical screen point on the record bar or the webcam bubble? */
+function isOwnUi(p: { x: number; y: number }): boolean {
+  for (const w of [toolbar, bubble]) {
+    if (!w || w.isDestroyed() || !w.isVisible()) continue
+    const b = process.platform === 'win32' ? screen.dipToScreenRect(null, w.getBounds()) : w.getBounds()
+    if (p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height) return true
+  }
+  return false
+}
+
 /** Floating webcam preview while recording (kept out of the screen capture). */
 function showBubble(displayRect: Rect, cam: WebcamRecordOptions): void {
   const size = Math.round(Math.min(displayRect.width, displayRect.height) * Math.max(0.12, Math.min(0.4, cam.size)))
@@ -331,7 +341,7 @@ app.whenReady().then(() => {
     cb({ video: first, audio: 'loopback' })
   })
 
-  recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, showBorder, hideBorder, iconPath: ICON, openEditor, broadcast })
+  recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, showBorder, hideBorder, isOwnUi, iconPath: ICON, openEditor, broadcast })
   registerIpc()
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast

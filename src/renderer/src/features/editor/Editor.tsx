@@ -19,6 +19,7 @@ import ZoomPanel from './panels/ZoomPanel'
 import TextPanel from './panels/TextPanel'
 import AudioPanel from './panels/AudioPanel'
 import ClipPanel from './panels/ClipPanel'
+import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
 import { joinVideoAt, addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
@@ -30,6 +31,7 @@ const RAIL: { id: Panel; icon: string; title: string; soon?: boolean }[] = [
   { id: 'zoom', icon: 'zoom', title: 'Zoom' },
   { id: 'text', icon: 'text', title: 'Text' },
   { id: 'media', icon: 'image', title: 'Media library' },
+  { id: 'effects', icon: 'fx', title: 'Transitions & effects' },
   { id: 'webcam', icon: 'webcam', title: 'Webcam' },
   { id: 'audio', icon: 'audio', title: 'Audio' },
   { id: 'settings', icon: 'scissors', title: 'Clips & speed' },
@@ -102,6 +104,7 @@ function EditorView() {
       exportDialog: () => setExporting(true),
       patchCursor: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.cursor, patch)),
       seek: (t: number) => useEditor.getState().setTime(t),
+      patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
       import: (paths: string[]) => importMedia(useEditor.getState().project!.dir, paths, timeBus.get()),
       estimate: () => {
         const st = useEditor.getState()
@@ -311,6 +314,7 @@ function EditorView() {
             {panel === 'webcam' && <WebcamPanel />}
             {panel === 'audio' && <AudioPanel />}
             {panel === 'settings' && <ClipPanel />}
+            {panel === 'effects' && <EffectsPanel />}
             {panel === 'ai' && <AiPanel />}
           </div>
         </aside>
@@ -325,18 +329,7 @@ function EditorView() {
           <Preview />
 
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button className="btn sm" onClick={(e) => openContextMenu(e, [
-              { label: 'Zoom at playhead', hint: kb('addZoom'), onClick: () => addZoomAt(timeBus.get()) },
-              { label: 'Text at playhead', hint: kb('addText'), onClick: () => addTextAt(timeBus.get()) },
-              { label: 'Import media…', hint: kb('import'), onClick: () => importMedia(project.dir) },
-              { sep: true },
-              { label: 'Join a video before…', onClick: () => joinVideoAt('start') },
-              { label: 'Join a video after…', onClick: () => joinVideoAt('end') }
-            ])}><Icon name="plus" size={14} /> Add <Icon name="chevron" size={12} /></button>
-            <div style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 6px' }} />
-            <button className="icon-btn" title={`Add zoom (${kb('addZoom')})`} onClick={() => addZoomAt(timeBus.get())}><Icon name="zoom" /></button>
-            <button className="icon-btn" title={`Add text (${kb('addText')})`} onClick={() => addTextAt(timeBus.get())}><Icon name="text" /></button>
-            <button className="icon-btn" title={`Split (${kb('split')})`} onClick={splitAtPlayhead}><Icon name="scissors" /></button>
+            <div className="transport-side" />
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
               <TimeLabel />
               <button className="icon-btn" onClick={() => jump(-1)} title="Go to start"><Icon name="prev" /></button>
@@ -346,6 +339,7 @@ function EditorView() {
               <button className="icon-btn" onClick={() => jump(1)} title="Go to end"><Icon name="next" /></button>
               <span className="hint" style={{ minWidth: 56 }}>{fmtTime(project.media.screen.duration)}</span>
             </div>
+            <div className="transport-side" style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <div className="tl-zoom" title="Timeline zoom">
               <button className="icon-btn sm" title="Zoom timeline out" onClick={() => useTimelineView.getState().setZoom((z) => z / 1.5)}><Icon name="minus" size={14} /></button>
               <input
@@ -357,6 +351,7 @@ function EditorView() {
                 onChange={(e) => useTimelineView.getState().setZoom(ZOOM_MIN * Math.pow(ZOOM_MAX / ZOOM_MIN, +e.target.value / 100))}
               />
               <button className="icon-btn sm" title="Zoom timeline in" onClick={() => useTimelineView.getState().setZoom((z) => z * 1.5)}><Icon name="plus" size={14} /></button>
+            </div>
             </div>
           </div>
         </main>

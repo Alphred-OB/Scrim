@@ -47,7 +47,7 @@ const luminance = (c: string) => {
 
 /** All CSS variables for a theme, derived from its five colors. */
 export function themeVars(c: ThemeColors): Record<string, string> {
-  const dark = c.base === 'dark'
+  const dark = luminance(c.bg) < 0.4
   return {
     '--bg': c.bg,
     '--bg-2': dark ? mix(c.bg, c.text, 0.035) : c.panel,
@@ -95,7 +95,7 @@ export function resolveTheme(s: AppSettings, systemLight: boolean): { id: string
 export function applyTheme(s: AppSettings, systemLight: boolean, isMainWindow: boolean): void {
   const root = document.documentElement
   const { id, colors } = resolveTheme(s, systemLight)
-  root.dataset.theme = colors.base
+  root.dataset.theme = luminance(colors.bg) < 0.4 ? 'dark' : 'light'
   for (const k of applied) root.style.removeProperty(k)
   applied = []
   // dark and light come straight from tokens.css; everything else is generated
@@ -107,7 +107,7 @@ export function applyTheme(s: AppSettings, systemLight: boolean, isMainWindow: b
   }
   root.style.setProperty('--font', `'${s.uiFont || 'Inter'}'`)
   if (isMainWindow) {
-    api.setTheme(colors.base).catch(() => {})
+    api.setTheme(luminance(colors.bg) < 0.4 ? 'dark' : 'light').catch(() => {})
     api.setZoom(s.uiScale || 1)
   }
 }

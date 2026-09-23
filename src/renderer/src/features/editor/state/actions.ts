@@ -70,7 +70,10 @@ export function addAssetAt(asset: Asset, t0: number): void {
   } else {
     const o: OverlayClip = {
       id: uid('ov'), assetId: asset.id, start: t, end, trimStart: 0, x: 0.78, y: 0.28, w: asset.kind === 'image' ? 0.18 : 0.32, radius: 16, shadow: true,
-      opacity: 1, volume: 1, muted: !asset.hasAudio, fullscreen: false
+      opacity: 1, volume: 1, muted: !asset.hasAudio,
+      // videos play inside the recording's frame by default, images float on top
+      mode: asset.kind === 'video' ? 'frame' : 'pip',
+      fit: 'contain'
     }
     s.update((e) => e.overlays.push(o))
     s.select({ kind: 'overlay', id: o.id })

@@ -207,7 +207,32 @@ export interface OverlayClip {
   opacity: number
   volume: number
   muted: boolean
-  fullscreen: boolean // cover the whole canvas (b-roll)
+  /** pip = floating box, frame = plays inside the recording's frame (replaces it), full = covers everything */
+  mode: OverlayMode
+  fit: 'contain' | 'cover' // how frame/full media fills its area
+  /** @deprecated use mode; kept so old projects migrate */
+  fullscreen?: boolean
+}
+
+export type OverlayMode = 'pip' | 'frame' | 'full'
+
+export type TransitionType = 'none' | 'fade' | 'fade-white' | 'blur' | 'zoom' | 'whip' | 'flash'
+export interface Transition { type: TransitionType; duration: number }
+export interface TransitionSettings {
+  intro: Transition // start of the video
+  outro: Transition // end of the video
+  cut: Transition // used at every cut unless the cut has its own
+  perCut: Record<string, Transition> // key = id of the clip after the cut
+}
+
+export type EffectLook = 'none' | 'vivid' | 'warm' | 'cool' | 'mono' | 'noir' | 'sepia' | 'vintage' | 'matte' | 'punchy'
+export interface EffectSettings {
+  look: EffectLook
+  brightness: number // 1 = unchanged
+  contrast: number
+  saturation: number
+  vignette: number // 0..1
+  grain: number // 0..1
 }
 
 export interface AudioClip {
@@ -269,6 +294,8 @@ export interface EditState {
   webcam: WebcamSettings
   audio: AudioSettings
   export: ExportSettings
+  transitions: TransitionSettings
+  effects: EffectSettings
 }
 
 export interface Project {

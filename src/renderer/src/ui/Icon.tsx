@@ -24,6 +24,8 @@ const ICONS: Record<string, ReactNode> = {
   wand: P('M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M12.2 6.2L11 5M3 21l9-9'),
   plus: P('M12 5v14M5 12h14'),
   minus: P('M5 12h14'),
+  fx: P('M4 20l8-8M14 4l1.2 2.8L18 8l-2.8 1.2L14 12l-1.2-2.8L10 8l2.8-1.2zM19 13l.6 1.4L21 15l-1.4.6L19 17l-.6-1.4L17 15l1.4-.6z'),
+  transition: P('M3 6h7v12H3zM14 6h7v12h-7zM10 12h4'),
   expand: P('M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'),
   sun: P('M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'),
   trash: P('M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'),

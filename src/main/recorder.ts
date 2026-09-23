@@ -19,6 +19,8 @@ export interface RecorderHooks {
   hideBubble: () => void
   showBorder: (rect: Rect, protect: boolean, outside: boolean) => void
   hideBorder: () => void
+  /** true when a physical screen point is on one of Scrim's own windows (record bar, bubble) */
+  isOwnUi: (p: { x: number; y: number }) => boolean
   iconPath: string
   openEditor: (dir: string) => void
   broadcast: (channel: string, payload: unknown) => void
@@ -375,7 +377,7 @@ class Recorder {
         }
       }
 
-      this.tracker = new CursorTracker(this.rect)
+      this.tracker = new CursorTracker(this.rect, this.hooks.isOwnUi)
       this.tracker.start()
       await this.launchCapture(opts)
       this.tracker.setRect(this.rect)
@@ -486,6 +488,7 @@ class Recorder {
     this.busy = true
     try {
       this.pausedAt = Date.now()
+      this.tracker?.dropClicksSince(this.pausedAt - 400) // the click that paused (tray, hotkey) isn't content
       this.activeMs += this.pausedAt - (this.videoStartMs || this.startWall)
       this.set({ state: 'paused', elapsed: this.activeMs / 1000 })
       // stop audio/webcam and the screen at the same moment so they stay in sync
@@ -660,6 +663,7 @@ class Recorder {
     this.cleanupRuntime()
     const endedAt = wasPaused ? this.pausedAt : Date.now()
     const videoStart = this.firstStart || this.startWall + 250
+    this.tracker?.dropClicksSince(endedAt - 400) // the click that stopped the recording isn't content
     let cursor = this.tracker?.stop(videoStart)
     this.tracker = null
     if (cursor) cursor = removePaused(cursor, this.gaps, videoStart, endedAt)
@@ -793,5 +797,10 @@ export function removePaused(c: CursorData, gaps: [number, number][], videoStart
     const up = k.up !== undefined ? map(k.up) ?? t + 0.1 : undefined
     return [{ ...k, t, up }]
   })
-  return { ...c, samples, clicks }
+  const hidden = (c.hidden ?? []).flatMap(([a, b]) => {
+    const ma = map(a) ?? map(b)
+    const mb = map(b) ?? ma
+    return ma === null || mb === null ? [] : [[ma, mb] as [number, number]]
+  })
+  return { ...c, samples, clicks, hidden }
 }

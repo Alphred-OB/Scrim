@@ -225,6 +225,19 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await js(`window.__scrim.patchCursor({ highlight: false })`)
       })
 
+      await step('transitions, effects and media in the video', async () => {
+        await js(`window.__scrim.patch('transitions', { intro: { type: 'fade', duration: 0.8 }, cut: { type: 'zoom', duration: 0.8 } })`)
+        await js(`window.__scrim.patch('effects', { look: 'vintage', vignette: 0.6, grain: 0.5 })`)
+        await js('window.__scrim.panel("effects")')
+        await js('window.__scrim.seek(1.2)')
+        await wait(900)
+        await shot('effects.png')
+        await js('window.__scrim.seek(2.85)') // just before the first cut
+        await wait(700)
+        await shot('transition-cut.png')
+        await js(`window.__scrim.patch('effects', { look: 'none', vignette: 0, grain: 0 })`)
+      })
+
       await step('live background', async () => {
         await js('window.__scrim.panel("background")')
         await wait(400)

@@ -202,7 +202,7 @@ export default function Preview() {
       hs.push({ kind: 'text', id: tx.id, box: { x: b.x * sx, y: b.y * sy, w: b.w * sx, h: b.h * sy } })
     }
     for (const o of L.edit.overlays) {
-      if (t < o.start || t > o.end || o.fullscreen) continue
+      if (t < o.start || t > o.end || o.mode !== 'pip') continue
       const as = L.assets.get(o.assetId)
       if (!as) continue
       const r = overlayRect(o, as.width || 16, as.height || 9, W, H)
@@ -448,7 +448,8 @@ export default function Preview() {
                       ]
                     : h.kind === 'overlay'
                       ? [
-                          { label: 'Make full screen', onClick: () => useEditor.getState().update((ed) => { const o = ed.overlays.find((x) => x.id === h.id); if (o) o.fullscreen = true }) },
+                          { label: 'Play in the video instead', onClick: () => useEditor.getState().update((ed) => { const o = ed.overlays.find((x) => x.id === h.id); if (o) o.mode = 'frame' }) },
+                          { label: 'Make full screen', onClick: () => useEditor.getState().update((ed) => { const o = ed.overlays.find((x) => x.id === h.id); if (o) o.mode = 'full' }) },
                           { sep: true },
                           { label: 'Delete', danger: true, onClick: () => useEditor.getState().update((ed) => (ed.overlays = ed.overlays.filter((x) => x.id !== h.id))) }
                         ]

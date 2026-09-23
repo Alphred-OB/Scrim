@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
-import { Icon, Section, Slider, Toggle, fmtTime, openContextMenu } from '@/ui'
+import { Icon, Section, Seg, Slider, Toggle, fmtTime, openContextMenu } from '@/ui'
 import { api, mediaUrl } from '@/lib/api'
 import { addAssetAt, joinVideoAt, removeAsset } from '../state/actions'
 import { dragAsset } from '../state/dragAsset'
-import type { Asset } from '@shared/types'
+import type { Asset, OverlayMode } from '@shared/types'
 
 /** Imports files into the project. Pass `at` (seconds) to also place them on the timeline. */
 export async function importMedia(dir: string, paths?: string[], at?: number): Promise<string[]> {
@@ -128,8 +128,23 @@ export default function MediaPanel() {
       {ov && asset && (
         <Section title="Selected media" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((ed) => (ed.overlays = ed.overlays.filter((x) => x.id !== ov.id))); select(null) }}>Delete</button>}>
           <div className="chip" style={{ maxWidth: '100%' }}>{asset.name}</div>
-          <Toggle label="Full screen (b-roll)" value={ov.fullscreen} onChange={(v) => setOv((o) => (o.fullscreen = v))} />
-          {!ov.fullscreen && (
+          <span className="section-title" style={{ marginTop: 4 }}>Placement</span>
+          <Seg
+            options={[{ v: 'frame', l: 'In the video' }, { v: 'pip', l: 'On top' }, { v: 'full', l: 'Full screen' }]}
+            value={ov.mode}
+            onChange={(v) => setOv((o) => (o.mode = v as OverlayMode))}
+          />
+          <span className="hint">
+            {ov.mode === 'frame'
+              ? 'Plays inside your recording\'s frame, with the same background, corners and shadow. Your recording is hidden while it plays.'
+              : ov.mode === 'full'
+                ? 'Covers the whole video, background included.'
+                : 'Floats on top of your recording, like picture in picture. Drag it on the preview.'}
+          </span>
+          {ov.mode !== 'pip' && (
+            <Seg options={[{ v: 'contain', l: 'Fit whole' }, { v: 'cover', l: 'Fill and crop' }]} value={ov.fit} onChange={(v) => setOv((o) => (o.fit = v as 'contain' | 'cover'))} />
+          )}
+          {ov.mode === 'pip' && (
             <>
               <Slider label="Size" value={ov.w} min={0.08} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setOv((o) => (o.w = v), 'ovw')} />
               <Slider label="Corner radius" value={ov.radius} min={0} max={80} step={1} format={(v) => `${v}px`} onChange={(v) => setOv((o) => (o.radius = v), 'ovr')} />

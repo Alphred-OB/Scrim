@@ -1,4 +1,4 @@
-import type { ClickEvent, EditState, GradientDef, OverlayClip, TextItem } from '@shared/types'
+import type { ClickEvent, EditState, GradientDef, OverlayClip, TextItem, Transition } from '@shared/types'
 import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
 import { drawLive, drawWallpaper } from './backgrounds'
@@ -127,7 +127,7 @@ function drawCover(ctx: Ctx, img: CanvasImageSource, iw: number, ih: number, w: 
 
 /** Where an overlay clip sits on the output canvas. */
 export function overlayRect(o: OverlayClip, iw: number, ih: number, W: number, H: number): { x: number; y: number; w: number; h: number } {
-  if (o.fullscreen) return { x: 0, y: 0, w: W, h: H }
+  if (o.mode === 'full') return { x: 0, y: 0, w: W, h: H }
   const w = o.w * W
   const h = w * (ih / Math.max(1, iw))
   return { x: o.x * W - w / 2, y: o.y * H - h / 2, w, h }
@@ -282,6 +282,58 @@ export class Renderer {
     return { c, pad }
   }
 
+  private scratch: AnyCanvas | null = null
+  private applyTransition(ctx: Ctx, W: number, H: number, t: number, edit: EditState, k: number): void {
+    const tr = transitionAt(edit, t)
+    if (!tr || tr.amount <= 0.001) return
+    const a = Math.min(1, tr.amount)
+    const e = a * a * (3 - 2 * a) // smoothstep
+    const type = tr.type
+    if (type === 'fade' || type === 'fade-white' || type === 'flash') {
+      ctx.save()
+      ctx.fillStyle = type === 'fade' ? '#000' : '#fff'
+      ctx.globalAlpha = type === 'flash' ? e * e * e : e
+      ctx.fillRect(0, 0, W, H)
+      ctx.restore()
+      return
+    }
+    // the rest reshape the finished frame, so copy it first
+    if (!this.scratch || this.scratch.width !== W || this.scratch.height !== H) this.scratch = makeCanvas(W, H)
+    const sc = this.scratch.getContext('2d') as Ctx
+    sc.clearRect(0, 0, W, H)
+    sc.drawImage(ctx.canvas as CanvasImageSource, 0, 0)
+    ctx.save()
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+    if (type === 'blur') {
+      ctx.filter = `blur(${Math.round(e * 28 * k)}px)`
+      ctx.drawImage(this.scratch, 0, 0)
+    } else if (type === 'zoom') {
+      const s = 1 + 0.45 * e
+      ctx.filter = `blur(${Math.round(e * 8 * k)}px)`
+      ctx.translate(W / 2, H / 2)
+      ctx.scale(s, s)
+      ctx.drawImage(this.scratch, -W / 2, -H / 2)
+    } else if (type === 'whip') {
+      // quick sideways pan with motion smear: out to the left, in from the right
+      const dir = tr.side === 'out' ? -1 : 1
+      const dx = dir * e * W * 0.35
+      ctx.filter = `blur(${Math.round(e * 14 * k)}px)`
+      for (let i = 0; i < 4; i++) {
+        ctx.globalAlpha = i === 0 ? 1 : 0.35
+        ctx.drawImage(this.scratch, dx - dir * i * e * W * 0.04, 0)
+      }
+    }
+    ctx.restore()
+    if (type === 'zoom' || type === 'blur') {
+      ctx.save()
+      ctx.globalAlpha = e * 0.35
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, W, H)
+      ctx.restore()
+    }
+  }
+
   /** Animated backgrounds are drawn at a reduced size and scaled up: cheap, and the softness looks intentional. */
   private liveCanvas: AnyCanvas | null = null
   private drawLiveBg(ctx: Ctx, W: number, H: number, t: number, edit: EditState): void {
@@ -336,7 +388,16 @@ export class Renderer {
     ]
     const z = zoomAt(edit.zoom, t, inp.camera, toContent)
     const vp = viewport(z)
-    if (inp.drawFrame) {
+    // media set to play "inside the frame" replaces the recording for its duration
+    const inFrame = edit.overlays.find((o) => o.mode === 'frame' && t >= o.start && t <= o.end && inp.overlays?.has(o.id))
+    const look = effectFilter(edit.effects)
+    if (look) ctx.filter = look
+    if (inFrame) {
+      const src = inp.overlays!.get(inFrame.id)!
+      ctx.globalAlpha = inFrame.opacity
+      drawFit(ctx, src.src, src.w, src.h, L.view, inFrame.fit)
+      ctx.globalAlpha = 1
+    } else if (inp.drawFrame) {
       inp.drawFrame(
         ctx,
         L.crop.x + vp.x * L.crop.w,
@@ -350,8 +411,11 @@ export class Renderer {
       )
     }
 
+    ctx.filter = 'none'
+    drawVignetteGrain(ctx, edit.effects, L.view, t)
+
     // 4. cursor + click effects (inside the window clip)
-    if (edit.cursor.show && inp.cursor && !cursorHiddenAt(inp.cursor, inp.t)) {
+    if (!inFrame && edit.cursor.show && inp.cursor && !cursorHiddenAt(inp.cursor, inp.t)) {
       ctx.save()
       ctx.beginPath()
       ctx.rect(L.view.x, L.view.y, L.view.w, L.view.h)
@@ -379,14 +443,23 @@ export class Renderer {
 
     // 6. imported media (picture in picture, logos, b-roll)
     for (const o of edit.overlays) {
-      if (t < o.start || t > o.end) continue
+      if (t < o.start || t > o.end || o.mode === 'frame') continue
       const src = inp.overlays?.get(o.id)
       if (!src) continue
+      if (o.mode === 'full') {
+        ctx.save()
+        ctx.globalAlpha = o.opacity
+        ctx.fillStyle = '#000'
+        ctx.fillRect(0, 0, W, H)
+        drawFit(ctx, src.src, src.w, src.h, { x: 0, y: 0, w: W, h: H }, o.fit)
+        ctx.restore()
+        continue
+      }
       const r = overlayRect(o, src.w, src.h, W, H)
       ctx.save()
       ctx.globalAlpha = o.opacity
-      const rad = o.fullscreen ? 0 : o.radius * L.k
-      if (o.shadow && !o.fullscreen) {
+      const rad = o.radius * L.k
+      if (o.shadow) {
         ctx.shadowColor = 'rgba(0,0,0,.45)'
         ctx.shadowBlur = 30 * L.k
         ctx.shadowOffsetY = 10 * L.k
@@ -408,6 +481,9 @@ export class Renderer {
 
     // 8. text
     for (const tx of edit.texts) if (t >= tx.start && t <= tx.end) drawText(ctx, tx, t, W, H, L.k)
+
+    // 9. transitions at the start, the end and around cuts
+    this.applyTransition(ctx, W, H, t, edit, L.k)
 
     return { layout: L, zoom: z }
   }
@@ -570,6 +646,103 @@ function drawSpotlight(ctx: Ctx, cs: EditState['cursor'], inp: RenderInputs, px:
     ctx.fillRect(px - R, py - R, R * 2, R * 2)
   }
   ctx.restore()
+}
+
+/** CSS filter for the recording from the chosen look and adjustments ('' when untouched). */
+export function effectFilter(fx: EditState['effects']): string {
+  const looks: Record<string, string> = {
+    none: '',
+    vivid: 'saturate(1.35) contrast(1.08)',
+    punchy: 'contrast(1.25) saturate(1.2)',
+    warm: 'sepia(0.18) saturate(1.15) hue-rotate(-8deg)',
+    cool: 'saturate(1.05) hue-rotate(12deg) brightness(1.02)',
+    mono: 'grayscale(1)',
+    noir: 'grayscale(1) contrast(1.35) brightness(0.95)',
+    sepia: 'sepia(0.75)',
+    vintage: 'sepia(0.35) contrast(0.92) saturate(0.85) brightness(1.05)',
+    matte: 'contrast(0.85) brightness(1.08) saturate(0.9)'
+  }
+  const parts = [looks[fx.look] ?? '']
+  if (Math.abs(fx.brightness - 1) > 0.005) parts.push(`brightness(${fx.brightness.toFixed(3)})`)
+  if (Math.abs(fx.contrast - 1) > 0.005) parts.push(`contrast(${fx.contrast.toFixed(3)})`)
+  if (Math.abs(fx.saturation - 1) > 0.005) parts.push(`saturate(${fx.saturation.toFixed(3)})`)
+  return parts.filter(Boolean).join(' ')
+}
+
+let grainTile: AnyCanvas | null = null
+function drawVignetteGrain(ctx: Ctx, fx: EditState['effects'], r: { x: number; y: number; w: number; h: number }, t: number): void {
+  if (fx.vignette > 0.001) {
+    const cx = r.x + r.w / 2
+    const cy = r.y + r.h / 2
+    const R = Math.hypot(r.w, r.h) / 2
+    const g = ctx.createRadialGradient(cx, cy, R * 0.35, cx, cy, R)
+    g.addColorStop(0, 'rgba(0,0,0,0)')
+    g.addColorStop(1, `rgba(0,0,0,${Math.min(0.9, fx.vignette * 0.85)})`)
+    ctx.fillStyle = g
+    ctx.fillRect(r.x, r.y, r.w, r.h)
+  }
+  if (fx.grain > 0.001) {
+    // one small noise tile, shifted every frame so the grain moves like film
+    if (!grainTile) {
+      grainTile = makeCanvas(128, 128)
+      const g = grainTile.getContext('2d') as Ctx
+      const img = g.createImageData(128, 128)
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = Math.random() * 255
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v
+        img.data[i + 3] = 255
+      }
+      g.putImageData(img, 0, 0)
+    }
+    const pat = ctx.createPattern(grainTile as CanvasImageSource, 'repeat')
+    if (pat) {
+      const f = Math.floor(t * 24)
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(r.x, r.y, r.w, r.h)
+      ctx.clip()
+      ctx.globalAlpha = fx.grain * 0.18
+      ctx.globalCompositeOperation = 'overlay'
+      ctx.translate((f * 37) % 128, (f * 59) % 128)
+      ctx.fillStyle = pat
+      ctx.fillRect(r.x - 128, r.y - 128, r.w + 256, r.h + 256)
+      ctx.restore()
+    }
+  }
+}
+
+/** Draws media into a box, letterboxed (contain) or cropped to fill (cover). */
+function drawFit(ctx: Ctx, src: CanvasImageSource, sw: number, sh: number, box: { x: number; y: number; w: number; h: number }, fit: 'contain' | 'cover'): void {
+  if (fit === 'cover') return drawCover(ctx, src, sw, sh, box.w, box.h, box.x, box.y)
+  const s = Math.min(box.w / sw, box.h / sh)
+  const w = sw * s
+  const h = sh * s
+  ctx.drawImage(src, box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h)
+}
+
+/** Which transition is playing at source time t, and how far into it (amount peaks at the cut). */
+export function transitionAt(edit: EditState, t: number): { type: string; amount: number; side: 'in' | 'out' } | null {
+  const tr = edit.transitions
+  const clips = [...edit.clips].sort((a, b) => a.start - b.start)
+  const i = clips.findIndex((c) => t >= c.start - 1e-6 && t <= c.end + 1e-6)
+  if (i < 0) return null
+  const c = clips[i]
+  const fromStart = (t - c.start) / c.speed // output seconds
+  const toEnd = (c.end - t) / c.speed
+  const pick = (x: Transition | undefined): Transition | null => (x && x.type !== 'none' && x.duration > 0 ? x : null)
+  // the cut before this clip (or the intro) and the cut after it (or the outro)
+  const before = i === 0 ? pick(tr.intro) : pick(tr.perCut[c.id] ?? tr.cut)
+  const after = i === clips.length - 1 ? pick(tr.outro) : pick(tr.perCut[clips[i + 1].id] ?? tr.cut)
+  // intro/outro use their full length; a cut shares its length between both sides
+  if (before) {
+    const d = i === 0 ? before.duration : before.duration / 2
+    if (fromStart < d) return { type: before.type, amount: 1 - fromStart / d, side: 'in' }
+  }
+  if (after) {
+    const d = i === clips.length - 1 ? after.duration : after.duration / 2
+    if (toEnd < d) return { type: after.type, amount: 1 - toEnd / d, side: 'out' }
+  }
+  return null
 }
 
 function hexA(hex: string, a: number): string {
