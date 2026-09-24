@@ -1114,3 +1114,30 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .tl-key kbd { font-size: 9.5px; padding: 2px 4px; }
 .tl-key:hover { border-color: var(--text-2); }
 .tl-key.off { opacity: 0.35; }
+/* Keys page */
+.keys-preview { width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; background: #2a2f3a; display: block; }
+.dim-section { opacity: 0.45; pointer-events: none; transition: opacity 0.2s; }
+.keys-looks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.keys-look { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; border-radius: 11px; border: 1.5px solid transparent; background: var(--card); color: var(--text-2); font: 600 11px var(--font); cursor: pointer; }
+.keys-look.on { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+.keys-look-cap { font: 600 12px var(--font); padding: 5px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
+.keys-look-cap.dark { background: #16171c; color: #fff; border: 1px solid rgba(255, 255, 255, 0.15); }
+.keys-look-cap.light { background: #fff; color: #15161b; }
+.keys-look-cap.accent { background: #2f6bff; color: #fff; }
+.keys-look-cap.custom { color: #fff; }
+.keys-pos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 12px; background: var(--stage); aspect-ratio: 16 / 7; }
+.keys-pos-btn { position: relative; border: 1.5px solid var(--line-2); border-radius: 8px; background: transparent; cursor: pointer; }
+.keys-pos-btn:hover { border-color: var(--text-2); }
+.keys-pos-btn.on { border-color: var(--accent); background: var(--accent-soft); }
+.keys-pos-btn i { position: absolute; width: 26px; height: 9px; border-radius: 3px; background: var(--text-2); left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.keys-pos-btn.on i { background: var(--accent); }
+/* Keys rail icon: the keys press one after another on hover, and once on click */
+.rail-icon-keys .ri-key { transform-box: fill-box; transform-origin: center; transition: transform 0.2s var(--ease), opacity 0.2s; }
+.rail-btn:hover .rail-icon-keys .ri-key1 { animation: riKeyPress 1.2s ease-in-out infinite; }
+.rail-btn:hover .rail-icon-keys .ri-key2 { animation: riKeyPress 1.2s ease-in-out 0.2s infinite; }
+.rail-btn:hover .rail-icon-keys .ri-key3 { animation: riKeyPress 1.2s ease-in-out 0.4s infinite; }
+.rail-btn:hover .rail-icon-keys .ri-key-space { animation: riKeySpace 1.2s ease-in-out 0.6s infinite; }
+.rail-btn.clicked .rail-icon-keys .ri-key, .rail-icon-keys.is-clicked .ri-key { animation: riKeyPress 0.35s ease-out 1; }
+@keyframes riKeyPress { 0%, 30%, 100% { transform: translateY(0) scale(1); opacity: 1; } 12% { transform: translateY(1.2px) scale(0.8); opacity: 0.6; } }
+@keyframes riKeySpace { 0%, 30%, 100% { transform: translateY(0); } 12% { transform: translateY(1px); } }
+.rail-icon-keys .ri-key-space { transform-box: fill-box; }

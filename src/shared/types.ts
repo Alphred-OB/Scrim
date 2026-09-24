@@ -45,11 +45,19 @@ export interface KeyPress { t: number; keys: string[] }
 /** How pressed shortcuts are shown on the video. */
 export interface KeySettings {
   show: boolean
-  style: 'dark' | 'light' | 'accent'
-  position: 'bottom' | 'bottom-left' | 'bottom-right' | 'top'
+  style: 'dark' | 'light' | 'accent' | 'custom'
+  /** keycap color for the custom style (text color is picked automatically) */
+  color: string
+  position: 'bottom' | 'bottom-left' | 'bottom-right' | 'top' | 'top-left' | 'top-right'
   size: number // 1 = default
+  radius: number // 0 = square, 1 = default, 2 = pill
   hold: number // seconds each shortcut stays on screen
-  hidden: number[] // shortcut times (rounded ms) switched off on the timeline
+  animation: 'pop' | 'slide' | 'fade'
+  /** 'words' shows Ctrl Shift Alt Win, 'symbols' shows ⌃ ⇧ ⌥ ⊞ */
+  labels: 'words' | 'symbols'
+  /** also show single keys like Enter, Esc or the arrows (not just combinations) */
+  singles: boolean
+  hidden: number[] // shortcut times (rounded ms) switched off
 }
 
 export interface CursorSample { t: number; x: number; y: number } // t = seconds from video start, x/y normalized 0..1 in capture rect

@@ -94,6 +94,17 @@ export default function RailIcon({ id, active, clicked, size = 20 }: RailIconPro
         </svg>
       )
 
+    case 'keys': // Keyboard shortcuts
+      return (
+        <svg className={common} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <rect className="ri-keys-board" x="2.5" y="6" width="19" height="12" rx="2.8" />
+          <rect className="ri-key ri-key1" x="5.6" y="9.1" width="2.6" height="2.4" rx="0.6" fill="currentColor" stroke="none" />
+          <rect className="ri-key ri-key2" x="10.7" y="9.1" width="2.6" height="2.4" rx="0.6" fill="currentColor" stroke="none" />
+          <rect className="ri-key ri-key3" x="15.8" y="9.1" width="2.6" height="2.4" rx="0.6" fill="currentColor" stroke="none" />
+          <path className="ri-key-space" d="M7.5 14.6 H16.5" />
+        </svg>
+      )
+
     case 'settings': // Clips
       return (
         <svg className={common} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

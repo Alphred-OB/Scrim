@@ -737,7 +737,10 @@ export default function Timeline() {
                   style={{ left: XS(kp.t), top: top('keys') + 5, height: TRACK_H - 10, minWidth: Math.max(18, edit.keys.hold * pps) }}
                   title={`${kp.keys.join(' + ')}${hidden ? ' (hidden)' : ''}. Right click to ${hidden ? 'show' : 'hide'} it.`}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => seek(kp.t)}
+                  onClick={() => {
+                    seek(kp.t)
+                    useEditor.getState().setPanel('keys')
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault()
                     update((ed) => (ed.keys.hidden = hidden ? ed.keys.hidden.filter((h) => h !== id) : [...ed.keys.hidden, id]))

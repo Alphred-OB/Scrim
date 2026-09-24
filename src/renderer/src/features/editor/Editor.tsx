@@ -25,6 +25,7 @@ import ClipPanel from './panels/ClipPanel'
 import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
+import KeysPanel from './panels/KeysPanel'
 import RailIcon from './RailIcon'
 import { addTextAt, addTransitionItem, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
@@ -39,6 +40,7 @@ const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boo
   { id: 'effects', icon: 'fx', title: 'Transitions & effects', label: 'Effects' },
   { id: 'webcam', icon: 'webcam', title: 'Webcam' },
   { id: 'audio', icon: 'audio', title: 'Audio' },
+  { id: 'keys', icon: 'keyboard', title: 'Keyboard shortcuts', label: 'Keys' },
   { id: 'settings', icon: 'scissors', title: 'Clips & speed', label: 'Clips' },
   { id: 'ai', icon: 'cc', title: 'AI captions & annotations', label: 'AI', soon: true }
 ]
@@ -355,6 +357,7 @@ function EditorView() {
             {panel === 'media' && <MediaPanel />}
             {panel === 'webcam' && <WebcamPanel />}
             {panel === 'audio' && <AudioPanel />}
+            {panel === 'keys' && <KeysPanel />}
             {panel === 'settings' && <ClipPanel />}
             {panel === 'effects' && <EffectsPanel />}
             {panel === 'ai' && <AiPanel />}

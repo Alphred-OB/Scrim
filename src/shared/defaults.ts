@@ -57,7 +57,7 @@ export function defaultEdit(duration: number): EditState {
     zoom: { enabled: true, auto: true, autoScale: 1.6, master: 1, ease: 0.6, segments: [] },
     clips: [{ id: uid('c'), start: 0, end: duration, speed: 1 }],
     texts: [],
-    keys: { show: true, style: 'dark', position: 'bottom', size: 1, hold: 1.4, hidden: [] },
+    keys: { show: true, style: 'dark', color: '#ff3b30', position: 'bottom', size: 1, radius: 1, hold: 1.4, animation: 'pop', labels: 'words', singles: true, hidden: [] },
     assets: [],
     overlays: [],
     audioClips: [],
