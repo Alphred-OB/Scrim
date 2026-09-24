@@ -10,12 +10,13 @@ import { maybeAutoStart } from '@/features/onboarding/tours'
 import { preloadSample, startPractice } from '@/features/onboarding/practice'
 
 const LS = 'df.recordPrefs'
-interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; webcam: WebcamRecordOptions }
+interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; keys: boolean; webcam: WebcamRecordOptions }
 const DEF: Prefs = {
   mic: true,
   systemAudio: true,
   fps: 30,
   countdown: 3,
+  keys: true,
   webcam: { enabled: false, quality: 720, shape: 'circle', size: 0.24, corner: 'br', showBubble: true }
 }
 function loadPrefs(): Prefs {
@@ -192,6 +193,7 @@ export default function Launcher() {
       micDeviceId: prefs.micDeviceId,
       systemAudio: prefs.systemAudio,
       countdown: prefs.countdown,
+      keys: prefs.keys,
       webcam: cam.enabled ? cam : undefined
     })
   }
@@ -449,6 +451,9 @@ export default function Launcher() {
 
               <span className="section-title" style={{ marginTop: 12 }}>Video</span>
               <Seg options={[{ v: 30, l: '30 fps' }, { v: 60, l: '60 fps' }]} value={prefs.fps} onChange={(v) => setPrefs({ ...prefs, fps: v as 30 | 60 })} />
+              <span className="section-title" style={{ marginTop: 12 }}>Keyboard</span>
+              <Toggle label="Show keyboard shortcuts" value={prefs.keys} onChange={(v) => setPrefs({ ...prefs, keys: v })} />
+              <span className="hint">Shortcuts like Ctrl+C or Enter can be shown in the video. What you type is never saved.</span>
               <span className="section-title" style={{ marginTop: 12 }}>Countdown</span>
               <Seg options={[{ v: 0, l: 'Off' }, { v: 3, l: '3s' }, { v: 5, l: '5s' }]} value={prefs.countdown} onChange={(v) => setPrefs({ ...prefs, countdown: v as number })} />
             </div>

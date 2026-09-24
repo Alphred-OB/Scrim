@@ -56,6 +56,7 @@ export default function Timeline() {
   const project = useEditor((s) => s.project)!
   const selection = useEditor((s) => s.selection)
   const update = useEditor((s) => s.update)
+  const keyPresses = useEditor((s) => s.cursorData?.keys) ?? []
   const select = useEditor((s) => s.select)
   const setTime = useEditor((s) => s.setTime)
   const canUndo = useEditor((s) => s.past.length > 0)
@@ -403,6 +404,8 @@ export default function Timeline() {
   rows.push({ key: 'video', base: 'video', label: 'Video', icon: 'film', color: COLORS.video, kind: 'clip', h: VIDEO_H })
   if (edit.zoom.segments.length || spareOn === 'zoom')
     rows.push({ key: 'zoom', base: 'zoom', label: 'Zoom', icon: 'zoom', color: COLORS.zoom, kind: 'zoom', h: TRACK_H, toggle: eye(edit.zoom.enabled, () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), 'Turn all zooms on or off') })
+  if (keyPresses.length)
+    rows.push({ key: 'keys', base: 'keys', label: 'Keys', icon: 'keyboard', color: '#5b6478', h: TRACK_H, toggle: eye(edit.keys.show, () => update((e) => (e.keys.show = !e.keys.show)), 'Show or hide keyboard shortcuts') })
   pushLanes('text', lanesOf(edit.texts, spareOn === 'text'), { label: 'Text', icon: 'text', color: COLORS.text, kind: 'text', toggle: eye(edit.tracks.text, () => update((e) => (e.tracks.text = !e.tracks.text)), 'Show or hide all text') })
   pushLanes('blur', lanesOf(edit.blurs ?? [], spareOn === 'blur'), { label: 'Blur', icon: 'eyeOff', color: COLORS.blur, kind: 'blur', toggle: eye(edit.tracks.blurs !== false, () => update((e) => (e.tracks.blurs = !(e.tracks.blurs !== false))), 'Show or hide blur regions') })
   pushLanes('overlay', lanesOf(edit.overlays, spareOn === 'overlay'), { label: 'Media', icon: 'image', color: COLORS.overlay, kind: 'overlay', toggle: eye(edit.tracks.media, () => update((e) => (e.tracks.media = !e.tracks.media)), 'Show or hide all media') })
@@ -721,6 +724,28 @@ export default function Timeline() {
               const a = edit.assets.find((x) => x.id === ov.assetId)
               return block('overlay', ov, laneKey('overlay', ov.lane), COLORS.overlay, a?.kind === 'video' ? 'film' : 'image', a?.name ?? 'Media',
                 a?.kind === 'image' ? <div className="tl-thumb" style={{ backgroundImage: `url(${mediaUrl(a.path)})` }} /> : a?.kind === 'video' ? <Filmstrip path={a.path} duration={a.duration} from={ov.trimStart} to={ov.trimStart + (ov.end - ov.start)} width={Math.max(6, XS(ov.end) - XS(ov.start))} height={TRACK_H - 6} /> : undefined, !edit.tracks.media)
+            })}
+
+            {/* keyboard shortcuts: click to jump there, right click to hide one */}
+            {keyPresses.length > 0 && keyPresses.map((kp) => {
+              const id = Math.round(kp.t * 1000)
+              const hidden = edit.keys.hidden.includes(id)
+              return (
+                <button
+                  key={'k' + id}
+                  className={`tl-key ${hidden || !edit.keys.show ? 'off' : ''}`}
+                  style={{ left: XS(kp.t), top: top('keys') + 5, height: TRACK_H - 10, minWidth: Math.max(18, edit.keys.hold * pps) }}
+                  title={`${kp.keys.join(' + ')}${hidden ? ' (hidden)' : ''}. Right click to ${hidden ? 'show' : 'hide'} it.`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => seek(kp.t)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    update((ed) => (ed.keys.hidden = hidden ? ed.keys.hidden.filter((h) => h !== id) : [...ed.keys.hidden, id]))
+                  }}
+                >
+                  {kp.keys.map((c, i) => <kbd key={i}>{c}</kbd>)}
+                </button>
+              )
             })}
 
             {/* zooms */}

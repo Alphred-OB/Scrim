@@ -3,8 +3,9 @@ import type { ClickEffect, ClickSound, SpotlightMode, SpotlightWhen } from '@sha
 import { CLICK_SOUNDS } from '@shared/clickSounds'
 import { playClick } from '../preview/clickPlayer'
 import { defaultEdit } from '@shared/defaults'
-import { ColorRow, Icon, Section, Seg, Slider, Toggle } from '@/ui'
+import { ColorRow, Icon, Section, Seg, Slider, Toggle, fmtTime } from '@/ui'
 import { useEditor } from '../state/store'
+import { timeBus } from '../state/timeBus'
 import { CURSORS, cursorDef } from '../engine/cursors'
 import { cursorThumb } from '../engine/thumbnails'
 
@@ -180,7 +181,57 @@ export default function CursorPanel() {
           )}
           <span className="hint">Plays in the preview and goes into the export. Clicks cut out of the video stay silent.</span>
         </Section>
+
+        <KeysSection />
       </div>
     </div>
+  )
+}
+
+/** Keyboard shortcuts pressed while recording, shown as keycaps on the video. */
+function KeysSection() {
+  const project = useEditor((s) => s.project)!
+  const update = useEditor((s) => s.update)
+  const keys = useEditor((s) => s.cursorData?.keys) ?? []
+  const k = project.edit.keys
+  const set = (fn: (x: typeof k) => void, key?: string) => update((e) => fn(e.keys), key)
+  const seek = (t: number) => {
+    useEditor.getState().setTime(t)
+    timeBus.emit(t)
+  }
+  const off = new Set(k.hidden)
+  return (
+    <Section title="Keyboard shortcuts">
+      {!keys.length ? (
+        <span className="hint">No shortcuts in this recording. Turn on "Show keyboard shortcuts" before you record, then press things like Ctrl+C or Enter while recording.</span>
+      ) : (
+        <>
+          <Toggle label={`Show shortcuts on the video (${keys.length})`} value={k.show} onChange={(v) => set((x) => (x.show = v))} />
+          {k.show && (
+            <>
+              <Seg options={[{ v: 'dark', l: 'Dark' }, { v: 'light', l: 'Light' }, { v: 'accent', l: 'Blue' }]} value={k.style} onChange={(v) => set((x) => (x.style = v as typeof k.style))} />
+              <Seg options={[{ v: 'bottom-left', l: 'Left' }, { v: 'bottom', l: 'Bottom' }, { v: 'bottom-right', l: 'Right' }, { v: 'top', l: 'Top' }]} value={k.position} onChange={(v) => set((x) => (x.position = v as typeof k.position))} />
+              <Slider label="Size" value={k.size} min={0.6} max={2} step={0.05} def={1} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => set((x) => (x.size = v), 'ksize')} />
+              <Slider label="Time on screen" value={k.hold} min={0.6} max={3} step={0.1} def={1.4} format={(v) => `${v.toFixed(1)}s`} onChange={(v) => set((x) => (x.hold = v), 'khold')} />
+              <div className="key-list">
+                {keys.map((p) => {
+                  const id = Math.round(p.t * 1000)
+                  const hidden = off.has(id)
+                  return (
+                    <div key={id} className={`key-row ${hidden ? 'off' : ''}`}>
+                      <button className="link" onClick={() => seek(Math.max(0, p.t - 0.2))} title="Go to it">{fmtTime(p.t, true)}</button>
+                      <span className="key-caps">{p.keys.map((c, i) => <kbd key={i}>{c}</kbd>)}</span>
+                      <button className="icon-btn" title={hidden ? 'Show this one' : 'Hide this one'} onClick={() => set((x) => (x.hidden = hidden ? x.hidden.filter((h) => h !== id) : [...x.hidden, id]))}>
+                        <Icon name={hidden ? 'eyeOff' : 'eye'} size={14} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </Section>
   )
 }

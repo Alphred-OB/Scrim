@@ -228,6 +228,7 @@ export default function Preview() {
       cursor: L.track,
       camera: L.camera,
       clicks: L.clicks,
+      keys: useEditor.getState().cursorData?.keys,
       bgImage: L.bgImage,
       bgVideo: L.edit.background.type === 'video' && bgv && bgv.readyState >= 2 ? bgv : null,
       webcam: camSrc,

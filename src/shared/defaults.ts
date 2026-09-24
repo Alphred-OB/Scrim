@@ -57,6 +57,7 @@ export function defaultEdit(duration: number): EditState {
     zoom: { enabled: true, auto: true, autoScale: 1.6, master: 1, ease: 0.6, segments: [] },
     clips: [{ id: uid('c'), start: 0, end: duration, speed: 1 }],
     texts: [],
+    keys: { show: true, style: 'dark', position: 'bottom', size: 1, hold: 1.4, hidden: [] },
     assets: [],
     overlays: [],
     audioClips: [],
@@ -165,6 +166,7 @@ export function migrateProject(p: Project): Project {
     effects: { ...d.effects, ...e.effects },
     effectClips: (e.effectClips ?? []).map((c) => ({ ...defaultEffect(), ...c })),
     blurs: (e.blurs ?? []).map((b) => ({ ...b, type: b.type ?? 'blur', radius: b.radius ?? 8, amount: b.amount ?? 0.6, darken: b.darken ?? 0.15 })),
+    keys: { ...d.keys, ...(e.keys ?? {}) },
     tracks: { ...d.tracks, ...e.tracks },
     clips: e.clips?.length ? e.clips : d.clips,
     texts: (e.texts ?? []).map(migrateText)

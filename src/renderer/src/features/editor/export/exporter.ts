@@ -252,6 +252,7 @@ export async function exportProject(
         cursor: track,
         camera,
         clicks,
+        keys: cursorData?.keys,
         bgImage,
         bgVideo: bgFrame ? (bgFrame.toCanvasImageSource() as CanvasImageSource) : null,
         bgVideoSize: bgFrame ? [bgFrame.displayWidth, bgFrame.displayHeight] : undefined,

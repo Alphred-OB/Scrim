@@ -35,6 +35,21 @@ export interface RecordOptions {
   systemAudio: boolean
   countdown: number // seconds, 0 = none
   webcam?: WebcamRecordOptions
+  /** save keyboard shortcuts (Ctrl+C, Enter...) so they can be shown in the video. Plain typing is never saved. */
+  keys?: boolean
+}
+
+/** One keyboard shortcut pressed while recording, e.g. { t: 3.2, keys: ['Ctrl', 'Shift', 'P'] } */
+export interface KeyPress { t: number; keys: string[] }
+
+/** How pressed shortcuts are shown on the video. */
+export interface KeySettings {
+  show: boolean
+  style: 'dark' | 'light' | 'accent'
+  position: 'bottom' | 'bottom-left' | 'bottom-right' | 'top'
+  size: number // 1 = default
+  hold: number // seconds each shortcut stays on screen
+  hidden: number[] // shortcut times (rounded ms) switched off on the timeline
 }
 
 export interface CursorSample { t: number; x: number; y: number } // t = seconds from video start, x/y normalized 0..1 in capture rect
@@ -46,6 +61,8 @@ export interface CursorData {
   clicks: ClickEvent[]
   /** Source time ranges with no cursor data (e.g. a joined video that wasn't recorded in Scrim). The cursor is hidden there. */
   hidden?: [number, number][]
+  /** keyboard shortcuts pressed while recording */
+  keys?: KeyPress[]
 }
 
 export interface MediaInfo {
@@ -358,6 +375,8 @@ export interface EditState {
   effects: EffectSettings
   effectClips: EffectClip[]
   blurs: BlurItem[]
+  /** keyboard shortcuts shown on the video */
+  keys: KeySettings
   /**
    * Empty space before the recording starts (seconds), made by dragging the video later on the
    * timeline. That space uses negative source time, so intro text and media sit at t < 0.

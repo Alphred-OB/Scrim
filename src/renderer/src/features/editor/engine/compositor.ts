@@ -1,5 +1,6 @@
 import { drawAnimatedText } from './textAnim'
-import type { BlurItem, ClickEvent, EditState, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
+import { drawKeys } from './keysOverlay'
+import type { BlurItem, ClickEvent, EditState, KeyPress, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
 import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
 import { drawLive, drawWallpaper } from './backgrounds'
@@ -20,6 +21,8 @@ export interface RenderInputs {
   cursor: Track | null
   camera: Track | null
   clicks: ClickEvent[]
+  /** keyboard shortcuts pressed while recording */
+  keys?: KeyPress[]
   bgImage?: CanvasImageSource | null
   bgVideo?: CanvasImageSource | null
   /** clock for animated backgrounds; defaults to t (the preview keeps them moving while paused) */
@@ -574,6 +577,9 @@ export class Renderer {
       const texts = [...edit.texts].sort((a, b) => (a.lane ?? 0) - (b.lane ?? 0))
       for (const tx of texts) if (t >= tx.start && t <= tx.end) drawAnimatedText(ctx, tx, t, W, H, L.k)
     }
+
+    // 8b. keyboard shortcuts
+    if (edit.keys?.show && inp.keys?.length) drawKeys(ctx, inp.keys, edit.keys, t, W, H, L.k)
 
     // 9. transitions at the start, the end and around cuts
     this.applyTransition(ctx, W, H, t, edit, L.k)

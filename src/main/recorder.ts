@@ -408,6 +408,7 @@ class Recorder {
       }
 
       this.tracker = new CursorTracker(this.rect, this.hooks.isOwnUi)
+      this.tracker.trackKeys = opts.keys !== false
       this.tracker.start()
       await this.launchCapture(opts)
       this.tracker.setRect(this.rect)
@@ -837,5 +838,9 @@ export function removePaused(c: CursorData, gaps: [number, number][], videoStart
     const mb = map(b) ?? ma
     return ma === null || mb === null ? [] : [[ma, mb] as [number, number]]
   })
-  return { ...c, samples, clicks, hidden }
+  const keys = (c.keys ?? []).flatMap((k) => {
+    const t = map(k.t)
+    return t === null ? [] : [{ ...k, t }]
+  })
+  return { ...c, samples, clicks, hidden, keys }
 }

@@ -1103,3 +1103,14 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .sound-tile.on .sound-ico { background: var(--accent); color: var(--on-accent); animation: soundBump 0.3s var(--ease); }
 @keyframes soundBump { 50% { transform: scale(1.2); } }
 .tl-joint.hot { transform: scale(1.45); background: var(--accent); color: var(--on-accent); box-shadow: 0 0 0 4px var(--accent-soft); opacity: 1; }
+/* keyboard shortcuts list */
+.key-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.key-row { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 9px; background: var(--card); font-size: 12px; }
+.key-row.off .key-caps { opacity: 0.35; }
+.key-row .link { font-variant-numeric: tabular-nums; min-width: 44px; text-align: left; }
+.key-caps { flex: 1; display: flex; gap: 4px; flex-wrap: wrap; }
+.key-caps kbd, .tl-key kbd { font: 600 11px/1 var(--font); padding: 4px 6px; border-radius: 5px; background: var(--card-hi); border: 1px solid var(--line-2); border-bottom-width: 2px; color: var(--text); }
+.tl-key { position: absolute; display: flex; align-items: center; gap: 3px; padding: 0 5px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--card-hi); cursor: pointer; overflow: hidden; z-index: 2; }
+.tl-key kbd { font-size: 9.5px; padding: 2px 4px; }
+.tl-key:hover { border-color: var(--text-2); }
+.tl-key.off { opacity: 0.35; }
