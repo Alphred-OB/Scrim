@@ -1,8 +1,12 @@
 import express from 'express'
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { detailPage, listPage } from './admin.js'
 
 const KINDS = new Set(['bug', 'idea'])
+const CLIENTS = new Set(['scrim-desktop', 'scrim-website'])
+const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'public')
 const STATUSES = ['new', 'seen', 'planned', 'done', 'wontfix']
 const LIMITS = { title: 140, message: 8000, email: 200, logs: 600_000, shot: 4_000_000 }
 const PER_HOUR = 12 // reports one address can send in an hour
@@ -23,14 +27,36 @@ export function createApp(db, opts = {}) {
   app.disable('x-powered-by')
   app.set('trust proxy', true) // Render and Vercel sit behind a proxy
 
+  app.use((_req, res, next) => {
+    res.set({
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'"
+    })
+    next()
+  })
   app.get('/health', (_req, res) => res.json({ ok: true }))
-  app.get('/', (_req, res) => res.type('text').send('Scrim feedback service. Nothing to see here.'))
+
+  // ---------------- the website ----------------
+  const latest = latestRelease(opts.githubRepo ?? process.env.GITHUB_REPO ?? 'Alphred-OB/Scrim', opts.fetch ?? fetch)
+  app.get('/v1/latest', async (_req, res) => {
+    const r = await latest().catch(() => null)
+    if (!r) return res.status(404).json({ error: 'No release yet' })
+    res.set('Cache-Control', 'public, max-age=300').json({ version: r.version, size: r.size, published: r.published })
+  })
+  // always the newest installer, so links never go stale
+  app.get('/download', async (_req, res) => {
+    const r = await latest().catch(() => null)
+    res.redirect(302, r?.url ?? `https://github.com/${opts.githubRepo ?? process.env.GITHUB_REPO ?? 'Alphred-OB/Scrim'}/releases/latest`)
+  })
+  app.use(express.static(PUBLIC, { extensions: ['html'], maxAge: '1h', setHeaders: (res, p) => /\.(webp|mp4|jpg|png)$/.test(p) && res.set('Cache-Control', 'public, max-age=86400') }))
 
   // ---------------- from the app ----------------
   app.post('/v1/feedback', express.json({ limit: '7mb' }), async (req, res) => {
     try {
       // a light filter for random bots; the app always sends this
-      if (req.get('x-scrim-client') !== 'scrim-desktop') return res.status(403).json({ error: 'Not allowed' })
+      if (!CLIENTS.has(req.get('x-scrim-client') ?? '')) return res.status(403).json({ error: 'Not allowed' })
       const b = req.body ?? {}
       if (b.website) return res.status(200).json({ id: 0 }) // honeypot: pretend it worked
       const kind = String(b.kind ?? '')
@@ -62,6 +88,7 @@ export function createApp(db, opts = {}) {
         meta: JSON.parse(JSON.stringify(meta).slice(0, 20000) || '{}')
       })
       notify({ id: row.id, kind, title, appVersion: b.appVersion }).catch(() => {})
+      db.forgetAddresses?.().catch(() => {}) // the spam check only needs an hour of memory
       res.status(201).json({ id: row.id })
     } catch (e) {
       if (e?.type === 'entity.too.large') return res.status(413).json({ error: 'That report is too big' })
@@ -126,5 +153,24 @@ function webhookNotifier(url) {
   return async ({ id, kind, title, appVersion }) => {
     const text = `${kind === 'bug' ? 'New problem report' : 'New feature idea'} #${id}: ${title}${appVersion ? ` (Scrim ${appVersion})` : ''}`
     await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: text, text }) })
+  }
+}
+
+/** The newest published GitHub release with a Windows installer, cached for 10 minutes. */
+function latestRelease(repo, fetchFn) {
+  let cache = null
+  let at = 0
+  return async () => {
+    if (cache && Date.now() - at < 600_000) return cache
+    const headers = { accept: 'application/vnd.github+json', 'user-agent': 'scrim-site' }
+    if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+    const r = await fetchFn(`https://api.github.com/repos/${repo}/releases/latest`, { headers })
+    if (!r.ok) throw new Error('GitHub ' + r.status)
+    const j = await r.json()
+    const exe = (j.assets ?? []).find((a) => /\.exe$/i.test(a.name))
+    if (!exe) throw new Error('No installer in the latest release')
+    cache = { version: String(j.tag_name ?? '').replace(/^v/, ''), url: exe.browser_download_url, size: exe.size, published: j.published_at }
+    at = Date.now()
+    return cache
   }
 }

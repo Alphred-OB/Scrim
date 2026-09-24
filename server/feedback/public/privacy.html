@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy · Scrim</title>
+<link rel="icon" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="/"><img src="/img/icon.png" alt="">Scrim</a>
+    <nav class="nav-links"><a href="/feedback">Feedback</a><a class="btn small primary" href="/download">Download</a></nav>
+  </div>
+</header>
+<main class="page wrap prose">
+  <h2 style="font-size:40px;margin-top:0">Privacy</h2>
+  <p>Scrim is made by Erudite African Network. This page explains, in plain words, what leaves your computer and what doesn't.</p>
+
+  <h2>Your recordings stay on your PC</h2>
+  <p>Recordings, projects and exported videos are saved on your computer only. Scrim has no account and no cloud storage, and it doesn't upload your videos anywhere.</p>
+
+  <h2>Captions</h2>
+  <p>You choose how captions are made. On your PC (offline), nothing is sent anywhere; the speech model is downloaded once from Hugging Face. With Groq, only the sound of your recording is sent to Groq to be turned into text, using your own Groq key.</p>
+
+  <h2>Crash reports (off unless you say yes)</h2>
+  <p>If you turn them on, Scrim sends a report to Sentry when something breaks: the error, the app version and basic facts like Windows version and memory. Your name, home folder, computer name and keys are removed first. Videos, pictures and files are never included. Turn it off any time in Settings.</p>
+
+  <h2>Problem reports and ideas</h2>
+  <p>When you send one from the app or this website, we receive what you wrote, your email if you gave it, and anything you chose to attach (the app log with your name and folders removed, or a picture). We use it only to fix problems and improve Scrim, and we don't share it. We keep a scrambled version of your internet address for an hour to stop spam.</p>
+
+  <h2>Updates</h2>
+  <p>Scrim checks GitHub for new versions. GitHub sees that a copy of Scrim asked, like any download.</p>
+
+  <h2>Questions</h2>
+  <p>Ask us through the <a href="/feedback">feedback page</a>, and we can also delete anything you've sent us.</p>
+</main>
+<footer>
+  <div class="wrap">
+    <span>© <span data-year></span> Erudite African Network</span>
+    <nav><a href="/">Home</a><a href="/feedback">Feedback</a></nav>
+  </div>
+</footer>
+<script src="/site.js" defer></script>
+</body>
+</html>

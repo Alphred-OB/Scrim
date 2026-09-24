@@ -1,7 +1,11 @@
-# Scrim feedback service
+# Scrim website and feedback service
 
-Receives "Report a problem" and "Suggest a feature" from the Scrim app and shows them in a small
-dashboard at `/admin`. Crash reports go to Sentry, not here.
+One small Node app that does three things:
+
+- **The website** (`public/`): home page, `/feedback` (report a problem or suggest a feature) and `/privacy`.
+  `/download` always sends people to the newest Windows installer on GitHub Releases.
+- **Feedback** from the app and the website, stored in Postgres.
+- **A dashboard** at `/admin` to read and sort it. Crash reports go to Sentry, not here.
 
 ## Put it online (Render, about 5 minutes)
 
@@ -10,6 +14,10 @@ dashboard at `/admin`. Crash reports go to Sentry, not here.
 3. When asked, set `ADMIN_PASSWORD` (your dashboard password). `NOTIFY_WEBHOOK_URL` is optional: paste a Discord or Slack webhook to get a message for every new report.
 4. Your own domain: in the service's **Settings > Custom Domains**, add e.g. `feedback.eruditeafricannetwork.com`, then add the CNAME record Render shows you in Cloudflare (DNS only, grey cloud, until Render has issued the certificate).
 5. Put the address in the app: `src/shared/config.ts`, `FEEDBACK_URL`.
+6. Downloads: `GITHUB_REPO` (default `Alphred-OB/Scrim`) must have a published release with the `.exe`.
+   The repo has to be public for visitors to download it. `GITHUB_TOKEN` is optional and only raises GitHub's rate limit.
+
+Since the site and the feedback live together, one domain covers both, for example `scrim.eruditeafricannetwork.com`.
 
 Note: Render's free database is deleted after 30 days on the free plan; switch it to the cheapest paid plan (or point `DATABASE_URL` at a free Neon database) for anything you want to keep.
 

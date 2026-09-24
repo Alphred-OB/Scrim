@@ -24,6 +24,7 @@ form.search input{padding:7px 11px;border-radius:9px;border:1px solid var(--line
 img.shot{max-width:100%;border-radius:10px;border:1px solid var(--line)}.btns{display:flex;gap:6px;flex-wrap:wrap}
 button{padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
 button.on{border-color:var(--accent);background:var(--accent);color:#fff}button.danger{color:var(--bug)}
+.del{margin-left:auto;display:flex;gap:6px;align-items:center}.del summary{list-style:none;cursor:pointer;padding:7px 12px;border-radius:9px;border:1px solid var(--line);color:var(--bug)}.del[open] summary{display:none}
 </style></head><body><main>${body}</main></body></html>`
 
 export function listPage(rows, counts, f) {
@@ -57,7 +58,7 @@ export function detailPage(r, statuses) {
   <h1 style="margin-bottom:10px">${esc(r.title)}</h1><div class="msg">${esc(r.message)}</div></div>
   <div class="card meta"><div><b>Reply to</b>${r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : 'Not given'}</div><div><b>Scrim</b>${esc(r.app_version ?? 'unknown')}</div><div><b>Computer</b>${esc(r.os ?? 'unknown')}</div>${r.crash_id ? `<div><b>Crash report</b>${esc(r.crash_id)}</div>` : ''}</div>
   <div class="card"><div class="btns">${statuses.map((s) => `<form method="post" action="/admin/${r.id}/status"><button name="status" value="${s}" class="${r.status === s ? 'on' : ''}">${STATUS[s]}</button></form>`).join('')}
-  <form method="post" action="/admin/${r.id}/delete" onsubmit="return confirm('Delete this report?')" style="margin-left:auto"><button class="danger">Delete</button></form></div></div>
+  <details class="del"><summary>Delete</summary><form method="post" action="/admin/${r.id}/delete"><button class="danger">Yes, delete it for good</button></form></details></div></div>
   ${r.has_shot ? `<div class="card"><img class="shot" src="/admin/${r.id}/screenshot" alt="Screenshot"></div>` : ''}
   ${r.logs ? `<div class="card"><div class="top" style="margin:0 0 8px"><b>Log</b><a class="chip" href="/admin/${r.id}/logs.txt">Download</a></div><pre>${esc(r.logs.slice(-40000))}</pre></div>` : ''}
   ${meta ? `<div class="card"><b>Details</b>${meta}</div>` : ''}`

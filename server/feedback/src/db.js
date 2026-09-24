@@ -69,6 +69,7 @@ export function createDb(url = process.env.DATABASE_URL) {
       const r = await pool.query(`select count(*)::int as n from feedback where ip_hash = $1 and created_at > now() - ($2 || ' minutes')::interval`, [ipHash, String(minutes)])
       return r.rows[0].n
     },
+    forgetAddresses: () => pool.query(`update feedback set ip_hash = null where ip_hash is not null and created_at < now() - interval '1 hour'`),
     close: () => pool.end()
   }
 }

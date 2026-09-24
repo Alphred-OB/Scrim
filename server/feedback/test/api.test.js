@@ -13,7 +13,8 @@ let base
 before(async () => {
   await db.migrate()
   await db.pool.query('truncate feedback restart identity')
-  const app = createApp(db, { adminUser: 'admin', adminPassword: 'pw', notify: async (m) => sent.push(m) })
+  const fakeGithub = async () => ({ ok: true, json: async () => ({ tag_name: 'v0.4.0', published_at: '2026-09-24', assets: [{ name: 'Scrim-Setup-0.4.0.exe', size: 136072282, browser_download_url: 'https://example.com/Scrim-Setup-0.4.0.exe' }, { name: 'latest.yml', size: 300 }] }) })
+  const app = createApp(db, { adminUser: 'admin', adminPassword: 'pw', notify: async (m) => sent.push(m), fetch: fakeGithub, githubRepo: 'x/y' })
   await new Promise((r) => (server = app.listen(0, r)))
   base = `http://127.0.0.1:${server.address().port}`
 })
@@ -91,4 +92,27 @@ test('status changes and delete', async () => {
   const del = await admin('/admin/2/delete', { method: 'POST', headers: { origin: base } })
   assert.equal(del.status, 303)
   assert.equal(await db.get(2), null)
+})
+
+test('the website pages are served with safe headers', async () => {
+  for (const p of ['/', '/feedback', '/privacy', '/site.css', '/img/frame.webp']) {
+    const r = await fetch(base + p)
+    assert.equal(r.status, 200, p)
+    assert.ok(r.headers.get('content-security-policy'), p)
+  }
+  assert.match(await (await fetch(base + '/')).text(), /Download free for Windows/)
+})
+
+test('download always points at the newest installer', async () => {
+  const r = await fetch(base + '/download', { redirect: 'manual' })
+  assert.equal(r.status, 302)
+  assert.equal(r.headers.get('location'), 'https://example.com/Scrim-Setup-0.4.0.exe')
+  const v = await (await fetch(base + '/v1/latest')).json()
+  assert.equal(v.version, '0.4.0')
+})
+
+test('the website form can send feedback', async () => {
+  await db.pool.query('update feedback set ip_hash = null')
+  const r = await fetch(base + '/v1/feedback', { method: 'POST', headers: { 'content-type': 'application/json', 'x-scrim-client': 'scrim-website' }, body: JSON.stringify({ kind: 'idea', title: 'Chapters please', message: 'For YouTube', meta: { from: 'website' } }) })
+  assert.equal(r.status, 201)
 })
