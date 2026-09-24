@@ -24,7 +24,7 @@ Note: Render's free database is deleted after 30 days on the free plan; switch i
 ## Styling
 
 The site uses Tailwind CSS v4. The source is `styles/site.css` (colors, the button and card classes);
-everything else is utility classes in `public/*.html`. After changing classes run `npm run css`
+everything else is utility classes in `public/*.html`. Smooth scrolling is Lenis, copied into `public/vendor` (no CDN). After changing classes run `npm run css`
 (or `npm run css:watch` while working). The built `public/site.css` is committed so the site works
 without a build, and Render rebuilds it on every deploy.
 
