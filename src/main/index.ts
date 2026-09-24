@@ -34,6 +34,7 @@ let border: BrowserWindow | null = null
 // Windows wants a real .ico (with every size) for the taskbar, title bar and tray; elsewhere a png is fine
 const ICON_PNG = join(__dirname, '../../resources/icon.png')
 const ICON = process.platform === 'win32' ? join(__dirname, '../../resources/icon.ico') : ICON_PNG
+const APP_ID = app.isPackaged ? 'com.eruditeafrican.scrim' : 'com.eruditeafrican.scrim.dev'
 
 function loadRoute(win: BrowserWindow, route: string): void {
   if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${route}`)
@@ -59,6 +60,9 @@ function createMainWindow(): void {
       backgroundThrottling: false // audio keeps recording while hidden
     }
   })
+  // Windows takes the taskbar icon from the app's id. While developing, the running exe is
+  // Electron's, so tell Windows our own id and icon for this window or it shows the Electron atom.
+  if (process.platform === 'win32') mainWindow.setAppDetails({ appId: APP_ID, appIconPath: ICON, appIconIndex: 0, relaunchDisplayName: 'Scrim' })
   mainWindow.on('ready-to-show', () => closeSplash(() => mainWindow?.show(), selfTestDir() ? 0 : 1700))
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -344,7 +348,7 @@ app.whenReady().then(() => {
   // The installed app has a Start menu shortcut with this id, which gives the taskbar our icon.
   // While developing there's no such shortcut, and a made up id makes Windows show Electron's
   // atom instead, so use the exe path (Electron's default) and let the window icon show.
-  if (process.platform === 'win32') app.setAppUserModelId(app.isPackaged ? 'com.eruditeafrican.scrim' : process.execPath)
+  if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
   handleMediaProtocol()
 
   const ses = session.defaultSession

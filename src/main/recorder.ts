@@ -1,4 +1,4 @@
-import { BrowserWindow, desktopCapturer, dialog, screen, globalShortcut, Tray, Menu, nativeImage, Notification } from 'electron'
+import { BrowserWindow, desktopCapturer, dialog, screen, globalShortcut, Tray, Menu, nativeImage } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { promises as fs, existsSync } from 'fs'
 import { join } from 'path'
@@ -375,7 +375,7 @@ class Recorder {
       // 3. countdown. The floating bar only stays visible when it can be kept out of the video.
       const protect = this.engine.kind === 'dda'
       this.hooks.mainWindow()?.hide()
-      this.hooks.showToolbar(displayRect, protect)
+      this.hooks.showToolbar(displayRect, true)
       if (opts.webcam?.enabled && opts.webcam.showBubble && protect) this.hooks.showBubble(displayRect, opts.webcam)
       this.updateBorder()
       for (let c = opts.countdown; c > 0; c--) {
@@ -384,11 +384,9 @@ class Recorder {
         await new Promise((r) => setTimeout(r, 1000))
       }
       if (this.cancelled) return
-      if (!protect) this.hooks.hideToolbar() // GDI capture freezes/slows when a protected, see-through window is on screen
-      if (!protect && Notification.isSupported()) {
-        // the bar can't stay on screen with this capture method, so say how to stop
-        new Notification({ title: 'Scrim is recording', body: `Stop with ${getSettings().shortcuts.stopRecording || 'Alt+Shift+S'} or the Scrim icon in the taskbar tray.`, silent: true }).show()
-      }
+      // The bar stays on screen with every capture method. It's marked as excluded from capture,
+      // which Windows 10 (2004+) and 11 honor for Compatibility capture too, so it never shows in the video.
+      if (!protect) console.log('[rec] compatibility capture: keeping the bar visible (excluded from capture)')
       this.showTray()
 
       // 4. audio + webcam in the renderer, video in ffmpeg, cursor in main
