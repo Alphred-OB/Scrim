@@ -206,6 +206,27 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         if (Math.abs(t - 2) > 0.1) throw new Error(`playhead went to ${t.toFixed(2)}s instead of 2s`)
       })
 
+      await step('scrubbing never goes dark', async () => {
+        const rect = await js<{ x: number; y: number; width: number; height: number }>(`(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0]; const b = c.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) } })()`)
+        const bright = async () => {
+          const img = (await win.webContents.capturePage(rect)).resize({ width: 32, height: 18 })
+          const d = img.toBitmap()
+          let s = 0
+          for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]
+          return s / (d.length / 4) / 3
+        }
+        await js('window.__scrim.seek(1)')
+        await wait(900)
+        const base = await bright()
+        let low = 999
+        for (let i = 0; i < 24; i++) {
+          await js(`window.__scrim.seek(${1 + i * 0.37})`)
+          await wait(16)
+          low = Math.min(low, await bright())
+        }
+        log('scrub brightness', JSON.stringify({ base, low }))
+        if (low < base * 0.55) throw new Error(`went dark while scrubbing: ${low.toFixed(1)} vs ${base.toFixed(1)}`)
+      })
       await step('pausing keeps the playhead where it stopped', async () => {
         await js('window.__scrim.seek(1)')
         await wait(300)
