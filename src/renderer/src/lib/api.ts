@@ -1,5 +1,5 @@
 import type {
-  AppSettings, Asset, CursorData, CaptureSource, Preset, Project, ProjectSummary, RecordOptions, RecorderStatus
+  AppSettings, Asset, CursorData, CaptureSource, Preset, Project, ProjectSummary, RecordOptions, RecorderStatus, UpdateStatus
 } from '@shared/types'
 
 export interface MuxJobIn {
@@ -7,7 +7,7 @@ export interface MuxJobIn {
   outPath: string
   duration: number
   clips: { id: string; start: number; end: number; speed: number }[]
-  tracks: { path: string; offset: number; volume: number; window?: [number, number]; fadeIn?: number; fadeOut?: number }[]
+  tracks: { path: string; offset: number; volume: number; window?: [number, number]; fadeIn?: number; fadeOut?: number; edited?: boolean }[]
   music?: { path: string; volume: number }
   gif?: { width: number; fps: number }
   format?: 'mp4' | 'webm' | 'mov' | 'gif'
@@ -62,6 +62,9 @@ export interface Api {
   peaks(path: string): Promise<number[]>
   notify(title: string, body: string): Promise<void>
   engines(): Promise<{ dda: boolean; platform: string }>
+  updateStatus(): Promise<UpdateStatus>
+  checkForUpdate(): Promise<UpdateStatus>
+  installUpdate(): Promise<boolean>
   openEditor(dir: string): void
   on(channel: string, cb: (...a: any[]) => void): () => void
   onCall(handler: (method: string, arg: any) => Promise<unknown>): void

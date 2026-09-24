@@ -27,7 +27,7 @@ export interface MuxJob {
   outPath: string
   duration: number
   clips: Clip[]
-  tracks: { path: string; offset: number; volume: number; window?: [number, number]; fadeIn?: number; fadeOut?: number }[]
+  tracks: { path: string; offset: number; volume: number; window?: [number, number]; fadeIn?: number; fadeOut?: number; edited?: boolean }[]
   music?: { path: string; volume: number }
   gif?: { width: number; fps: number }
   format?: 'mp4' | 'webm' | 'mov' | 'gif'
@@ -82,8 +82,11 @@ export async function mux(job: MuxJob, onProgress: (p: number) => void): Promise
       if (t.fadeOut && t.fadeOut > 0) win += `,afade=t=out:st=${Math.max(ws, we - t.fadeOut).toFixed(3)}:d=${t.fadeOut.toFixed(3)}`
     }
     filters.push(`[${idx}:a]aresample=48000,aformat=channel_layouts=stereo,${align},apad${win}[${lbl}al]`)
-    // 2) keep only the clip ranges, in order
-    if (clips.length === 1) {
+    // 2) keep only the clip ranges, in order. Imported audio is already placed on the edited
+    //    timeline (it plays straight through cuts), so it skips this step.
+    if (t.edited) {
+      filters.push(`[${lbl}al]volume=${t.volume.toFixed(3)}[${lbl}]`)
+    } else if (clips.length === 1) {
       const c = clips[0]
       const tempo = atempoChain(c.speed)
       filters.push(`[${lbl}al]atrim=start=${c.start.toFixed(3)}:end=${c.end.toFixed(3)},asetpts=PTS-STARTPTS${tempo ? ',' + tempo : ''},volume=${t.volume.toFixed(3)}[${lbl}]`)

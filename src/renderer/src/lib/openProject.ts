@@ -1,4 +1,5 @@
 import { api } from '@/lib/api'
+import { showMessage } from '@/ui'
 
 /**
  * Ctrl+O: pick a Scrim project (project.json or its screen.mp4) or any video, then open it in the
@@ -11,6 +12,6 @@ export async function openProjectFromDialog(beforeLeave?: () => Promise<unknown>
     await beforeLeave?.()
     location.hash = `/editor?dir=${encodeURIComponent(dir)}`
   } catch (e) {
-    alert(e instanceof Error ? e.message : String(e))
+    showMessage("That couldn't be opened", e instanceof Error ? e.message : String(e))
   }
 }

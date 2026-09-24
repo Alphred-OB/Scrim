@@ -7,7 +7,7 @@ import { audibleClicks, clickTrackWav } from '@shared/clickSounds'
 import { api, mediaUrl, type MuxJobIn } from '@/lib/api'
 import { Renderer, computeLayout, outputSize } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
-import { outputDuration, outputToSource, sortedClips } from '../engine/timeMap'
+import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
 
 export interface ExportProgress { phase: 'prepare' | 'render' | 'audio' | 'done'; progress: number; frame?: number; frames?: number; speed?: number; eta?: number }
 
@@ -170,10 +170,13 @@ export async function exportProject(
       if (!ovImages.has(a.id)) ovImages.set(a.id, await createImageBitmap(await (await fetch(mediaUrl(a.path))).blob()))
       continue
     }
+    // media clips run on the edited timeline, straight through cuts (same as the preview)
     const list: { frame: number; time: number }[] = []
+    const s0 = sourceToOutput(clips, o.start, lead)
+    const s1 = sourceToOutput(clips, o.end, lead)
     for (let k = 0; k < frames; k++) {
-      const t = srcTime(k)
-      if (t >= o.start && t <= o.end) list.push({ frame: k, time: o.trimStart + (t - o.start) })
+      const T = k / fps
+      if (T >= s0 && T <= s1) list.push({ frame: k, time: o.trimStart + (T - s0) })
     }
     const s = await openSink(a.path, list)
     if (s) {
@@ -296,12 +299,16 @@ export async function exportProject(
   for (const c of edit.audioClips) {
     const as = assets.get(c.assetId)
     if (!as || c.muted || c.volume <= 0 || !edit.tracks.audio) continue
-    tracks.push({ path: as.path, offset: c.start - c.trimStart, volume: c.volume, window: [c.start, c.end], fadeIn: c.fadeIn, fadeOut: c.fadeOut })
+    const s0 = sourceToOutput(clips, c.start, lead)
+    const s1 = sourceToOutput(clips, c.end, lead)
+    tracks.push({ path: as.path, offset: s0 - c.trimStart, volume: c.volume, window: [s0, s1], fadeIn: c.fadeIn, fadeOut: c.fadeOut, edited: true })
   }
   for (const o of edit.overlays) {
     const as = assets.get(o.assetId)
     if (!as || as.kind !== 'video' || !as.hasAudio || o.muted || o.volume <= 0 || !edit.tracks.media) continue
-    tracks.push({ path: as.path, offset: o.start - o.trimStart, volume: o.volume, window: [o.start, o.end], fadeIn: 0.05, fadeOut: 0.05 })
+    const s0 = sourceToOutput(clips, o.start, lead)
+    const s1 = sourceToOutput(clips, o.end, lead)
+    tracks.push({ path: as.path, offset: s0 - o.trimStart, volume: o.volume, window: [s0, s1], fadeIn: 0.05, fadeOut: 0.05, edited: true })
   }
   // click sounds: one WAV with a click at every click, cut and sped up along with the video
   let clickWav = ''
@@ -321,7 +328,7 @@ export async function exportProject(
       duration: outDur,
       // the mixer works on times from 0: shift everything past the lead-in, which is one more silent-or-not stretch
       clips: lead > 0 ? [{ id: 'lead', start: 0, end: lead, speed: 1 }, ...clips.map((c) => ({ ...c, start: c.start + lead, end: c.end + lead }))] : clips,
-      tracks: lead > 0 ? tracks.map((t) => ({ ...t, offset: t.offset + lead, window: t.window ? ([t.window[0] + lead, t.window[1] + lead] as [number, number]) : undefined })) : tracks,
+      tracks: lead > 0 ? tracks.map((t) => t.edited ? t : ({ ...t, offset: t.offset + lead, window: t.window ? ([t.window[0] + lead, t.window[1] + lead] as [number, number]) : undefined })) : tracks,
       music: a.musicPath && !a.musicMuted ? { path: a.musicPath, volume: a.musicVolume } : undefined,
       gif: settings.format === 'gif' ? { width: W, fps } : undefined,
       format: settings.format

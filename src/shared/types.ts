@@ -458,3 +458,7 @@ export interface AppSettings {
   /** guided interface tours already shown ('home', 'editor') */
   toursSeen: string[]
 }
+
+/** Where the app's self update is at (updates come from GitHub Releases). */
+export type UpdateState = 'off' | 'idle' | 'checking' | 'downloading' | 'ready' | 'latest' | 'error'
+export interface UpdateStatus { state: UpdateState; current: string; version?: string; progress?: number; error?: string; notes?: string }

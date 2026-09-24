@@ -1,7 +1,7 @@
 // The timeline. It shows the video as it will be exported: cut parts are gone and later
 // things slide left to close the gap (like CapCut and Resolve), faster clips are shorter.
 // Only tracks that have something on them are shown; the right one appears while you drag.
-import { useEffect, useLayoutEffect, useRef, useState, ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, ReactNode } from 'react'
 import { create } from 'zustand'
 import type { OverlayMode, Transition } from '@shared/types'
 import { Icon, fmtTime, openContextMenu, MenuItem } from '@/ui'
@@ -15,6 +15,7 @@ import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../
 import Waveform from './Waveform'
 import Filmstrip from './Filmstrip'
 import { TRANSITIONS } from '../panels/EffectsPanel'
+import { TransitionPicker } from './TransitionPicker'
 
 const TRACK_H = 34
 const VIDEO_H = 58
@@ -77,6 +78,8 @@ export default function Timeline() {
   const [hoverT, setHoverT] = useState<number | null>(null)
   // the start, cut or end a dragged transition will land on
   const [hotJoint, setHotJoint] = useState<string | null>(null)
+  const [picker, setPicker] = useState<{ which: string; x: number; y: number } | null>(null)
+  const closePicker = useCallback(() => setPicker(null), [])
 
   // ---- time: everything on screen is output time (what plays after cuts and speed changes) ----
   const clips = sortedClips(edit.clips)
@@ -164,7 +167,7 @@ export default function Timeline() {
   }
   const snapT = (T: number, pts: number[]): number => {
     if (!useTimelineView.getState().snap) return T
-    const tol = 8 / pps
+    const tol = 12 / pps
     let best = T
     let bd = tol
     for (const p of pts) if (Math.abs(p - T) < bd) (bd = Math.abs(p - T)), (best = p)
@@ -197,6 +200,28 @@ export default function Timeline() {
     return !a || a.kind === 'image' ? Infinity : a.duration - ov.trimStart
   }
 
+  /** Magnet: an item dropped onto a neighbour on its own layer joins it end to end instead of
+   *  jumping to another layer, as long as the nudge is small. */
+  const joinNeighbour = (list: Item[], it: Item): boolean => {
+    const lane = it.lane ?? 0
+    const Ts = o(it.start)
+    const Te = o(it.end)
+    const len = Te - Ts
+    const hit = list.filter((x) => x.id !== it.id && (x.lane ?? 0) === lane && o(x.start) < Te - 1e-3 && o(x.end) > Ts + 1e-3)
+    if (hit.length !== 1) return false
+    const n = hit[0]
+    const nS = o(n.start)
+    const nE = o(n.end)
+    // push to whichever side of the neighbour is nearer
+    const T = Ts + len / 2 < (nS + nE) / 2 ? nS - len : nE
+    if (Math.abs(T - Ts) > Math.max(len * 0.6, 40 / pps) || T < 0 || T + len > outDur + 1e-3) return false
+    const free = !list.some((x) => x.id !== it.id && x.id !== n.id && (x.lane ?? 0) === lane && o(x.start) < T + len - 1e-3 && o(x.end) > T + 1e-3)
+    if (!free) return false
+    it.start = +src(T).toFixed(3)
+    it.end = +src(T + len).toFixed(3)
+    return true
+  }
+
   // ---- dragging items ----
   const startDrag = (e: React.PointerEvent, kind: Kind, item: Item, mode: 'move' | 'l' | 'r') => {
     if (e.button !== 0) return
@@ -211,14 +236,14 @@ export default function Timeline() {
     let lane = lane0
     const s0 = item.start
     const e0 = item.end
-    const srcLen = e0 - s0
     const T0s = o(s0)
     const T0e = o(e0)
+    const outLen = T0e - T0s
     const others = listFor(kind).filter((x) => x.id !== item.id)
     // zooms can't overlap each other; everything else stacks on layers
     const lo = layered ? -lead : Math.max(0, ...others.filter((x) => x.end <= s0 + 1e-3).map((x) => x.end))
     const hi = layered ? duration : Math.min(duration, ...others.filter((x) => x.start >= e0 - 1e-3).map((x) => x.start))
-    const maxLen = assetLen(item, kind)
+    const maxLen = assetLen(item, kind) // in edited time: imported media plays straight through cuts
     const trim0 = (item as { trimStart?: number }).trimStart ?? 0
     const pts = snapPoints(item.id)
     const key = `drag-${kind}-${item.id}-${Date.now()}`
@@ -245,20 +270,23 @@ export default function Timeline() {
             T = Te - (T0e - T0s)
           }
         }
-        ns = Math.min(hi - srcLen, Math.max(lo, src(T)))
-        ne = ns + srcLen
+        // keep the length you see on the timeline, so edges land exactly where they snapped
+        T = Math.min(o(hi) - outLen, Math.max(layered ? 0 : o(lo), T))
+        ns = src(T)
+        ne = src(T + outLen)
       } else if (mode === 'l') {
         const T = snapT(T0s + dT, pts)
         if (T !== T0s + dT) line = T
-        ns = Math.min(e0 - 0.2, Math.max(lo, src(T)))
+        let Ts = Math.min(T0e - 0.2, Math.max(layered ? 0 : o(lo), T))
         if (kind === 'overlay' || kind === 'audioClip') {
-          trim = Math.max(0, trim0 + (ns - s0))
-          ns = s0 + (trim - trim0)
+          trim = Math.max(0, trim0 + (Ts - T0s))
+          Ts = T0s + (trim - trim0)
         }
+        ns = src(Ts)
       } else {
         const T = snapT(T0e + dT, pts)
         if (T !== T0e + dT) line = T
-        ne = Math.max(s0 + 0.2, Math.min(hi, s0 + maxLen, src(T)))
+        ne = src(Math.max(T0s + 0.2, Math.min(o(hi), T0s + maxLen, T)))
       }
       setSnapLine(line)
       update((ed) => {
@@ -279,7 +307,7 @@ export default function Timeline() {
         update((ed) => {
           const list = listFor(kind, ed)
           const it = list.find((x) => x.id === item.id)
-          if (it) it.lane = freeLane(list, it.start, it.end, it.lane ?? 0, it.id)
+          if (it && !joinNeighbour(list, it)) it.lane = freeLane(list, it.start, it.end, it.lane ?? 0, it.id)
         }, key)
       if (!moved && mode === 'move') seek(timeAt(x0))
     }
@@ -561,21 +589,16 @@ export default function Timeline() {
 
   // ---- transitions on the video: intro, outro and one on every cut ----
   const name = (t: Transition) => TRANSITIONS.find((x) => x.v === t.type)?.l ?? ''
-  const tMenu = (cur: Transition, set: (t: Transition | null) => void, canInherit: boolean, own: boolean) =>
-    [
-      ...TRANSITIONS.map((x) => ({ label: x.l, checked: cur.type === x.v, onClick: () => set({ type: x.v, duration: cur.duration || 0.6 }) })),
-      { sep: true },
-      ...[0.3, 0.5, 0.8, 1.2].map((d) => ({ label: `${d}s long`, checked: Math.abs(cur.duration - d) < 0.01, disabled: cur.type === 'none', onClick: () => set({ type: cur.type, duration: d }) })),
-      ...(canInherit ? [{ sep: true }, { label: 'Same as every cut', checked: !own, onClick: () => set(null) }] : []),
-      { sep: true },
-      { label: 'Transitions panel…', onClick: () => useEditor.getState().setPanel('effects') }
-    ] as MenuItem[]
+  const openPicker = (which: string) => (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPicker({ which, x: r.left + r.width / 2, y: r.top + r.height / 2 })
+  }
   const joint = (key: string, T: number, cur: Transition, title: string, onMenu: (e: React.MouseEvent) => void, edge?: 'l' | 'r') => (
     <button
       key={key}
       className={`tl-joint ${cur.type !== 'none' ? 'on' : ''} ${edge ?? ''} ${hotJoint === key.replace(/^cut/, '') ? 'hot' : ''}`}
       style={{ left: X(T), top: top('video') + VIDEO_H / 2 }}
-      title={`${title}. Click to change.`}
+      title={`${title}. Click to pick one.`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={onMenu}
     >
@@ -585,13 +608,12 @@ export default function Timeline() {
   const tr = edit.transitions
   const joints: ReactNode[] = []
   if (clips.length) {
-    joints.push(joint('intro', lead, tr.intro, `Start: ${tr.intro.type === 'none' ? 'none' : name(tr.intro)}`, (e) => openContextMenu(e, tMenu(tr.intro, (v) => update((ed) => (ed.transitions.intro = v ?? ed.transitions.intro)), false, true)), 'l'))
-    joints.push(joint('outro', outDur, tr.outro, `End: ${tr.outro.type === 'none' ? 'none' : name(tr.outro)}`, (e) => openContextMenu(e, tMenu(tr.outro, (v) => update((ed) => (ed.transitions.outro = v ?? ed.transitions.outro)), false, true)), 'r'))
+    joints.push(joint('intro', lead, tr.intro, `Start: ${tr.intro.type === 'none' ? 'none' : name(tr.intro)}`, openPicker('intro'), 'l'))
+    joints.push(joint('outro', outDur, tr.outro, `End: ${tr.outro.type === 'none' ? 'none' : name(tr.outro)}`, openPicker('outro'), 'r'))
     clips.slice(1).forEach((c) => {
       const own = tr.perCut[c.id]
       const cur = own ?? tr.cut
-      joints.push(joint('cut' + c.id, o(c.start), cur, `Cut: ${cur.type === 'none' ? 'none' : name(cur)}${own ? '' : ' (same as every cut)'}`, (e) =>
-        openContextMenu(e, tMenu(cur, (v) => update((ed) => { if (v) ed.transitions.perCut[c.id] = v; else delete ed.transitions.perCut[c.id] }), true, !!own))))
+      joints.push(joint('cut' + c.id, o(c.start), cur, `Cut: ${cur.type === 'none' ? 'none' : name(cur)}${own ? '' : ' (same as every cut)'}`, openPicker(c.id)))
     })
   }
 
@@ -740,7 +762,7 @@ export default function Timeline() {
             {edit.overlays.map((ov) => {
               const a = edit.assets.find((x) => x.id === ov.assetId)
               return block('overlay', ov, laneKey('overlay', ov.lane), COLORS.overlay, a?.kind === 'video' ? 'film' : 'image', a?.name ?? 'Media',
-                a?.kind === 'image' ? <div className="tl-thumb" style={{ backgroundImage: `url(${mediaUrl(a.path)})` }} /> : a?.kind === 'video' ? <Filmstrip path={a.path} duration={a.duration} from={ov.trimStart} to={ov.trimStart + (ov.end - ov.start)} width={Math.max(6, XS(ov.end) - XS(ov.start))} height={TRACK_H - 6} /> : undefined, !edit.tracks.media)
+                a?.kind === 'image' ? <div className="tl-thumb" style={{ backgroundImage: `url(${mediaUrl(a.path)})` }} /> : a?.kind === 'video' ? <Filmstrip path={a.path} duration={a.duration} from={ov.trimStart} to={ov.trimStart + (o(ov.end) - o(ov.start))} width={Math.max(6, XS(ov.end) - XS(ov.start))} height={TRACK_H - 6} /> : undefined, !edit.tracks.media)
             })}
 
             {/* keyboard shortcuts: click to jump there, right click to hide one */}
@@ -818,7 +840,7 @@ export default function Timeline() {
               const a = edit.assets.find((x) => x.id === c.assetId)
               const w = Math.max(6, XS(c.end) - XS(c.start))
               return block('audioClip', c, laneKey('audio', c.lane), COLORS.audio, 'music', a?.name ?? 'Audio',
-                a ? <div style={{ position: 'absolute', inset: 0, opacity: c.muted ? 0.3 : 0.85 }}><Waveform path={a.path} from={c.trimStart} to={c.trimStart + (c.end - c.start)} width={w} height={TRACK_H - 6} color="rgba(255,255,255,.55)" /></div> : undefined, !edit.tracks.audio)
+                a ? <div style={{ position: 'absolute', inset: 0, opacity: c.muted ? 0.3 : 0.85 }}><Waveform path={a.path} from={c.trimStart} to={c.trimStart + (o(c.end) - o(c.start))} width={w} height={TRACK_H - 6} color="rgba(255,255,255,.55)" /></div> : undefined, !edit.tracks.audio)
             })}
 
             {/* end of the video */}
@@ -842,6 +864,35 @@ export default function Timeline() {
           </div>
         </div>
       </div>
+      {picker && (() => {
+        const w = picker.which
+        const own = w !== 'intro' && w !== 'outro' ? tr.perCut[w] : undefined
+        const cur = w === 'intro' ? tr.intro : w === 'outro' ? tr.outro : own ?? tr.cut
+        const title = w === 'intro' ? 'Start of the video' : w === 'outro' ? 'End of the video' : 'Transition at this cut'
+        return (
+          <TransitionPicker
+            x={picker.x}
+            y={picker.y}
+            title={title}
+            cur={cur}
+            own={w === 'intro' || w === 'outro' || !!own}
+            canInherit={w !== 'intro' && w !== 'outro'}
+            onClose={closePicker}
+            onMore={() => {
+              setPicker(null)
+              useEditor.getState().setPanel('effects')
+            }}
+            onChange={(v, key) =>
+              update((ed) => {
+                if (w === 'intro') ed.transitions.intro = v ?? ed.transitions.intro
+                else if (w === 'outro') ed.transitions.outro = v ?? ed.transitions.outro
+                else if (v) ed.transitions.perCut[w] = v
+                else delete ed.transitions.perCut[w]
+              }, key ? key + w : undefined)
+            }
+          />
+        )
+      })()}
     </div>
   )
 }

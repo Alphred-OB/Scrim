@@ -5,7 +5,7 @@ import { autoZoomFromClicks } from '@shared/autozoom'
 import { api } from '@/lib/api'
 import { flushSave, useEditor } from './store'
 import { timeBus } from './timeBus'
-import { outputDuration, sortedClips, sourceToOutput } from '../engine/timeMap'
+import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
 
 const st = () => useEditor.getState()
 const dur = () => st().project?.media.screen.duration ?? 0
@@ -62,7 +62,9 @@ export function addAssetAt(asset: Asset, t0: number, lane = 0): void {
   const e0 = s.project!.edit
   // it lands exactly where it was dropped; if that spot is taken it goes on the next free layer
   const t = Math.max(-lead(), Math.min(t0, dur() - 0.5))
-  const end = Math.min(dur(), t + (asset.kind === 'image' ? 4 : Math.max(0.5, asset.duration)))
+  // imported media runs on the edited timeline, so its length is measured there (cuts don't eat it)
+  const T = sourceToOutput(e0.clips, t, lead())
+  const end = Math.min(dur(), outputToSource(e0.clips, T + (asset.kind === 'image' ? 4 : Math.max(0.5, asset.duration)), lead()))
   if (end - t < 0.2) return
   const layer = freeLane(asset.kind === 'audio' ? e0.audioClips : e0.overlays, t, end, lane)
   if (asset.kind === 'audio') {
@@ -106,7 +108,8 @@ export function splitAtPlayhead(): void {
         const arr = (sel.kind === 'overlay' ? e.overlays : sel.kind === 'audioClip' ? e.audioClips : sel.kind === 'blur' ? e.blurs : e.texts) as { id: string; start: number; end: number; trimStart?: number }[]
         const src = arr.find((x) => x.id === sel.id)!
         const copy = { ...structuredClone(src), id: nid, start: t }
-        if (copy.trimStart !== undefined) copy.trimStart = (src.trimStart ?? 0) + (t - src.start)
+        const O = (x: number) => sourceToOutput(e.clips, x, e.leadIn ?? 0)
+        if (copy.trimStart !== undefined) copy.trimStart = (src.trimStart ?? 0) + (O(t) - O(src.start))
         src.end = t
         arr.push(copy)
       })

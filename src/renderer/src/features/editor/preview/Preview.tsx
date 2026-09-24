@@ -5,7 +5,7 @@ import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { Renderer, blurRect, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
-import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips, viewport, zoomAt } from '../engine/timeMap'
+import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips, sourceToOutput, viewport, zoomAt } from '../engine/timeMap'
 import { Icon, openContextMenu } from '@/ui'
 import { playClick } from './clickPlayer'
 
@@ -13,7 +13,7 @@ type Box = { x: number; y: number; w: number; h: number }
 type Handle = { kind: 'text' | 'overlay' | 'webcam' | 'blur'; id: string; box: Box } // box in CSS px relative to canvas
 
 /** Everything that plays alongside the main video, and what time it should be at. */
-interface Follower { key: string; el: HTMLMediaElement; want: number | null; volume: number; muted: boolean; rate: number }
+interface Follower { key: string; el: HTMLMediaElement; want: number | null; volume: number; muted: boolean; rate: number; free?: boolean }
 
 export default function Preview() {
   const project = useEditor((s) => s.project)!
@@ -92,9 +92,18 @@ export default function Preview() {
     const clip = clipAt(e.clips, t)
     const rate = clip?.speed ?? 1
     const out: Follower[] = []
-    const add = (key: string, want: number | null, volume: number, muted: boolean) => {
+    const add = (key: string, want: number | null, volume: number, muted: boolean, free = false) => {
       const el = pool.current.get(key)
-      if (el) out.push({ key, el, want, volume, muted, rate })
+      if (el) out.push({ key, el, want, volume, muted, rate: free ? 1 : rate, free })
+    }
+    // Imported audio and media clips live on the edited timeline: they keep playing straight
+    // through cuts and speed changes, exactly as they look on the timeline and sound in the export.
+    const lead = e.leadIn ?? 0
+    const O = (x: number) => sourceToOutput(e.clips, x, lead)
+    const T = O(t)
+    const place = (start: number, end: number, trimStart: number) => {
+      const s0 = O(start)
+      return T >= s0 && T <= O(end) ? trimStart + (T - s0) : null
     }
     const m = project.media
     if (m.mic) add('mic', t - m.mic.offset - a.syncOffset, a.micVolume, a.micMuted)
@@ -104,16 +113,16 @@ export default function Preview() {
     for (const o of e.overlays) {
       const as = L.assets.get(o.assetId)
       if (as?.kind !== 'video') continue
-      add('ov:' + o.id, t >= o.start && t <= o.end ? o.trimStart + (t - o.start) : null, o.volume, o.muted || !as.hasAudio || !e.tracks.media)
+      add('ov:' + o.id, place(o.start, o.end, o.trimStart), o.volume, o.muted || !as.hasAudio || !e.tracks.media, true)
     }
-    for (const c of e.audioClips) add('ac:' + c.id, t >= c.start && t <= c.end ? c.trimStart + (t - c.start) : null, c.volume, c.muted || !e.tracks.audio)
+    for (const c of e.audioClips) add('ac:' + c.id, place(c.start, c.end, c.trimStart), c.volume, c.muted || !e.tracks.audio, true)
     return out
   }
 
-  const syncFollowers = (isPlaying: boolean) => {
+  const syncFollowers = (isPlaying: boolean, at = logical.current) => {
     const v = videoRef.current
     if (!v) return
-    for (const f of followers(logical.current)) {
+    for (const f of followers(at)) {
       const el = f.el
       el.volume = Math.max(0, Math.min(1, f.volume))
       el.muted = f.muted
@@ -134,9 +143,20 @@ export default function Preview() {
       // Small drift is fixed by nudging the speed instead of seeking. Every seek blanks the
       // element for a moment (webcam recordings seek slowly), which is what made it flicker.
       const drift = want! - el.currentTime
-      if (Math.abs(drift) > 0.6) el.currentTime = want!
-      else if (Math.abs(drift) > 0.03) el.playbackRate = f.rate * (1 + Math.max(-0.12, Math.min(0.12, drift * 0.8)))
-      if (el.paused) el.play().catch(() => {})
+      if (el.paused) {
+        // starting: land on the right spot first, then play
+        if (Math.abs(drift) > 0.05) el.currentTime = want!
+        el.play().catch(() => {})
+      } else if (f.key === 'webcam') {
+        if (Math.abs(drift) > 0.6) el.currentTime = want!
+        else if (Math.abs(drift) > 0.03) el.playbackRate = f.rate * (1 + Math.max(-0.12, Math.min(0.12, drift * 0.8)))
+      } else {
+        // Sound is never sped up or slowed down to catch up (that makes it wobble). It only
+        // jumps when it's clearly off, and gets a few frames to settle after starting.
+        if (el.playbackRate !== f.rate) el.playbackRate = f.rate
+        const settled = !el.seeking && el.readyState >= 3
+        if (settled && Math.abs(drift) > 0.2) el.currentTime = want!
+      }
     }
     const bgv = pool.current.get('bg') as HTMLVideoElement | undefined
     // background videos loop on their own, even while the editor is paused, so they always look alive
@@ -436,7 +456,7 @@ export default function Preview() {
         draw.current(at)
         timeBus.emit(at)
       }
-      syncFollowers(true)
+      syncFollowers(true, v.currentTime)
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)

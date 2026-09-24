@@ -8,7 +8,8 @@ import Toolbar from '@/features/recording/Toolbar'
 import Bubble from '@/features/recording/Bubble'
 import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
-import { ContextMenuHost } from '@/ui'
+import { ContextMenuHost, DialogHost } from '@/ui'
+import { UpdateBanner } from '@/lib/update'
 import Onboarding from '@/features/onboarding/Onboarding'
 import { PracticeLoader } from '@/features/onboarding/practice'
 import CoachMarks from '@/features/onboarding/CoachMarks'
@@ -73,6 +74,8 @@ export default function App() {
         <Launcher />
       )}
       <ContextMenuHost />
+      <DialogHost />
+      <UpdateBanner />
       {settingsLoaded && !settings.onboarded && <Onboarding />}
       <CoachMarks />
       <PracticeLoader />

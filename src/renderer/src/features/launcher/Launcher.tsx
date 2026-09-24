@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CaptureSource, Corner, ProjectSummary, RecorderStatus, WebcamRecordOptions, WebcamShape } from '@shared/types'
 import { api, mediaUrl } from '@/lib/api'
 import { webcamConstraints } from '@/lib/mediaCapture'
-import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu } from '@/ui'
+import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu, askConfirm, showMessage } from '@/ui'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { matches, useSettings } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
@@ -204,7 +204,7 @@ export default function Launcher() {
       const p = await api.importVideo(file)
       if (p) api.openEditor(p.dir)
     } catch (e) {
-      alert(String(e))
+      showMessage("That video couldn't be imported", String(e).replace(/^Error:\s*/, ''))
     } finally {
       setBusy('')
     }
@@ -218,7 +218,7 @@ export default function Launcher() {
     { label: 'Open', onClick: () => api.openEditor(p.dir) },
     { label: 'Show in folder', onClick: () => api.showItem(p.dir) },
     { sep: true },
-    { label: 'Delete', danger: true, onClick: async () => { if (confirm(`Delete "${p.name}"? This can't be undone.`)) { await api.deleteProject(p.dir); loadProjects() } } }
+    { label: 'Delete', danger: true, onClick: async () => { if (await askConfirm({ title: `Delete "${p.name}"?`, body: 'The project and its recording will be removed for good. This can\'t be undone.', ok: 'Delete', danger: true })) { await api.deleteProject(p.dir); loadProjects() } } }
   ]
 
   // R and E on the home screen

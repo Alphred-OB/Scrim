@@ -5,6 +5,7 @@ import { useSettings, comboFromEvent, playDoneSound } from '@/lib/settings'
 import { api } from '@/lib/api'
 import { Icon, ProgressViz, PROGRESS_STYLES, Select, Seg, Slider, Toggle } from '@/ui'
 import AppearanceTab from './AppearanceTab'
+import { UpdateSettings } from '@/lib/update'
 
 type Tab = 'general' | 'shortcuts' | 'export' | 'appearance' | 'ai'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -111,6 +112,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
               <span className="hint">Left and Right move the playhead by this much. Hold Shift to move 5 times further. Comma and period always move one frame.</span>
             </div>
           )}
+          {tab === 'general' && <UpdateSettings />}
 
           {tab === 'shortcuts' && (
             <div className="section">

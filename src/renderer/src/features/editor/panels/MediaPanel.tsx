@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
-import { Icon, Section, Seg, Slider, Toggle, fmtTime, openContextMenu } from '@/ui'
+import { Icon, Section, Seg, Slider, Toggle, fmtTime, openContextMenu, askConfirm } from '@/ui'
 import { api, mediaUrl } from '@/lib/api'
 import { addAssetAt, joinVideoAt, removeAsset } from '../state/actions'
 import { dragAsset } from '../state/dragAsset'
@@ -53,7 +53,7 @@ function AssetTile({ a }: { a: Asset }) {
             : []),
           { label: 'Show file', onClick: () => api.showItem(a.path) },
           { sep: true },
-          { label: 'Remove from project', danger: true, onClick: () => confirm(`Remove "${a.name}" and its clips?`) && removeAsset(a.id) }
+          { label: 'Remove from project', danger: true, onClick: async () => (await askConfirm({ title: `Remove "${a.name}"?`, body: 'Its clips on the timeline go too. You can undo this.', ok: 'Remove', danger: true })) && removeAsset(a.id) }
         ])
       }
       className="glass"

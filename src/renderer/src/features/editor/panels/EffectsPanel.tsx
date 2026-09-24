@@ -87,7 +87,7 @@ function subscribeFxTick(fn: (now: number) => void) {
   }
 }
 
-function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name: string; on: boolean; onPick: (e: React.MouseEvent) => void }) {
+export function TransitionTile({ type, name, on, onPick, hint }: { type: TransitionType; name: string; on: boolean; onPick: (e: React.MouseEvent) => void; hint?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
     const c = ref.current!
@@ -121,7 +121,7 @@ function TransitionTile({ type, name, on, onPick }: { type: TransitionType; name
       }}
       onDragEnd={() => dragAsset.setFx(null)}
       onClick={onPick}
-      title="Click for options, or drag onto the timeline"
+      title={hint ?? 'Click for options, or drag onto the timeline'}
     >
       <canvas ref={ref} width={128} height={80} />
       <span>{name}</span>
@@ -137,7 +137,7 @@ const SPEEDS = [
 ]
 
 /** Length (speed), feel and direction for any transition. */
-function TransitionOptions({ value, onChange }: { value: { type: TransitionType; duration: number; direction?: TransitionDir; ease?: TransitionEase }; onChange: (p: Partial<Transition>) => void }) {
+export function TransitionOptions({ value, onChange }: { value: { type: TransitionType; duration: number; direction?: TransitionDir; ease?: TransitionEase }; onChange: (p: Partial<Transition>) => void }) {
   if (value.type === 'none') return null
   const speed = SPEEDS.find((x) => Math.abs(x.v - value.duration) < 0.01)?.v ?? -1
   return (

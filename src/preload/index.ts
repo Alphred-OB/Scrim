@@ -48,6 +48,9 @@ const api = {
   peaks: (p: string) => invoke('media:peaks', p),
   notify: (title: string, body: string) => invoke('app:notify', title, body),
   engines: () => invoke('app:engines'),
+  updateStatus: () => invoke('update:status'),
+  checkForUpdate: () => invoke('update:check'),
+  installUpdate: () => invoke('update:install'),
   setTheme: (t: 'dark' | 'light') => invoke('app:theme', t),
   setZoom: (f: number) => webFrame.setZoomFactor(Math.max(0.7, Math.min(1.5, f))),
 
