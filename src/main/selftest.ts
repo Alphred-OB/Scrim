@@ -738,6 +738,26 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await js(`window.__scrim.patchEdit({ aspect: '16:9', reframe: 'fit' })`)
         await wait(300)
       })
+      await step('rail icons animate', async () => {
+        const count = await js<number>(`document.querySelectorAll('.rail-btn').length`)
+        log('rail buttons', count)
+        const frames: Buffer[] = []
+        for (let i = 0; i < count; i++) {
+          const b = await js<{ x: number; y: number; w: number; h: number }>(`(() => { const el = document.querySelectorAll('.rail-btn')[${i}]; el.scrollIntoView({ block: 'nearest' }); const r = el.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } })()`)
+          await wait(350)
+          win.webContents.sendInputEvent({ type: 'mouseMove', x: b.x + b.w / 2, y: b.y + b.h / 2 })
+          for (const ms of [120, 80, 100]) {
+            await wait(ms)
+            frames.push((await win.webContents.capturePage({ x: b.x, y: b.y, width: b.w, height: b.h })).toPNG())
+          }
+          win.webContents.sendInputEvent({ type: 'mouseMove', x: 700, y: 400 })
+        }
+        await Promise.all(frames.map((f, i) => fs.writeFile(join(out, `rail-${String(i).padStart(2, '0')}.png`), f)))
+        const noAnim = await js<boolean>(`getComputedStyle(document.querySelector('.rail-btn .rx')).animationName === undefined`)
+        void noAnim
+        win.webContents.sendInputEvent({ type: 'mouseMove', x: 700, y: 400 })
+        await wait(300)
+      })
       await step('full screen preview', async () => {
         await js(`document.querySelector('.preview-full-btn').click()`, true)
         await wait(900)

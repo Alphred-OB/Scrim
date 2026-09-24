@@ -67,6 +67,8 @@ export interface Api {
   transcribeGroq(path: string, key: string): Promise<{ words: TranscriptWord[]; lang?: string }>
   /** 16 kHz mono samples for the offline speech model */
   speechPcm(path: string): Promise<Float32Array>
+  /** index of the first file with real sound in it, or -1 */
+  pickSpeech(paths: string[]): Promise<number>
   cleanVoice(src: string, dir: string, strength: number): Promise<string>
   /** how much the screen changes over time (0 = frozen), one value per `step` seconds */
   screenChange(path: string): Promise<{ step: number; values: number[] }>

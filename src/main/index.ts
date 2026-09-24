@@ -31,7 +31,9 @@ let mainWindow: BrowserWindow | null = null
 let toolbar: BrowserWindow | null = null
 let bubble: BrowserWindow | null = null
 let border: BrowserWindow | null = null
-const ICON = join(__dirname, '../../resources/icon.png')
+// Windows wants a real .ico (with every size) for the taskbar, title bar and tray; elsewhere a png is fine
+const ICON_PNG = join(__dirname, '../../resources/icon.png')
+const ICON = process.platform === 'win32' ? join(__dirname, '../../resources/icon.ico') : ICON_PNG
 
 function loadRoute(win: BrowserWindow, route: string): void {
   if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${route}`)
@@ -339,7 +341,10 @@ function openEditor(dir: string): void {
 app.whenReady().then(() => {
   migrateLegacyUserData()
   Menu.setApplicationMenu(null)
-  if (process.platform === 'win32') app.setAppUserModelId('com.eruditeafrican.scrim')
+  // The installed app has a Start menu shortcut with this id, which gives the taskbar our icon.
+  // While developing there's no such shortcut, and a made up id makes Windows show Electron's
+  // atom instead, so use the exe path (Electron's default) and let the window icon show.
+  if (process.platform === 'win32') app.setAppUserModelId(app.isPackaged ? 'com.eruditeafrican.scrim' : process.execPath)
   handleMediaProtocol()
 
   const ses = session.defaultSession
@@ -355,7 +360,7 @@ app.whenReady().then(() => {
   registerIpc()
   initUpdater(broadcast)
   registerSpeechIpc()
-  if (!selfTestDir()) showSplash(ICON)
+  if (!selfTestDir()) showSplash(ICON_PNG)
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast
   setTimeout(() => {

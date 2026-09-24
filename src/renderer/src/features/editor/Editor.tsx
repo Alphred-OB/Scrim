@@ -32,6 +32,7 @@ import GuidePanel from './panels/GuidePanel'
 import BrandPanel from './panels/BrandPanel'
 import { engineSelfTest } from './speech/transcribe'
 import RailIcon from './RailIcon'
+import RailMore from './RailMore'
 import { addTextAt, addTransitionItem, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
@@ -367,6 +368,7 @@ function EditorView() {
               {r.soon && <span className="rail-soon-dot" />}
             </button>
           ))}
+          <RailMore />
         </nav>
         <aside ref={panelRef} data-tour="panel" className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
           <div className="fade-in" key={panel}>

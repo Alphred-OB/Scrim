@@ -3,12 +3,27 @@ import { api } from '@/lib/api'
 
 export interface SpeechSource { path: string; offset: number; source: Transcript['source']; label: string }
 
-/** The voice to transcribe: the microphone if there is one, otherwise PC sound, otherwise the video's own audio. */
-export function speechSource(p: Project): SpeechSource {
+/** Every place a voice could be, best first: the microphone, then PC sound, then the video's own sound. */
+export function speechSources(p: Project): SpeechSource[] {
   const m = p.media
-  if (m.mic) return { path: m.mic.path, offset: m.mic.offset, source: 'mic', label: 'your microphone' }
-  if (m.system) return { path: m.system.path, offset: m.system.offset, source: 'system', label: 'PC sound' }
-  return { path: m.screen.path, offset: 0, source: 'screen', label: "the video's sound" }
+  const out: SpeechSource[] = []
+  if (m.mic) out.push({ path: m.mic.path, offset: m.mic.offset, source: 'mic', label: 'your microphone' })
+  if (m.system) out.push({ path: m.system.path, offset: m.system.offset, source: 'system', label: 'PC sound' })
+  out.push({ path: m.screen.path, offset: 0, source: 'screen', label: "the video's sound" })
+  return out
+}
+
+/** The voice to transcribe (for labels): the first likely source. */
+export function speechSource(p: Project): SpeechSource {
+  return speechSources(p)[0]
+}
+
+/** The first source that really has sound in it (a mic file can exist but be silent). */
+async function findVoice(p: Project): Promise<SpeechSource> {
+  const all = speechSources(p)
+  const i = await api.pickSpeech(all.map((s) => s.path))
+  if (i < 0) throw new Error('This recording has no sound to listen to. Record with your microphone on, or import a video that has sound.')
+  return all[i]
 }
 
 export type Progress = (stage: 'extract' | 'download' | 'transcribe' | 'upload', p: number, note?: string) => void
@@ -51,10 +66,14 @@ const fake = (): TranscriptWord[] | null => (window as unknown as { __fakeWords?
  * (falls back to offline if Groq fails), otherwise Whisper on this PC.
  */
 export async function transcribe(p: Project, s: AppSettings, onProgress: Progress): Promise<Transcript> {
-  const src = speechSource(p)
-  const base = { offset: src.offset, source: src.source, createdAt: Date.now() }
   const f = fake()
-  if (f) return { ...base, words: f, engine: 'local' }
+  if (f) {
+    const s0 = speechSource(p)
+    return { offset: s0.offset, source: s0.source, createdAt: Date.now(), words: f, engine: 'local' }
+  }
+  onProgress('extract', 0)
+  const src = await findVoice(p)
+  const base = { offset: src.offset, source: src.source, createdAt: Date.now() }
   const pref = s.transcribeEngine ?? 'auto'
   const key = s.groqKey?.trim() ?? ''
   if (pref === 'groq' || (pref === 'auto' && key)) {

@@ -22,8 +22,27 @@ function ffmpegOut(args: string[]): Promise<Buffer> {
     p.stdout.on('data', (d: Buffer) => chunks.push(d))
     p.stderr.on('data', (d: Buffer) => (err += d.toString()).length > 20000 && (err = err.slice(-10000)))
     p.on('error', reject)
-    p.on('close', (code) => (code === 0 ? resolve(Buffer.concat(chunks)) : reject(new Error(err.trim().split('\n').pop() || 'ffmpeg failed'))))
+    p.on('close', (code) => {
+      if (code === 0) return resolve(Buffer.concat(chunks))
+      if (/does not contain any stream|matches no streams/i.test(err)) return reject(new Error('That file has no sound track.'))
+      reject(new Error(err.trim().split('\n').pop() || 'ffmpeg failed'))
+    })
   })
+}
+
+/** True when the file has a sound track with something in it (not just silence). */
+export async function hasSound(path: string): Promise<boolean> {
+  const r = await runFfmpeg(['-i', path, '-map', '0:a:0', '-t', '600', '-af', 'volumedetect', '-f', 'null', '-'])
+  if (r.code !== 0 || !/Stream #[^\n]*Audio:/.test(r.stderr)) return false
+  const m = /max_volume:\s*(-?[\d.]+|-inf) dB/.exec(r.stderr)
+  if (!m) return true
+  return m[1] !== '-inf' && parseFloat(m[1]) > -60
+}
+
+/** The first of the files that has real sound, or -1. */
+export async function pickSpeech(paths: string[]): Promise<number> {
+  for (let i = 0; i < paths.length; i++) if (await hasSound(paths[i]).catch(() => false)) return i
+  return -1
 }
 
 /** 16 kHz mono float samples of a file (what Whisper wants). */
@@ -193,6 +212,7 @@ export async function saveGuide(html: string, outPath: string, pdf: boolean): Pr
 export function registerSpeechIpc(): void {
   ipcMain.handle('speech:groq', (e, path: string, key: string) => groqTranscribe(path, key, (p) => e.sender.send('speech:progress', p)))
   ipcMain.handle('speech:pcm', (_e, path: string) => speechPcm(path))
+  ipcMain.handle('speech:pick', (_e, paths: string[]) => pickSpeech(paths))
   ipcMain.handle('voice:clean', (_e, src: string, dir: string, strength: number) => cleanVoice(src, dir, strength))
   ipcMain.handle('tidy:screen', (_e, path: string) => screenChange(path))
   ipcMain.handle('guide:stills', (_e, path: string, times: number[]) => stills(path, times))

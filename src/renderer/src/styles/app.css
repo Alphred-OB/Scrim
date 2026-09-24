@@ -1183,21 +1183,6 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s var(--ease); }
 @keyframes updBob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(2px) } }
 
-/* ---------- rail icons: trim, guide, brand ---------- */
-.rail-icon-tidy .ri-tidy-a, .rail-icon-tidy .ri-tidy-b { transition: transform 0.35s var(--ease); }
-.rail-btn:hover .rail-icon-tidy .ri-tidy-a { transform: translateX(2px); }
-.rail-btn:hover .rail-icon-tidy .ri-tidy-b { transform: translateX(-2px); }
-.rail-icon-tidy.is-clicked .ri-tidy-arrows { animation: riTidy 0.4s var(--ease); }
-@keyframes riTidy { 50% { transform: scaleX(0.4); transform-origin: 12px 12px; } }
-.rail-icon-guide .ri-guide-dot { transform-box: fill-box; transform-origin: center; }
-.rail-btn:hover .rail-icon-guide .ri-guide-dot1 { animation: riGuide 0.9s var(--ease) 0s; }
-.rail-btn:hover .rail-icon-guide .ri-guide-dot2 { animation: riGuide 0.9s var(--ease) 0.12s; }
-.rail-btn:hover .rail-icon-guide .ri-guide-dot3 { animation: riGuide 0.9s var(--ease) 0.24s; }
-@keyframes riGuide { 30% { transform: scale(1.7); } }
-.rail-icon-brand .ri-brand-star { transform-box: fill-box; transform-origin: center; transition: transform 0.4s var(--ease); }
-.rail-btn:hover .rail-icon-brand .ri-brand-star { transform: rotate(72deg) scale(1.1); }
-.rail-icon-brand.is-clicked .ri-brand-badge { animation: riAiPulse 0.36s cubic-bezier(0.34, 1.56, 0.64, 1); transform-box: fill-box; transform-origin: center; }
-
 /* ---------- captions page ---------- */
 .cap-empty { display: flex; flex-direction: column; gap: 10px; }
 .cap-empty-art { display: flex; gap: 8px; justify-content: center; align-items: center; height: 84px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font-weight: 800; font-size: 20px; }

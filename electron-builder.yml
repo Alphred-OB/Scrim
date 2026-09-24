@@ -16,7 +16,7 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: build/icon.png
+  icon: build/icon.ico
   # ---- code signing (removes "Unknown Publisher") ----
   # Option A, a .pfx certificate: set CSC_LINK (path or base64 of the .pfx) and CSC_KEY_PASSWORD
   # in the environment before `npm run release`. Nothing else is needed here.
