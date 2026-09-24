@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Aspect, CursorData, Preset } from '@shared/types'
 import { uid } from '@shared/defaults'
 import { api } from '@/lib/api'
@@ -100,6 +100,11 @@ function EditorView() {
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
   const [clickedRail, setClickedRail] = useState<Panel | null>(null)
+  // every tool opens at the top of its page, not wherever the last one was scrolled to
+  const panelRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (panelRef.current) panelRef.current.scrollTop = 0
+  }, [panel])
   const busy = useEditor((s) => s.busy)
   // first visit to the editor: show the guided tour of the interface
   const loadedDir = useEditor((s) => s.project?.dir)
@@ -347,7 +352,7 @@ function EditorView() {
             </button>
           ))}
         </nav>
-        <aside data-tour="panel" className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
+        <aside ref={panelRef} data-tour="panel" className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
           <div className="fade-in" key={panel}>
             {panel === 'background' && <BackgroundPanel />}
             {panel === 'cursor' && <CursorPanel />}
