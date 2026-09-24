@@ -167,3 +167,46 @@
 }
 
 @utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
+
+/* ---------- small details ---------- */
+@keyframes hot-ping { 0% { transform: scale(1); opacity: 0.55; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes ripple { from { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; } to { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+
+@layer components {
+  /* glowing hotspot on a screenshot, with a tooltip */
+  .hot { @apply absolute z-10 grid size-[3.4cqw] min-h-5 min-w-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full; }
+  .hot > span { @apply relative block size-[45%] rounded-full bg-white shadow-[0_0_0_0.35cqw_rgb(255_61_46/0.95)] transition-transform duration-300 ease-out-expo; }
+  .hot::before { content: ''; @apply absolute inset-[18%] rounded-full bg-accent; animation: hot-ping 1.8s ease-out infinite; }
+  .hot:hover > span, .hot:focus-visible > span { transform: scale(1.35); }
+  .hot::after {
+    content: attr(data-tip);
+    @apply pointer-events-none absolute bottom-[140%] left-1/2 rounded-full bg-[#111113] px-[1.5cqw] py-[0.7cqw] text-[1.7cqw] font-medium whitespace-nowrap text-white opacity-0 shadow-xl transition duration-300 ease-out-expo;
+    transform: translate(-50%, 6px) scale(0.96);
+  }
+  .hot:hover::after, .hot:focus-visible::after, .hot[data-show]::after { @apply opacity-100; transform: translate(-50%, 0) scale(1); }
+  .hot[style*="left:9"]::after, .hot[style*="left:8"]::after { left: auto; right: 0; transform: none; }
+  .hot[style*="left:2."]::after, .hot[style*="left:5"]::after { left: 0; transform: none; }
+
+  .chip-i { @apply rounded-full border border-line px-3 py-1.5 text-ink-2 transition duration-300 hover:border-ink hover:text-ink; }
+
+  /* range slider */
+  .range { @apply h-1 cursor-pointer appearance-none rounded-full bg-line-2; }
+  .range::-webkit-slider-thumb { @apply size-4 appearance-none rounded-full border-2 border-bg bg-ink shadow transition-transform duration-200; }
+  .range::-webkit-slider-thumb:hover { transform: scale(1.25); }
+  .range::-moz-range-thumb { @apply size-4 rounded-full border-2 border-bg bg-ink; }
+}
+
+@layer base {
+  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; border-radius: 6px; }
+  html { scrollbar-width: thin; scrollbar-color: var(--c-line-2) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--c-line-2); border-radius: 99px; border: 3px solid var(--c-bg); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  img { -webkit-user-drag: none; }
+
+  /* custom pointer: the real one is hidden only while ours is running */
+  html.pointer-on, html.pointer-on * { cursor: none !important; }
+  html.pointer-on input:not([type=range]), html.pointer-on textarea, html.pointer-on [contenteditable] { cursor: text !important; }
+}
+
+@utility ripple { animation: ripple 0.65s var(--ease-out-expo) forwards; }

@@ -321,45 +321,217 @@
     })
   })
 
-  // ---------- cursor ----------
-  const cur = $('[data-cursor]')
-  if (cur && fine && !lessMotion) {
-    cur.hidden = false
-    cur.classList.remove('hidden')
-    const dot = $('[data-cursor-dot]', cur)
-    const label = $('[data-cursor-label]', cur)
-    let x = innerWidth / 2
-    let y = innerHeight / 2
-    let cx = x
-    let cy = y
+  // ---------- sound effects (made on the fly, no audio files) ----------
+  const sfx = (() => {
+    let ctx = null
+    let on = true
+    try {
+      on = localStorage.getItem('scrim-sound') !== 'off'
+    } catch {}
+    let lastHover = 0
+    const ensure = () => {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext
+        if (!AC) return null
+        ctx = new AC()
+      }
+      if (ctx.state === 'suspended') ctx.resume()
+      return ctx
+    }
+    // browsers only allow sound after the first click or key
+    addEventListener('pointerdown', ensure, { once: true, capture: true })
+    addEventListener('keydown', ensure, { once: true, capture: true })
+    const tone = (f1, f2, dur, vol, type = 'sine', delay = 0) => {
+      if (!on || !ctx || ctx.state !== 'running') return
+      const t = ctx.currentTime + delay
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.type = type
+      o.frequency.setValueAtTime(f1, t)
+      o.frequency.exponentialRampToValueAtTime(f2, t + dur)
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.006)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+      o.connect(g).connect(ctx.destination)
+      o.start(t)
+      o.stop(t + dur + 0.02)
+    }
+    const noise = (dur, vol, from, to) => {
+      if (!on || !ctx || ctx.state !== 'running') return
+      const t = ctx.currentTime
+      const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate)
+      const d = buf.getChannelData(0)
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length)
+      const src = ctx.createBufferSource()
+      const f = ctx.createBiquadFilter()
+      const g = ctx.createGain()
+      src.buffer = buf
+      f.type = 'bandpass'
+      f.Q.value = 1.2
+      f.frequency.setValueAtTime(from, t)
+      f.frequency.exponentialRampToValueAtTime(to, t + dur)
+      g.gain.value = vol
+      src.connect(f).connect(g).connect(ctx.destination)
+      src.start(t)
+    }
+    return {
+      get on() {
+        return on
+      },
+      set on(v) {
+        on = v
+        try {
+          localStorage.setItem('scrim-sound', v ? 'on' : 'off')
+        } catch {}
+      },
+      hover() {
+        const n = performance.now()
+        if (n - lastHover < 70) return
+        lastHover = n
+        tone(2400, 2000, 0.035, 0.012)
+      },
+      click: () => tone(720, 360, 0.08, 0.05, 'triangle'),
+      toggle: (up) => (tone(up ? 520 : 780, up ? 780 : 520, 0.09, 0.04, 'triangle'), tone(up ? 1040 : 520, up ? 1040 : 390, 0.08, 0.025, 'sine', 0.07)),
+      tick: () => tone(1500, 1400, 0.05, 0.035, 'square'),
+      start: () => (tone(660, 660, 0.09, 0.05), tone(990, 990, 0.14, 0.05, 'sine', 0.1)),
+      stop: () => (tone(990, 990, 0.08, 0.045), tone(660, 600, 0.16, 0.045, 'sine', 0.09)),
+      zoom: (inward) => noise(0.45, 0.18, inward ? 400 : 2400, inward ? 2600 : 380),
+      cut: () => (noise(0.07, 0.25, 3000, 1500), tone(300, 120, 0.09, 0.05, 'triangle')),
+      whoosh: () => noise(0.35, 0.1, 600, 2000)
+    }
+  })()
+
+  const soundBtn = $('[data-sound]')
+  const paintSound = () => {
+    soundBtn?.setAttribute('aria-pressed', String(sfx.on))
+    $('[data-sound-on]')?.classList.toggle('hidden', !sfx.on)
+    $('[data-sound-off]')?.classList.toggle('hidden', sfx.on)
+  }
+  soundBtn?.addEventListener('click', () => {
+    sfx.on = !sfx.on
+    paintSound()
+    if (sfx.on) sfx.toggle(true)
+  })
+  paintSound()
+
+  // every button and link gets a soft tick on hover and a pop on press
+  document.addEventListener('pointerover', (e) => {
+    const t = e.target.closest?.('a, button, summary, [data-w], input[type=range]')
+    if (t && !t.contains(e.relatedTarget)) sfx.hover()
+  })
+  document.addEventListener('click', (e) => {
+    if (e.target.closest?.('[data-sound], [data-rec-start], [data-rec-stop], [data-zoom], [data-w], [data-fillers]')) return
+    if (e.target.closest?.('a, button, summary')) sfx.click()
+  })
+  $('[data-theme-toggle]')?.addEventListener('click', () => sfx.toggle(!isDark()))
+
+  // ---------- our own pointer ----------
+  const ptr = $('[data-pointer]')
+  const ptrPos = $('[data-p-pos]')
+  const ptrTrail = $('[data-p-trail]')
+  const ring = $('[data-p-ring]')
+  const pLabel = $('[data-p-label]')
+  const arrow = $('[data-p-arrow]')
+  const pDot = $('[data-p-dot]')
+  const setStyle = (st) => {
+    if (!ptr) return
+    ptr.dataset.style = st
+    arrow.classList.toggle('hidden', st === 'dot' || st === 'ring')
+    pDot.classList.toggle('hidden', st !== 'dot')
+    arrow.style.width = st === 'big' ? '34px' : '22px'
+    arrow.style.setProperty('--p-fill', st === 'big' ? '#ff3d2e' : 'var(--c-ink)')
+    ring.style.opacity = st === 'ring' || st === 'dot' || st === 'arrow' || st === 'big' ? '' : '0'
+    ring.dataset.base = st === 'ring' ? '34' : st === 'dot' ? '28' : '36'
+    ring.style.width = ring.style.height = ring.dataset.base + 'px'
+    ring.style.borderColor = st === 'ring' ? 'var(--c-ink)' : ''
+    ring.style.borderWidth = st === 'ring' ? '2px' : ''
+    $$('[data-cursor-pick] [data-style]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.style === st)))
+    try {
+      localStorage.setItem('scrim-pointer', st)
+    } catch {}
+  }
+  if (ptr && fine) {
+    root.classList.add('pointer-on')
+    ptr.classList.remove('hidden')
+    let saved = 'arrow'
+    try {
+      saved = localStorage.getItem('scrim-pointer') || 'arrow'
+    } catch {}
+    setStyle(saved)
+    let x = -100
+    let y = -100
+    let tx = x
+    let ty = y
+    let seen = false
     addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return
       x = e.clientX
       y = e.clientY
-    })
-    const loop = () => {
-      cx += (x - cx) * 0.2
-      cy += (y - cy) * 0.2
-      cur.style.transform = `translate3d(${cx}px,${cy}px,0)`
-      requestAnimationFrame(loop)
+      if (!seen) {
+        seen = true
+        tx = x
+        ty = y
+        ptr.style.opacity = '1'
+      }
+      ptrPos.style.transform = `translate3d(${x}px,${y}px,0)`
+    }, { passive: true })
+    const follow = () => {
+      tx += (x - tx) * (lessMotion ? 1 : 0.18)
+      ty += (y - ty) * (lessMotion ? 1 : 0.18)
+      ptrTrail.style.transform = `translate3d(${tx}px,${ty}px,0)`
+      requestAnimationFrame(follow)
     }
-    loop()
-    const grow = (text) => {
-      dot.style.width = dot.style.height = text ? '84px' : '10px'
-      label.textContent = text || ''
-      label.style.opacity = text ? '1' : '0'
-      label.style.transform = text ? 'scale(1)' : 'scale(0)'
-    }
-    $$('[data-cursor-text]').forEach((el) => {
-      el.addEventListener('pointerenter', () => grow(el.dataset.cursorText))
-      el.addEventListener('pointerleave', () => grow(''))
+    follow()
+    // grow over things you can press, show a word over special areas, hide over text fields
+    let labelOn = false
+    document.addEventListener('pointerover', (e) => {
+      const lab = e.target.closest?.('[data-cursor-text]')
+      const hit = e.target.closest?.('a, button, summary, [data-w], label, input[type=range]')
+      const field = e.target.closest?.('input:not([type=range]), textarea')
+      ptr.style.opacity = field ? '0' : '1'
+      if (lab && !hit) {
+        labelOn = true
+        ring.style.width = ring.style.height = '76px'
+        ring.style.background = 'var(--c-ink)'
+        ring.style.borderColor = 'transparent'
+        pLabel.textContent = lab.dataset.cursorText
+        pLabel.style.opacity = '1'
+        pLabel.style.transform = 'scale(1)'
+        arrow.style.transform = 'scale(0)'
+        pDot.style.transform = 'translate(-50%,-50%) scale(0)'
+        return
+      }
+      labelOn = false
+      pLabel.style.opacity = '0'
+      pLabel.style.transform = 'scale(.5)'
+      ring.style.background = hit ? 'color-mix(in srgb, var(--c-ink) 10%, transparent)' : ''
+      ring.style.borderColor = ptr.dataset.style === 'ring' ? 'var(--c-ink)' : hit ? 'transparent' : ''
+      const base = Number(ring.dataset.base || 36)
+      ring.style.width = ring.style.height = (hit ? base * 1.55 : base) + 'px'
+      arrow.style.transform = hit ? 'scale(.85)' : ''
+      pDot.style.transform = hit ? 'translate(-50%,-50%) scale(.6)' : 'translate(-50%,-50%)'
     })
-    $$('a, button').forEach((el) => {
-      el.addEventListener('pointerenter', () => !label.textContent && (dot.style.opacity = '0'))
-      el.addEventListener('pointerleave', () => (dot.style.opacity = '1'))
+    document.addEventListener('pointerleave', () => (ptr.style.opacity = '0'))
+    document.addEventListener('pointerenter', () => (ptr.style.opacity = '1'))
+    // a click ripple, the same as Scrim draws in your videos
+    addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse') return
+      const r = document.createElement('span')
+      r.className = 'ripple pointer-events-none absolute size-16 rounded-full border-2 border-accent'
+      r.style.left = e.clientX + 'px'
+      r.style.top = e.clientY + 'px'
+      ptr.appendChild(r)
+      setTimeout(() => r.remove(), 700)
+      if (!labelOn) arrow.style.transform = 'scale(.8)'
     })
-    document.addEventListener('pointerleave', () => (cur.style.opacity = '0'))
-    document.addEventListener('pointerenter', () => (cur.style.opacity = '1'))
+    addEventListener('pointerup', () => !labelOn && (arrow.style.transform = ''))
   }
+  $$('[data-cursor-pick] [data-style]').forEach((b) =>
+    b.addEventListener('click', () => {
+      setStyle(b.dataset.style)
+      sfx.toggle(true)
+    })
+  )
 
   // ---------- magnetic buttons ----------
   if (fine && !lessMotion) {
@@ -372,6 +544,14 @@
     })
   }
 
+  // ---------- hotspots: tap shows the tip on touch screens ----------
+  $$('.hot').forEach((h) =>
+    h.addEventListener('click', () => {
+      const was = h.hasAttribute('data-show')
+      $$('.hot[data-show]').forEach((x) => x.removeAttribute('data-show'))
+      if (!was) h.setAttribute('data-show', '')
+    })
+  )
 
   // ---------- tour: chapter bar follows what you're reading ----------
   const chapterLinks = $$('[data-chapters] a')
@@ -384,6 +564,7 @@
       let on = ''
       for (const c of chapters) if (c.getBoundingClientRect().top < mid) on = c.id
       if (on === current) return
+      if (current && on) sfx.hover()
       current = on
       chapterLinks.forEach((a) => {
         const hit = a.getAttribute('href') === '#' + on
@@ -394,6 +575,120 @@
     addEventListener('scroll', spy, { passive: true })
     lenis?.on('scroll', spy)
     spy()
+  }
+
+  // ---------- tour: a record button that works ----------
+  const rec = $('[data-rec]')
+  if (rec) {
+    const count = $('[data-rec-count]', rec)
+    const num = $('[data-rec-num]', rec)
+    const border = $('[data-rec-border]', rec)
+    const bar = $('[data-rec-bar]', rec)
+    const time = $('[data-rec-time]', rec)
+    const toast = $('[data-rec-toast]', rec)
+    const pauseBtn = $('[data-rec-pause]', rec)
+    let state = 'idle'
+    let secs = 0
+    let timer = null
+    const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+    const start = () => {
+      if (state !== 'idle') return
+      state = 'count'
+      count.toggleAttribute('data-on', true)
+      let n = 3
+      num.textContent = n
+      sfx.tick()
+      const step = () => {
+        n--
+        if (n > 0) {
+          num.textContent = n
+          num.animate([{ transform: 'scale(1.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 400, easing: 'cubic-bezier(0.16,1,0.3,1)' })
+          sfx.tick()
+          setTimeout(step, 800)
+        } else {
+          count.toggleAttribute('data-on', false)
+          border.toggleAttribute('data-on', true)
+          bar.toggleAttribute('data-on', true)
+          sfx.start()
+          state = 'rec'
+          secs = 0
+          time.textContent = fmt(0)
+          timer = setInterval(() => state === 'rec' && (time.textContent = fmt(++secs)), 1000)
+        }
+      }
+      setTimeout(step, 800)
+    }
+    const stop = () => {
+      if (state !== 'rec' && state !== 'paused') return
+      clearInterval(timer)
+      state = 'idle'
+      border.toggleAttribute('data-on', false)
+      bar.toggleAttribute('data-on', false)
+      toast.toggleAttribute('data-on', true)
+      sfx.stop()
+      setTimeout(() => toast.toggleAttribute('data-on', false), 2400)
+    }
+    $('[data-rec-start]', rec)?.addEventListener('click', (e) => {
+      e.stopPropagation()
+      start()
+    })
+    $('[data-rec-stop]', rec)?.addEventListener('click', stop)
+    pauseBtn?.addEventListener('click', () => {
+      if (state === 'rec') state = 'paused'
+      else if (state === 'paused') state = 'rec'
+      pauseBtn.style.opacity = state === 'paused' ? '0.5' : ''
+    })
+  }
+
+  // ---------- tour: click to zoom, just like Scrim ----------
+  const zoom = $('[data-zoom]')
+  if (zoom) {
+    const stage = $('[data-zoom-stage]', zoom)
+    const level = $('[data-zoom-level]', zoom)
+    let back = null
+    let userTouched = false
+    const zoomAt = (px, py, user) => {
+      const r = zoom.getBoundingClientRect()
+      const fx = (px - r.left) / r.width
+      const fy = (py - r.top) / r.height
+      const k = 2.2
+      // keep the zoomed view inside the frame
+      const tx = Math.max(-(k - 1) * r.width / 2, Math.min((k - 1) * r.width / 2, (0.5 - fx) * r.width * k))
+      const ty = Math.max(-(k - 1) * r.height / 2, Math.min((k - 1) * r.height / 2, (0.5 - fy) * r.height * k))
+      stage.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`
+      level.textContent = k.toFixed(1) + 'x'
+      const rp = document.createElement('span')
+      rp.className = 'ripple pointer-events-none absolute z-10 size-[9cqw] rounded-full border-[0.5cqw] border-white'
+      rp.style.left = px - r.left + 'px'
+      rp.style.top = py - r.top + 'px'
+      zoom.appendChild(rp)
+      setTimeout(() => rp.remove(), 700)
+      if (user) sfx.zoom(true)
+      clearTimeout(back)
+      back = setTimeout(() => {
+        stage.style.transform = ''
+        level.textContent = '1.0x'
+        if (user) sfx.zoom(false)
+      }, 1800)
+    }
+    zoom.addEventListener('click', (e) => {
+      userTouched = true
+      zoomAt(e.clientX, e.clientY, true)
+    })
+    // until someone clicks, it demonstrates on its own while on screen
+    const spots = [[0.66, 0.48], [0.3, 0.3], [0.78, 0.7]]
+    let si = 0
+    let demo = null
+    new IntersectionObserver(([e]) => {
+      clearInterval(demo)
+      if (!e.isIntersecting || userTouched) return
+      demo = setInterval(() => {
+        if (userTouched) return clearInterval(demo)
+        const r = zoom.getBoundingClientRect()
+        const [fx, fy] = spots[si++ % spots.length]
+        zoomAt(r.left + fx * r.width, r.top + fy * r.height, false)
+      }, 3600)
+    }, { threshold: 0.6 }).observe(zoom)
   }
 
   // ---------- tour: try the background ----------
@@ -409,9 +704,14 @@
     )
     const pad = $('[data-pad]', look)
     const rad = $('[data-radius]', look)
-    const paint = () => {
+    let lastTick = 0
+    const paint = (e) => {
       lookImg.style.width = 100 - Number(pad.value) * 2 + '%'
       lookImg.style.borderRadius = rad.value + 'px'
+      if (e && performance.now() - lastTick > 40) {
+        lastTick = performance.now()
+        sfx.hover()
+      }
     }
     pad?.addEventListener('input', paint)
     rad?.addEventListener('input', paint)
@@ -423,13 +723,20 @@
   if (tr) {
     const words = $$('[data-w]', tr)
     const out = $('[data-cut]', tr)
+    const trBar = $('[data-tr-bar]', tr)
+    const trLen = $('[data-tr-len]', tr)
     const len = (w) => 0.18 + w.textContent.length * 0.05 // a rough speaking time per word
+    const full = words.reduce((a, w) => a + len(w), 0)
     const style = (w) => {
       const cut = w.hasAttribute('data-gone')
       w.className = 'cursor-pointer rounded-md px-0.5 transition duration-300 ' + (cut ? 'text-faint line-through decoration-accent decoration-2' : 'hover:bg-bg-2')
     }
     const total = () => {
-      out.textContent = words.filter((w) => w.hasAttribute('data-gone')).reduce((a, w) => a + len(w), 0).toFixed(1) + 's'
+      const gone = words.filter((w) => w.hasAttribute('data-gone')).reduce((a, w) => a + len(w), 0)
+      out.textContent = gone.toFixed(1) + 's'
+      trBar.style.transform = `scaleX(${(full - gone) / full})`
+      const left = full - gone
+      trLen.textContent = `0:${left.toFixed(1).padStart(4, '0')}`
     }
     words.forEach((w) => {
       w.setAttribute('role', 'button')
@@ -439,19 +746,52 @@
         w.toggleAttribute('data-gone')
         style(w)
         total()
+        w.hasAttribute('data-gone') ? sfx.cut() : sfx.click()
       }
       w.addEventListener('click', flip)
       w.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), flip()))
     })
     $('[data-fillers]', tr)?.addEventListener('click', () => {
-      words.filter((w) => w.hasAttribute('data-filler')).forEach((w, i) =>
+      words.filter((w) => w.hasAttribute('data-filler') && !w.hasAttribute('data-gone')).forEach((w, i) =>
         setTimeout(() => {
           w.setAttribute('data-gone', '')
           style(w)
           total()
-        }, i * 140)
+          sfx.cut()
+        }, i * 160)
       )
     })
+    $('[data-tr-reset]', tr)?.addEventListener('click', () => {
+      words.forEach((w) => (w.removeAttribute('data-gone'), style(w)))
+      total()
+    })
+    total()
+  }
+
+  // ---------- tour: reshape for each platform ----------
+  const shapePick = $('[data-shape-pick]')
+  if (shapePick) {
+    const box = $('[data-shape-box]')
+    const img = $('[data-shape-img]')
+    const tag = $('[data-shape-tag]')
+    let pan = null
+    $$('button', shapePick).forEach((b) =>
+      b.addEventListener('click', () => {
+        $$('button', shapePick).forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+        box.style.width = b.dataset.width + '%'
+        tag.textContent = b.dataset.tag
+        sfx.whoosh()
+        clearInterval(pan)
+        img.style.objectPosition = '50% 50%'
+        if (b.dataset.pan) {
+          // tall videos follow the cursor from side to side
+          const xs = ['70%', '30%', '62%', '45%']
+          let i = 0
+          img.style.objectPosition = xs[0] + ' 50%'
+          pan = setInterval(() => (img.style.objectPosition = xs[++i % xs.length] + ' 50%'), 1800)
+        }
+      })
+    )
   }
 
   // ---------- year and version ----------
