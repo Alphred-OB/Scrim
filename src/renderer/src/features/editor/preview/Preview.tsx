@@ -3,7 +3,7 @@ import type { Asset, EditState } from '@shared/types'
 import { mediaUrl } from '@/lib/api'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
-import { Renderer, blurRect, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
+import { Renderer, type FrameDrawer, blurRect, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
 import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips, sourceToOutput, viewport, zoomAt } from '../engine/timeMap'
 import { Icon, openContextMenu } from '@/ui'
@@ -168,6 +168,50 @@ export default function Preview() {
   const logical = useRef(time)
   const camCache = useRef<HTMLCanvasElement | null>(null)
   const camHas = useRef(false)
+  // Last good frame of the recording. While the video element is seeking it has no picture, so
+  // scrubbing used to flash dark; we show this copy instead until the new frame arrives.
+  const frameCache = useRef<HTMLCanvasElement | null>(null)
+  const frameAt = useRef(-1)
+  const frameK = useRef(1)
+  const snapshot = () => {
+    const v = videoRef.current
+    if (!v || v.readyState < 2 || v.seeking || !v.videoWidth) return
+    if (Math.abs(frameAt.current - v.currentTime) < 1e-4) return
+    const k = Math.min(1, 1920 / v.videoWidth)
+    const w = Math.round(v.videoWidth * k)
+    const h = Math.round(v.videoHeight * k)
+    const fc = (frameCache.current ??= document.createElement('canvas'))
+    if (fc.width !== w || fc.height !== h) {
+      fc.width = w
+      fc.height = h
+    }
+    fc.getContext('2d', { alpha: false })!.drawImage(v, 0, 0, w, h)
+    frameK.current = k
+    frameAt.current = v.currentTime
+  }
+  // Scrubbing sends a new time on every mouse move. Starting a new seek before the last one is
+  // done means no frame ever lands, so seeks are queued: the newest time waits for the current one.
+  const pendingSeek = useRef<number | null>(null)
+  const seekVideo = (vt: number) => {
+    const v = videoRef.current
+    if (!v) return
+    if (v.seeking) pendingSeek.current = vt
+    else {
+      pendingSeek.current = null
+      if (Math.abs(v.currentTime - vt) > 0.001) v.currentTime = vt
+    }
+  }
+  const onVideoSeeked = () => {
+    const v = videoRef.current
+    const p = pendingSeek.current
+    pendingSeek.current = null
+    if (v && p !== null && !useEditor.getState().playing && Math.abs(v.currentTime - p) > 0.001) {
+      draw.current()
+      v.currentTime = p
+      return
+    }
+    draw.current()
+  }
 
   // Adaptive preview quality: if frames take too long to draw (big full screen, low end GPU),
   // render smaller while playing and scale up. The export is always full quality.
@@ -237,6 +281,15 @@ export default function Preview() {
       }
       if (camHas.current && camCache.current) camSrc = { src: camCache.current, w: camCache.current.width, h: camCache.current.height }
     }
+    const ready = v.readyState >= 2 && !v.seeking
+    if (ready && !isPlaying) snapshot()
+    const fc = frameCache.current
+    const fk = frameK.current
+    const drawFrame: FrameDrawer | null = ready
+      ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(v, sx, sy, sw, sh, dx, dy, dw, dh)
+      : fc && frameAt.current >= 0
+        ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(fc, sx * fk, sy * fk, sw * fk, sh * fk, dx, dy, dw, dh)
+        : null
     const t0 = performance.now()
     renderer.render(ctx, W, H, {
       edit: L.edit,
@@ -244,7 +297,7 @@ export default function Preview() {
       srcH,
       t,
       bgTime: t + ambient.current,
-      drawFrame: v.readyState >= 2 ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(v, sx, sy, sw, sh, dx, dy, dw, dh) : null,
+      drawFrame,
       cursor: L.track,
       camera: L.camera,
       clicks: L.clicks,
@@ -318,8 +371,7 @@ export default function Preview() {
       lastSeek.current = time
       logical.current = time
       // the lead-in (negative time) has no recording; park the video on its first frame
-      const vt = Math.max(0, time)
-      if (Math.abs(v.currentTime - vt) > 0.001) v.currentTime = vt
+      seekVideo(Math.max(0, time))
     }
     syncFollowers(false)
     timeBus.emit(time)
@@ -408,7 +460,10 @@ export default function Preview() {
       const cur = clipAt(cs, t)
       if (!cur) {
         const n = nextClip(cs, t)
-        if (n) v.currentTime = n.start
+        if (n) {
+          snapshot()
+          v.currentTime = n.start
+        }
         else {
           v.pause()
           return useEditor.getState().setPlaying(false)
@@ -421,6 +476,7 @@ export default function Preview() {
           if (next) {
             // If the next clip does not immediately follow in the source recording, jump to it
             if (Math.abs(next.start - cur.end) > 0.04) {
+              snapshot()
               v.currentTime = next.start
             }
           } else {
@@ -687,7 +743,7 @@ export default function Preview() {
 
       {/* media elements stay in the layout (invisible) so Chromium keeps decoding frames in real time */}
       <div className="media-pool" aria-hidden>
-      <video ref={videoRef} src={mediaUrl(m.screen.path)} muted playsInline preload="auto" className="pool-video" onLoadedData={() => draw.current()} onSeeked={() => draw.current()} />
+      <video ref={videoRef} src={mediaUrl(m.screen.path)} muted playsInline preload="auto" className="pool-video" onLoadedData={() => draw.current()} onSeeked={onVideoSeeked} />
       {m.mic && <audio ref={reg('mic')} src={mediaUrl(m.mic.path)} preload="auto" />}
       {m.system && <audio ref={reg('sys')} src={mediaUrl(m.system.path)} preload="auto" />}
       {m.webcam && <video ref={reg('webcam')} src={mediaUrl(m.webcam.path)} muted playsInline preload="auto" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => draw.current()} />}
