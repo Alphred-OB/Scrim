@@ -565,6 +565,7 @@ export default function Timeline() {
       <div
         key={it.id}
         data-kind={kind}
+        data-id={it.id}
         className={`tl-block ${sel ? 'sel' : ''} ${off ? 'off' : ''}`}
         onPointerDown={(e) => startDrag(e, kind, it, 'move')}
         onContextMenu={(e) => {

@@ -137,6 +137,7 @@ function EditorView() {
       clickSound: () => useEditor.getState().project!.edit.cursor.clickSound,
       lastText: () => { const ts = useEditor.getState().project!.edit.texts; return ts[ts.length - 1] },
       patchText: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.texts[e.texts.length - 1], patch)),
+      textById: (id: string, patch?: Record<string, unknown>) => { if (patch) useEditor.getState().update((e) => Object.assign(e.texts.find((x) => x.id === id)!, patch)); return useEditor.getState().project!.edit.texts.find((x) => x.id === id) },
       lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
       patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
       import: (paths: string[]) => importMedia(useEditor.getState().project!.dir, paths, timeBus.get()),
