@@ -172,6 +172,38 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
 
       openEditor(env.SCRIM_TEST_DIR!)
       await wait(3500)
+      if (env.SCRIM_TEST_LONG) {
+        // long playback: the time must keep moving the whole way (no stalls that need a pause and play)
+        await js(`window.api.getSettings().then((s) => window.api.saveSettings({ ...s, onboarded: true, toursSeen: ['home', 'editor', 'welcome', 'practice'] }))`)
+        await js(`document.querySelectorAll('.coach-foot .btn').forEach((b) => b.textContent.includes('Skip') && b.click())`, true).catch(() => {})
+        // jump around first, like scrubbing a long recording: every jump opens a new read of the file
+        for (let i = 0; i < 25; i++) {
+          await js(`window.__scrim.seek(${(i * 37) % 140})`)
+          await wait(120)
+        }
+        const { readdirSync, readlinkSync } = await import('fs')
+        const openReads = () => readdirSync('/proc/self/fd').filter((f) => { try { return readlinkSync('/proc/self/fd/' + f).endsWith('screen.mp4') } catch { return false } }).length
+        await wait(1500)
+        log('long play open reads after jumping', process.platform === 'linux' ? openReads() : -1, 'rss MB', Math.round(process.memoryUsage().rss / 1e6))
+        await js('window.__scrim.seek(0)')
+        await wait(500)
+        await js('window.__scrim.play(true)')
+        let prev = -1
+        let frozen = 0
+        const secs = Number(env.SCRIM_TEST_LONG) || 70
+        for (let i = 0; i < secs; i++) {
+          await wait(1000)
+          const t = (await state()).time as number
+          const vt = await js<number>(`document.querySelector('video').currentTime`)
+          if (vt - prev < 0.2) frozen++
+          if (i % 10 === 0) log('long play', i, 's', 'video at', vt.toFixed(1))
+          prev = vt
+          void t
+        }
+        log('long play frozen seconds', frozen)
+        log(frozen > 2 ? 'FAIL long playback froze' : 'PASS long playback keeps going')
+        return app.quit()
+      }
       await shot('editor.png')
       await step('editor tour walks through the interface', async () => {
         await wait(800)

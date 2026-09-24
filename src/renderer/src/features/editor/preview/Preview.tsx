@@ -440,7 +440,12 @@ export default function Preview() {
     }
     if ('requestVideoFrameCallback' in v) vfc = v.requestVideoFrameCallback(onFrame)
     let lastDraw = 0
-    const loop = () => {
+    // Watchdog: if the video stops moving on its own (the decoder or the file reader stalled),
+    // give it a gentle kick, the same thing pausing and playing again used to do by hand.
+    let stuckSince = 0
+    let lastT = -1
+    let kicks = 0
+    const step = () => {
       if (intro) {
         const it = intro.from + (performance.now() - intro.wall) / 1000
         if (it < 0) {
@@ -486,6 +491,22 @@ export default function Preview() {
         }
       }
       if (v.ended) return useEditor.getState().setPlaying(false)
+      {
+        const now = performance.now()
+        if (Math.abs(v.currentTime - lastT) > 1e-3) {
+          lastT = v.currentTime
+          stuckSince = now
+          kicks = 0
+        } else if (!intro && now - stuckSince > (v.seeking || v.readyState < 2 ? 6000 : 1500) && kicks < 5) {
+          kicks++
+          stuckSince = now
+          console.warn('[preview] playback stalled at', v.currentTime.toFixed(2), 'state', v.readyState, 'kick', kicks)
+          const at = v.currentTime
+          v.pause()
+          v.currentTime = at + 0.001
+          v.play().catch(() => {})
+        }
+      }
       const at = shown !== null && Math.abs(v.currentTime - shown) < 1 ? shown : v.currentTime
       // frames arriving late (GPU busy) count as slow too, not just slow drawing
       const now = performance.now()
@@ -514,6 +535,15 @@ export default function Preview() {
       }
       syncFollowers(true, v.currentTime)
       raf = requestAnimationFrame(loop)
+    }
+    // one bad frame (a missing image, a follower that can't seek) must never stop playback for good
+    const loop = () => {
+      try {
+        step()
+      } catch (e) {
+        console.error('[preview] playback loop error', e)
+        raf = requestAnimationFrame(loop)
+      }
     }
     raf = requestAnimationFrame(loop)
     return () => {

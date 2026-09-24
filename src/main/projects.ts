@@ -33,8 +33,22 @@ export async function saveProject(p: Project): Promise<void> {
   p.updatedAt = Date.now()
   const file = join(p.dir, 'project.json')
   const tmp = file + '.tmp'
-  await fs.writeFile(tmp, JSON.stringify(p, null, 1))
-  await fs.rename(tmp, file) // atomic-ish save so a crash never corrupts the project
+  const data = JSON.stringify(p, null, 1)
+  await fs.writeFile(tmp, data)
+  // atomic-ish save so a crash never corrupts the project. OneDrive and antivirus sometimes hold
+  // project.json for a moment (EPERM / EBUSY), so try again, and as a last resort write it directly.
+  for (let i = 0; i < 6; i++) {
+    try {
+      await fs.rename(tmp, file)
+      return
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code
+      if (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES') throw e
+      await new Promise((r) => setTimeout(r, 60 * (i + 1)))
+    }
+  }
+  await fs.writeFile(file, data)
+  await fs.rm(tmp, { force: true }).catch(() => {})
 }
 
 export async function loadProject(dir: string): Promise<Project> {
