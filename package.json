@@ -1,7 +1,7 @@
 {
   "name": "scrim",
   "productName": "Scrim",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Record, frame and polish screen demos",
   "author": "Erudite African Network",
   "main": "./out/main/index.js",
