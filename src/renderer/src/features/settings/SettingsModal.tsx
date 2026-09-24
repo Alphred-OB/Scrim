@@ -190,27 +190,66 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
           {tab === 'appearance' && <AppearanceTab settings={settings} save={save} />}
 
-          {tab === 'ai' && (
-            <div className="section">
-              <span className="section-title">AI features</span>
-              {[
-                { t: 'AI captions', d: 'Automatic subtitles from your voice, fully editable and styled like your text layers.' },
-                { t: 'Smart annotations', d: 'AI reads your screen and suggests callouts and highlights on the important moments.' },
-                { t: 'Auto trim silences', d: 'Finds long pauses and dead air so you can cut them in one click.' }
-              ].map((f) => (
-                <div key={f.t} style={{ padding: 14, borderRadius: 12, background: 'var(--card)', border: '1px solid var(--line)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <b>{f.t}</b>
-                    <span className="badge">Coming soon</span>
-                  </div>
-                  <div className="hint" style={{ marginTop: 4 }}>{f.d}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {tab === 'ai' && <AiTab />}
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+/** Speech to text engine for captions, text editing and guide titles. */
+function AiTab() {
+  const settings = useSettings((s) => s.settings)
+  const save = useSettings((s) => s.save)
+  const [show, setShow] = useState(false)
+  const engine = settings.transcribeEngine ?? 'auto'
+  const hasKey = !!settings.groqKey?.trim()
+  return (
+    <>
+      <div className="section">
+        <span className="section-title">Speech to text</span>
+        <span className="hint">Used for captions, editing by text and the titles of guide steps.</span>
+        <Seg
+          options={[{ v: 'auto', l: 'Automatic' }, { v: 'groq', l: 'Groq (online)' }, { v: 'local', l: 'This PC (offline)' }]}
+          value={engine}
+          onChange={(v) => save({ transcribeEngine: v as 'auto' | 'groq' | 'local' })}
+        />
+        <span className="hint">
+          {engine === 'auto'
+            ? hasKey
+              ? 'Groq is used, and this PC takes over if Groq is unreachable.'
+              : 'No Groq key yet, so Whisper runs on this PC.'
+            : engine === 'groq'
+              ? 'Very fast and accurate. Your audio is sent to Groq to be transcribed.'
+              : 'Nothing leaves your PC. Slower, and the model downloads the first time.'}
+        </span>
+      </div>
+      <div className="section">
+        <span className="section-title">Groq API key</span>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="field-input"
+            style={{ flex: 1 }}
+            type={show ? 'text' : 'password'}
+            placeholder="gsk_..."
+            value={settings.groqKey ?? ''}
+            spellCheck={false}
+            onChange={(e) => save({ groqKey: e.target.value.trim() })}
+          />
+          <button className="btn" onClick={() => setShow(!show)}>{show ? 'Hide' : 'Show'}</button>
+        </div>
+        <span className="hint">Get a free key at console.groq.com, under API Keys. It's stored only on this PC.</span>
+      </div>
+      <div className="section">
+        <span className="section-title">Offline model</span>
+        <Seg
+          options={[{ v: 'tiny', l: 'Fast (40 MB)' }, { v: 'base', l: 'Balanced (80 MB)' }, { v: 'small', l: 'Accurate (250 MB)' }]}
+          value={settings.localModel ?? 'base'}
+          onChange={(v) => save({ localModel: v as 'tiny' | 'base' | 'small' })}
+        />
+        <span className="hint">Bigger models hear better but take longer. It downloads once, then works without internet.</span>
+      </div>
+    </>
   )
 }

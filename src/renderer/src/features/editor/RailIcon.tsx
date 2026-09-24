@@ -130,6 +130,34 @@ export default function RailIcon({ id, active, clicked, size = 20 }: RailIconPro
         </svg>
       )
 
+    case 'tidy': // Smart trim: a clip that shrinks
+      return (
+        <svg className={common} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <rect className="ri-tidy-a" x="2.5" y="8" width="7" height="8" rx="1.6" />
+          <rect className="ri-tidy-b" x="14.5" y="8" width="7" height="8" rx="1.6" />
+          <path className="ri-tidy-arrows" d="M10.8 12h2.4M11.6 10.6 10.4 12l1.2 1.4M12.4 10.6l1.2 1.4-1.2 1.4" />
+        </svg>
+      )
+
+    case 'guide': // Guide: numbered steps
+      return (
+        <svg className={common} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="3" width="16" height="18" rx="2.5" />
+          <circle className="ri-guide-dot ri-guide-dot1" cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none" />
+          <circle className="ri-guide-dot ri-guide-dot2" cx="8.5" cy="12.5" r="1.2" fill="currentColor" stroke="none" />
+          <circle className="ri-guide-dot ri-guide-dot3" cx="8.5" cy="16.5" r="1.2" fill="currentColor" stroke="none" />
+          <path className="ri-guide-lines" d="M11.5 8.5h5M11.5 12.5h5M11.5 16.5h3.5" />
+        </svg>
+      )
+
+    case 'brand': // Brand: a badge with a star
+      return (
+        <svg className={common} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path className="ri-brand-badge" d="M12 2.8l2.4 1.7 2.9-.2.9 2.8 2.3 1.8-1 2.7 1 2.7-2.3 1.8-.9 2.8-2.9-.2L12 20.4l-2.4-1.7-2.9.2-.9-2.8-2.3-1.8 1-2.7-1-2.7 2.3-1.8.9-2.8 2.9.2z" />
+          <path className="ri-brand-star" d="M12 8.3l1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3z" fill="currentColor" stroke="none" />
+        </svg>
+      )
+
     default:
       return null
   }

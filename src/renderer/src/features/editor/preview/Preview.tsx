@@ -68,6 +68,20 @@ export default function Preview() {
     img.src = mediaUrl(edit.background.imagePath)
   }, [edit.background.type, edit.background.imagePath])
 
+  // brand logo
+  const logo = useRef<HTMLImageElement | null>(null)
+  const logoPath = edit.watermark?.path
+  useEffect(() => {
+    logo.current = null
+    if (!logoPath) return
+    const img = new Image()
+    img.onload = () => {
+      logo.current = img
+      requestAnimationFrame(() => draw.current())
+    }
+    img.src = mediaUrl(logoPath)
+  }, [logoPath])
+
   // images used by overlay clips
   useEffect(() => {
     for (const a of edit.assets) {
@@ -303,6 +317,7 @@ export default function Preview() {
       clicks: L.clicks,
       keys: useEditor.getState().cursorData?.keys,
       bgImage: L.bgImage,
+      watermark: logo.current && L.edit.watermark ? { src: logo.current, w: logo.current.naturalWidth, h: logo.current.naturalHeight } : null,
       bgVideo: L.edit.background.type === 'video' && bgv && bgv.readyState >= 2 ? bgv : null,
       webcam: camSrc,
       overlays
@@ -774,7 +789,7 @@ export default function Preview() {
       {/* media elements stay in the layout (invisible) so Chromium keeps decoding frames in real time */}
       <div className="media-pool" aria-hidden>
       <video ref={videoRef} src={mediaUrl(m.screen.path)} muted playsInline preload="auto" className="pool-video" onLoadedData={() => draw.current()} onSeeked={onVideoSeeked} />
-      {m.mic && <audio ref={reg('mic')} src={mediaUrl(m.mic.path)} preload="auto" />}
+      {m.mic && <audio ref={reg('mic')} src={mediaUrl(edit.audio.voiceClean && edit.audio.voiceCleanPath ? edit.audio.voiceCleanPath : m.mic.path)} preload="auto" />}
       {m.system && <audio ref={reg('sys')} src={mediaUrl(m.system.path)} preload="auto" />}
       {m.webcam && <video ref={reg('webcam')} src={mediaUrl(m.webcam.path)} muted playsInline preload="auto" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => draw.current()} />}
       {edit.audio.musicPath && <audio ref={reg('music')} src={mediaUrl(edit.audio.musicPath)} loop preload="auto" />}

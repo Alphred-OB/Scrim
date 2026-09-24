@@ -185,6 +185,9 @@ export async function exportProject(
     }
   }
 
+  let logo: ImageBitmap | null = null
+  if (edit.watermark?.path) logo = await createImageBitmap(await (await fetch(mediaUrl(edit.watermark.path))).blob()).catch(() => null)
+
   let bgImage: ImageBitmap | null = null
   if (edit.background.type === 'image' && edit.background.imagePath) {
     bgImage = await createImageBitmap(await (await fetch(mediaUrl(edit.background.imagePath))).blob())
@@ -260,7 +263,8 @@ export async function exportProject(
         bgVideo: bgFrame ? (bgFrame.toCanvasImageSource() as CanvasImageSource) : null,
         bgVideoSize: bgFrame ? [bgFrame.displayWidth, bgFrame.displayHeight] : undefined,
         webcam: camFrame ? { src: camFrame.toCanvasImageSource() as CanvasImageSource, w: camFrame.displayWidth, h: camFrame.displayHeight } : null,
-        overlays: ovMap
+        overlays: ovMap,
+        watermark: logo ? { src: logo, w: logo.width, h: logo.height } : null
       })
       await source.add(k / fps, 1 / fps)
       k++
@@ -287,6 +291,7 @@ export async function exportProject(
     input.dispose()
     bgImage?.close()
     ovImages.forEach((b) => b.close())
+    logo?.close()
   }
   await api.fileClose(tmpVideo)
 
@@ -294,7 +299,7 @@ export async function exportProject(
   onProgress({ phase: 'audio', progress: 0 })
   const a = edit.audio
   const tracks: MuxJobIn['tracks'] = []
-  if (media.mic && !a.micMuted && a.micVolume > 0) tracks.push({ path: media.mic.path, offset: media.mic.offset + a.syncOffset, volume: a.micVolume })
+  if (media.mic && !a.micMuted && a.micVolume > 0) tracks.push({ path: a.voiceClean && a.voiceCleanPath ? a.voiceCleanPath : media.mic.path, offset: media.mic.offset + a.syncOffset, volume: a.micVolume })
   if (media.system && !a.systemMuted && a.systemVolume > 0) tracks.push({ path: media.system.path, offset: media.system.offset + a.syncOffset, volume: a.systemVolume })
   for (const c of edit.audioClips) {
     const as = assets.get(c.assetId)

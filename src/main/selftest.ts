@@ -38,7 +38,7 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
   }
   const clickText = async (selector: string, text: string) => {
     const ok = await js<boolean>(
-      `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim().startsWith(${JSON.stringify(text)})); if (!el) return false; el.setAttribute('data-test-hit', '1'); return true })()`
+      `(() => { const el = [...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim().startsWith(${JSON.stringify(text)})); if (!el) return false; el.setAttribute('data-test-hit', '1'); el.scrollIntoView({ block: 'center', inline: 'nearest' }); return true })()`
     )
     if (!ok) throw new Error(`No ${selector} with text ${text}`)
     await click('[data-test-hit="1"]')
@@ -172,6 +172,15 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
 
       openEditor(env.SCRIM_TEST_DIR!)
       await wait(3500)
+      if (env.SCRIM_TEST_ENGINE) {
+        // quick check of the offline speech engine (used to try dev mode)
+        for (let i = 0; i < 120 && !(await js<boolean>('!!window.__scrim?.engineTest').catch(() => false)); i++) await wait(500)
+        const model = await fs.readFile('/tmp/dftest/double.onnx')
+        const r = await js(`window.__scrim.engineTest(${JSON.stringify([...model])})`).catch((e) => String(e))
+        log('engine', JSON.stringify(r))
+        log(JSON.stringify(r).includes('[2,4,6]') ? 'PASS engine in this mode' : 'FAIL engine in this mode')
+        return app.quit()
+      }
       if (env.SCRIM_TEST_LONG) {
         // long playback: the time must keep moving the whole way (no stalls that need a pause and play)
         await js(`window.api.getSettings().then((s) => window.api.saveSettings({ ...s, onboarded: true, toursSeen: ['home', 'editor', 'welcome', 'practice'] }))`)
@@ -591,6 +600,144 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await shot('intro-space.png')
       })
 
+      // ---------------- speech, captions, trim, guide, voice, brand, presets ----------------
+      type E = { transcript?: { words: unknown[] }; clips: { speed: number }[]; audio: { voiceCleanPath?: string }; watermark?: unknown; aspect: string; reframe?: string; guide?: unknown[] }
+      const ed = () => js<E>('window.__scrim.edit()')
+      const until = async (fn: () => Promise<boolean>, ms = 15000) => {
+        for (let i = 0; i < ms / 250; i++) {
+          if (await fn().catch(() => false)) return true
+          await wait(250)
+        }
+        return false
+      }
+      await js(`window.__scrim.saveTo(${JSON.stringify(out)})`)
+      await step('offline speech engine loads and runs', async () => {
+        const model = await fs.readFile(env.SCRIM_TEST_ONNX || '/tmp/dftest/double.onnx').catch(() => null)
+        if (!model) return log('engine test skipped (no model file)')
+        const r = await js<{ ok: boolean; out?: number[]; message?: string }>(`window.__scrim.engineTest(${JSON.stringify([...model])})`)
+        log('engine', JSON.stringify(r))
+        if (!r.ok || r.out?.join() !== '2,4,6') throw new Error('engine did not run: ' + (r.message ?? JSON.stringify(r.out)))
+        const n = await js<number>(`window.api.speechPcm(${JSON.stringify('/tmp/dftest/mic.webm')}).then((a) => a.length)`)
+        log('speech samples', n)
+        if (!(n > 16000)) throw new Error('no speech samples')
+      })
+      await step('captions from speech', async () => {
+        // mic time; the mic starts 0.5 s into the video
+        const said = 'So today I will um show you how this works. First open the settings page. Then we pick a color and save it.'.split(' ')
+        const words = said.map((w, i) => {
+          const t0 = i < 12 ? 0.1 + i * 0.28 : 5.4 + (i - 12) * 0.25
+          return { t0: +t0.toFixed(2), t1: +(t0 + 0.22).toFixed(2), w }
+        })
+        await js(`window.__scrim.fakeWords(${JSON.stringify(words)})`)
+        await js('window.__scrim.panel("ai")')
+        await wait(500)
+        await shot('captions-empty.png')
+        await clickText('.btn', 'Make captions')
+        if (!(await until(async () => !!(await ed()).transcript))) throw new Error('no transcript')
+        await js('window.__scrim.seek(1.9)')
+        await wait(800)
+        await shot('captions.png')
+        await clickText('.cap-look-name', 'Bold')
+        await js('window.__scrim.seek(6.4)')
+        await wait(600)
+        await shot('captions-bold.png')
+      })
+      await step('edit by text: remove um and shorten pauses', async () => {
+        await clickText('.fx-tabs button', 'Edit text')
+        await wait(400)
+        await shot('transcript.png')
+        const len = async () => (await ed()).clips.reduce((a, c) => a + ((c as unknown as { end: number; start: number }).end - (c as unknown as { start: number }).start) / c.speed, 0)
+        const n0 = await len()
+        await clickText('.btn', 'Remove 1 um')
+        await wait(300)
+        const n1 = await len()
+        await clickText('.btn', 'Shorten')
+        await wait(300)
+        const n2 = await len()
+        log('text edit clips', n0, n1, n2)
+        if (!(n1 < n0 - 0.1) || !(n2 < n1 - 0.5)) throw new Error(`video length ${n0} -> ${n1} -> ${n2}`)
+        await shot('transcript-cut.png')
+      })
+      await step('subtitle file', async () => {
+        await clickText('.fx-tabs button', 'Style')
+        await wait(300)
+        await clickText('.btn', 'Save .srt')
+        const f = join(out, 'Test a.srt')
+        if (!(await until(async () => (await fs.stat(f)).size > 20, 5000))) throw new Error('no srt')
+        const srt = await fs.readFile(f, 'utf8')
+        log('srt', JSON.stringify(srt.slice(0, 120)))
+        if (!srt.includes('-->') || srt.includes(' um ')) throw new Error('bad srt')
+      })
+      await step('smart trim looks for slow parts', async () => {
+        await js('window.__scrim.panel("tidy")')
+        await wait(400)
+        await clickText('.btn', 'Find slow parts')
+        if (!(await until(async () => js<boolean>(`!![...document.querySelectorAll('.section-title')].find((e) => /slow (part|found)/i.test(e.textContent))`), 20000))) throw new Error('no result')
+        const rows = await js<number>('document.querySelectorAll(".tidy-row").length')
+        log('slow parts', rows)
+        await shot('tidy.png')
+        if (rows) {
+          await clickText('.btn', 'Speed up')
+          await wait(300)
+          log('speeds', JSON.stringify((await ed()).clips.map((c) => c.speed)))
+        }
+      })
+      await step('guide from clicks, saved as PDF', async () => {
+        await js('window.__scrim.panel("guide")')
+        await wait(400)
+        await clickText('.btn', 'Make steps')
+        await wait(300)
+        const n = await js<number>('document.querySelectorAll(".guide-step").length')
+        log('guide steps', n)
+        if (!n) throw new Error('no steps')
+        await until(async () => js<boolean>('!!document.querySelector("img.guide-shot")'), 10000)
+        await wait(400)
+        await shot('guide.png')
+        await clickText('.btn', 'Save PDF')
+        const f = join(out, 'Test a guide.pdf')
+        if (!(await until(async () => (await fs.stat(f)).size > 5000, 30000))) throw new Error('no pdf')
+        log('guide pdf bytes', (await fs.stat(f)).size)
+      })
+      await step('voice clean up', async () => {
+        await js('window.__scrim.panel("audio")')
+        await wait(400)
+        await clickText('.trow', 'Clean up my voice')
+        if (!(await until(async () => !!(await ed()).audio.voiceCleanPath, 30000))) throw new Error('no cleaned voice')
+        const p = (await ed()).audio.voiceCleanPath!
+        log('clean voice bytes', (await fs.stat(p)).size)
+        await shot('voice.png')
+      })
+      await step('brand kit puts the logo on', async () => {
+        await js(`window.__scrim.saveSettings({ brandKits: [{ id: 'bk1', name: 'Test brand', logoPath: '/tmp/dftest/logo.png', logoPos: 'top-right', logoSize: 0.14, logoOpacity: 0.9, colors: ['#ff3b30', '#34c759', '#000000', '#ffffff'], font: 'Poppins' }] })`)
+        await js('window.__scrim.panel("brand")')
+        await wait(500)
+        if (!(await js<boolean>('!!document.querySelector(".brand-kit.open")'))) await click('.brand-kit-head')
+        await wait(300)
+        await clickText('.btn', 'Use this brand')
+        if (!(await until(async () => !!(await ed()).watermark, 8000))) throw new Error('no logo')
+        await js('window.__scrim.seek(2)')
+        await wait(700)
+        await shot('brand.png')
+      })
+      await step('export presets: vertical follows the cursor', async () => {
+        await js('window.__scrim.exportDialog()')
+        await wait(600)
+        await click('[data-preset="vertical"]')
+        await wait(500)
+        await shot('export-presets.png')
+        const e = await ed()
+        if (e.aspect !== '9:16' || e.reframe !== 'follow') throw new Error(`aspect ${e.aspect} reframe ${e.reframe}`)
+        await js(`document.querySelector('.modal .icon-btn').click()`, true)
+        await wait(500)
+        await js('window.__scrim.seek(2.6)')
+        await wait(700)
+        await shot('vertical.png')
+        const r = await js(`window.__scrim.export(${JSON.stringify(join(out, 'vertical.mp4'))}, { resolution: 720, fps: 30, format: 'mp4' })`)
+        log('vertical export', r)
+        if (r !== 'ok') throw new Error('vertical export: ' + r)
+        await js(`window.__scrim.patchEdit({ aspect: '16:9', reframe: 'fit' })`)
+        await wait(300)
+      })
       await step('full screen preview', async () => {
         await js(`document.querySelector('.preview-full-btn').click()`, true)
         await wait(900)

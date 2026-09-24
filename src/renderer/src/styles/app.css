@@ -1182,3 +1182,122 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .upd-bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s var(--ease); }
 @keyframes updBob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(2px) } }
+
+/* ---------- rail icons: trim, guide, brand ---------- */
+.rail-icon-tidy .ri-tidy-a, .rail-icon-tidy .ri-tidy-b { transition: transform 0.35s var(--ease); }
+.rail-btn:hover .rail-icon-tidy .ri-tidy-a { transform: translateX(2px); }
+.rail-btn:hover .rail-icon-tidy .ri-tidy-b { transform: translateX(-2px); }
+.rail-icon-tidy.is-clicked .ri-tidy-arrows { animation: riTidy 0.4s var(--ease); }
+@keyframes riTidy { 50% { transform: scaleX(0.4); transform-origin: 12px 12px; } }
+.rail-icon-guide .ri-guide-dot { transform-box: fill-box; transform-origin: center; }
+.rail-btn:hover .rail-icon-guide .ri-guide-dot1 { animation: riGuide 0.9s var(--ease) 0s; }
+.rail-btn:hover .rail-icon-guide .ri-guide-dot2 { animation: riGuide 0.9s var(--ease) 0.12s; }
+.rail-btn:hover .rail-icon-guide .ri-guide-dot3 { animation: riGuide 0.9s var(--ease) 0.24s; }
+@keyframes riGuide { 30% { transform: scale(1.7); } }
+.rail-icon-brand .ri-brand-star { transform-box: fill-box; transform-origin: center; transition: transform 0.4s var(--ease); }
+.rail-btn:hover .rail-icon-brand .ri-brand-star { transform: rotate(72deg) scale(1.1); }
+.rail-icon-brand.is-clicked .ri-brand-badge { animation: riAiPulse 0.36s cubic-bezier(0.34, 1.56, 0.64, 1); transform-box: fill-box; transform-origin: center; }
+
+/* ---------- captions page ---------- */
+.cap-empty { display: flex; flex-direction: column; gap: 10px; }
+.cap-empty-art { display: flex; gap: 8px; justify-content: center; align-items: center; height: 84px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font-weight: 800; font-size: 20px; }
+.cap-empty-art span { color: var(--text); -webkit-text-stroke: 0.5px rgba(0,0,0,.4); }
+.cap-empty-art b { color: #ffd60a; animation: capWord 1.6s var(--ease) infinite; }
+@keyframes capWord { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.12); } }
+.cap-busy { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.cap-busy-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.cap-busy-row .hint { margin-left: auto; }
+.cap-looks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cap-look { display: flex; flex-direction: column; gap: 6px; padding: 6px 6px 8px; border-radius: 11px; background: var(--card); border: 1.5px solid transparent; cursor: pointer; color: var(--dim); font-size: 11px; }
+.cap-look:hover { background: var(--card-hi); color: var(--text); }
+.cap-look.on { border-color: var(--accent); color: var(--text); }
+.cap-look-sample { height: 46px; border-radius: 7px; background: #3a4150; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; color: #fff; font-weight: 800; }
+.cap-look-sample i, .cap-look-sample em { font-style: normal; }
+.cap-look-karaoke .cap-look-sample i:first-child { color: var(--hl); }
+.cap-look-karaoke .cap-look-sample em { color: var(--hl); }
+.cap-look-karaoke .cap-look-sample, .cap-look-clean .cap-look-sample, .cap-look-bold .cap-look-sample { text-shadow: 0 1px 0 #000, 0 -1px 0 #000, 1px 0 0 #000, -1px 0 0 #000; }
+.cap-look-bold .cap-look-sample { font-weight: 900; text-transform: uppercase; font-size: 13px; }
+.cap-look-bold .cap-look-sample em { color: var(--hl); display: inline-block; transform: scale(1.12); }
+.cap-look-clean .cap-look-sample em { color: var(--hl); }
+.cap-look-box .cap-look-sample span, .cap-look-box .cap-look-sample { }
+.cap-look-box .cap-look-sample em { color: var(--hl); }
+.cap-look-box .cap-look-sample::before { content: none; }
+.cap-look-box .cap-look-sample { background: #3a4150; }
+.cap-look-box .cap-look-sample > * { background: rgba(0,0,0,.6); padding: 1px 3px; }
+.cap-look-neon .cap-look-sample { text-shadow: 0 0 6px var(--hl); }
+.cap-look-neon .cap-look-sample em { text-shadow: 0 0 10px var(--hl), 0 0 2px var(--hl); }
+.cap-look-minimal .cap-look-sample { font-weight: 500; font-size: 12px; }
+.cap-look-minimal .cap-look-sample > * { background: rgba(0,0,0,.35); padding: 1px 3px; }
+.cap-look-name { text-align: center; }
+
+.tw-box { max-height: 360px; overflow-y: auto; padding: 12px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); font-size: 14px; line-height: 1.9; user-select: none; }
+.tw { padding: 2px 1px; border-radius: 4px; cursor: text; transition: background 0.12s; }
+.tw:hover { background: var(--card-hi); }
+.tw.now { background: var(--accent-soft); color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-soft); }
+.tw.sel { background: color-mix(in srgb, var(--danger) 28%, transparent); color: var(--text); }
+.tw.cut { color: var(--dim); text-decoration: line-through; opacity: 0.55; cursor: default; }
+.tw.filler:not(.cut) { color: var(--warn); }
+.tw.hid:not(.cut) { opacity: 0.5; font-style: italic; }
+.tw-gap { color: var(--dim); font-size: 11px; letter-spacing: 1px; margin: 0 4px; }
+.tw-edit { font: inherit; background: var(--bg-2); color: var(--text); border: 1px solid var(--accent); border-radius: 5px; padding: 0 4px; outline: none; }
+
+/* ---------- smart trim ---------- */
+.tidy-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+.tidy-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 9px; background: var(--card); }
+.tidy-row.off { opacity: 0.5; }
+.tidy-row input { accent-color: var(--accent); }
+.tidy-time { background: none; border: none; color: var(--accent-2); font-variant-numeric: tabular-nums; cursor: pointer; padding: 0; font-size: 12.5px; min-width: 44px; text-align: left; }
+.tidy-time:hover { text-decoration: underline; }
+.tidy-bar { flex: 1; height: 5px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.tidy-bar i { display: block; height: 100%; background: var(--warn); border-radius: 5px; }
+
+/* ---------- guide ---------- */
+.guide-list { display: flex; flex-direction: column; gap: 10px; }
+.guide-step { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.guide-step.off { opacity: 0.45; }
+.guide-head { display: flex; align-items: center; gap: 8px; }
+.guide-num { width: 22px; height: 22px; border-radius: 50%; background: var(--danger); color: #fff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; }
+.guide-shot { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; display: block; }
+.guide-shot.empty { background: var(--field); animation: guidePulse 1.2s ease-in-out infinite; }
+@keyframes guidePulse { 50% { opacity: 0.5; } }
+.guide-title, .guide-note { width: 100%; background: var(--field); border: 1px solid var(--line); color: var(--text); border-radius: 9px; padding: 8px 10px; font: inherit; font-size: 13px; outline: none; resize: vertical; }
+.guide-title { font-weight: 600; }
+.guide-title:focus, .guide-note:focus { border-color: var(--accent); }
+
+/* ---------- brand kit ---------- */
+.brand-kit { border-radius: 12px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+.brand-kit.open { border-color: var(--line-2); }
+.brand-kit-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: none; border: none; color: var(--text); cursor: pointer; text-align: left; }
+.brand-kit-head > svg { transition: transform 0.2s var(--ease); }
+.brand-kit.open .brand-kit-head > svg { transform: rotate(180deg); }
+.brand-logo { width: 32px; height: 32px; border-radius: 8px; background: var(--field); display: grid; place-items: center; overflow: hidden; color: var(--dim); flex: none; }
+.brand-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.brand-name { flex: 1; font-weight: 600; font-size: 13.5px; }
+.brand-dots { display: flex; gap: 3px; }
+.brand-dots i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line-2); }
+.brand-kit-body { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; }
+.brand-row { display: flex; align-items: center; gap: 10px; }
+.brand-row .btn { flex: 1; justify-content: flex-start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-corners { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.brand-corner { position: relative; height: 38px; border-radius: 8px; background: var(--field); border: 1.5px solid var(--line); cursor: pointer; }
+.brand-corner.on { border-color: var(--accent); }
+.brand-corner i { position: absolute; width: 10px; height: 7px; border-radius: 2px; background: var(--text-2); }
+.brand-corner.on i { background: var(--accent); }
+.brand-corner.top-left i { top: 6px; left: 7px; }
+.brand-corner.top-right i { top: 6px; right: 7px; }
+.brand-corner.bottom-left i { bottom: 6px; left: 7px; }
+.brand-corner.bottom-right i { bottom: 6px; right: 7px; }
+.brand-apply { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+/* ---------- export presets and follow button ---------- */
+.exp-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.exp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border-radius: 12px; background: var(--card); border: 1.5px solid var(--line); color: var(--text); cursor: pointer; text-align: center; transition: border-color 0.15s, transform 0.15s var(--ease); }
+.exp-preset:hover { transform: translateY(-1px); border-color: var(--line-2); }
+.exp-preset.on { border-color: var(--accent); background: var(--accent-soft); }
+.exp-preset b { font-size: 11.5px; line-height: 1.25; }
+.exp-preset span:last-child { font-size: 10.5px; color: var(--dim); }
+.exp-shape { display: block; border: 2px solid currentColor; border-radius: 4px; height: 26px; color: var(--text-2); }
+.exp-shape.a16x9 { width: 40px; height: 23px; }
+.exp-shape.a9x16 { width: 16px; height: 28px; }
+.exp-shape.a1x1 { width: 25px; height: 25px; }
+.btn.ghost.on { background: var(--accent-soft); color: var(--accent-2); }

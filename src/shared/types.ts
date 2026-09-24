@@ -354,6 +354,10 @@ export interface AudioSettings {
   musicVolume: number
   musicMuted: boolean
   syncOffset: number // seconds, shifts recorded audio/webcam against the screen video
+  /** cleaned up copy of the voice (noise removed, level evened out), used instead of the mic when on */
+  voiceClean?: boolean
+  voiceCleanPath?: string
+  voiceCleanStrength?: number // 0..1
 }
 
 export type ExportFormat = 'mp4' | 'webm' | 'mov' | 'gif'
@@ -392,6 +396,15 @@ export interface EditState {
   leadIn: number
   /** eye / speaker buttons on the timeline tracks */
   tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean; blurs?: boolean; keys?: boolean }
+  /** what was said, word by word (made by Captions > Generate) */
+  transcript?: Transcript
+  captions?: CaptionSettings
+  /** brand logo drawn on every frame */
+  watermark?: Watermark | null
+  /** 'follow' fills a different shaped video (like 9:16) with the recording and pans with the cursor */
+  reframe?: 'fit' | 'follow'
+  /** step by step guide made from the clicks */
+  guide?: GuideStep[]
 }
 
 export interface Project {
@@ -457,8 +470,69 @@ export interface AppSettings {
   onboarded: boolean
   /** guided interface tours already shown ('home', 'editor') */
   toursSeen: string[]
+  /** speech to text: Groq (fast, online, needs a key) or Whisper on this PC (offline after a one time download) */
+  transcribeEngine?: 'auto' | 'groq' | 'local'
+  groqKey?: string
+  /** size of the offline speech model */
+  localModel?: 'tiny' | 'base' | 'small'
+  brandKits?: BrandKit[]
 }
 
 /** Where the app's self update is at (updates come from GitHub Releases). */
 export type UpdateState = 'off' | 'idle' | 'checking' | 'downloading' | 'ready' | 'latest' | 'error'
 export interface UpdateStatus { state: UpdateState; current: string; version?: string; progress?: number; error?: string; notes?: string }
+
+// ---------------- speech, captions, guide, brand ----------------
+/** A spoken word. Times are in the audio track's own time; add Transcript.offset to get video time. */
+export interface TranscriptWord { t0: number; t1: number; w: string }
+export interface Transcript {
+  words: TranscriptWord[]
+  /** where the audio track starts in the video (mic offset), without the sync offset */
+  offset: number
+  source: 'mic' | 'system' | 'screen'
+  engine: 'groq' | 'local'
+  lang?: string
+  createdAt: number
+}
+export type CaptionLook = 'clean' | 'bold' | 'box' | 'karaoke' | 'neon' | 'minimal'
+export interface CaptionSettings {
+  show: boolean
+  look: CaptionLook
+  font: string
+  size: number // px at 1080p
+  color: string
+  highlight: string // the word being spoken
+  bg: string
+  bgOpacity: number
+  y: number // 0 top .. 1 bottom (center of the caption)
+  maxChars: number // per line
+  lines: 1 | 2
+  uppercase: boolean
+  /** words the person turned off (by start time in ms), e.g. a misheard word */
+  hidden?: number[]
+  /** fixed spellings: start time in ms -> text */
+  fixes?: Record<string, string>
+}
+export type LogoCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+export interface Watermark { path: string; pos: LogoCorner; size: number; opacity: number; margin: number }
+export interface BrandKit {
+  id: string
+  name: string
+  logoPath?: string
+  logoPos: LogoCorner
+  logoSize: number // share of the video width, 0.05..0.3
+  logoOpacity: number
+  colors: string[] // [main, accent, dark, light]
+  font: string
+  introPath?: string
+  outroPath?: string
+}
+export interface GuideStep {
+  id: string
+  t: number // source time of the click
+  x: number // click position 0..1 in the recording
+  y: number
+  title: string
+  note: string
+  off?: boolean
+}

@@ -26,6 +26,11 @@ import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
 import KeysPanel from './panels/KeysPanel'
+import CaptionsPanel from './panels/CaptionsPanel'
+import TidyPanel from './panels/TidyPanel'
+import GuidePanel from './panels/GuidePanel'
+import BrandPanel from './panels/BrandPanel'
+import { engineSelfTest } from './speech/transcribe'
 import RailIcon from './RailIcon'
 import { addTextAt, addTransitionItem, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
@@ -42,7 +47,10 @@ const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boo
   { id: 'audio', icon: 'audio', title: 'Audio' },
   { id: 'keys', icon: 'keyboard', title: 'Keyboard shortcuts', label: 'Keys' },
   { id: 'settings', icon: 'scissors', title: 'Clips & speed', label: 'Clips' },
-  { id: 'ai', icon: 'cc', title: 'AI captions & annotations', label: 'AI', soon: true }
+  { id: 'ai', icon: 'cc', title: 'Captions and editing by text', label: 'Captions' },
+  { id: 'tidy', icon: 'wand', title: 'Smart trim: find and remove slow parts', label: 'Trim' },
+  { id: 'guide', icon: 'click', title: 'Step by step guide from your clicks', label: 'Guide' },
+  { id: 'brand', icon: 'palette', title: 'Brand kit: logo, colors, intro', label: 'Brand' }
 ]
 
 const ASPECTS: { v: Aspect; l: string }[] = [
@@ -137,6 +145,13 @@ function EditorView() {
       clickSound: () => useEditor.getState().project!.edit.cursor.clickSound,
       lastText: () => { const ts = useEditor.getState().project!.edit.texts; return ts[ts.length - 1] },
       patchText: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.texts[e.texts.length - 1], patch)),
+      fakeWords: (w: unknown) => ((window as unknown as { __fakeWords: unknown }).__fakeWords = w),
+      saveTo: (d: string) => ((window as unknown as { __saveTo: string }).__saveTo = d),
+      engineTest: (bytes: number[]) => engineSelfTest(new Uint8Array(bytes)),
+      edit: () => useEditor.getState().project!.edit,
+      patchEdit: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e, patch)),
+      saveSettings: (patch: Record<string, unknown>) => useSettings.getState().save(patch),
+      undo: () => useEditor.getState().undo(),
       textById: (id: string, patch?: Record<string, unknown>) => { if (patch) useEditor.getState().update((e) => Object.assign(e.texts.find((x) => x.id === id)!, patch)); return useEditor.getState().project!.edit.texts.find((x) => x.id === id) },
       lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
       patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
@@ -366,7 +381,10 @@ function EditorView() {
             {panel === 'keys' && <KeysPanel />}
             {panel === 'settings' && <ClipPanel />}
             {panel === 'effects' && <EffectsPanel />}
-            {panel === 'ai' && <AiPanel />}
+            {panel === 'ai' && <CaptionsPanel />}
+            {panel === 'tidy' && <TidyPanel />}
+            {panel === 'guide' && <GuidePanel />}
+            {panel === 'brand' && <BrandPanel />}
           </div>
         </aside>
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 22px 10px', gap: 10 }}>
@@ -374,6 +392,16 @@ function EditorView() {
             <div style={{ width: 110 }}>
               <Select compact value={project.edit.aspect} options={ASPECTS} onChange={(v) => update((e) => (e.aspect = v))} />
             </div>
+            {project.edit.aspect !== 'auto' && (
+              <button
+                className={`btn ghost sm ${project.edit.reframe === 'follow' ? 'on' : ''}`}
+                data-test="follow"
+                title="Fill the whole video with the recording and move with the cursor (great for vertical videos)"
+                onClick={() => update((e) => (e.reframe = e.reframe === 'follow' ? 'fit' : 'follow'))}
+              >
+                <Icon name="target" size={15} /> {project.edit.reframe === 'follow' ? 'Following cursor' : 'Follow cursor'}
+              </button>
+            )}
             <button data-tour="crop" className="btn ghost sm" onClick={() => setPanel('background')}><Icon name="crop" size={15} /> Crop</button>
           </div>
 
@@ -409,27 +437,6 @@ function EditorView() {
           {busy || toast}
         </div>
       )}
-    </div>
-  )
-}
-
-function AiPanel() {
-  return (
-    <div className="section">
-      <span className="section-title">AI</span>
-      {[
-        { t: 'AI captions', d: 'Subtitles made from your voice, fully editable and styled like your text layers.', i: 'cc' },
-        { t: 'Smart annotations', d: 'AI watches your screen and adds callouts and highlights at the important moments.', i: 'sparkles' },
-        { t: 'Auto trim silences', d: 'Finds long pauses and dead air so you can cut them in one click.', i: 'scissors' }
-      ].map((f) => (
-        <div key={f.t} className="glass" style={{ padding: 14, borderRadius: 14, boxShadow: 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name={f.i} size={16} /> <b>{f.t}</b></span>
-            <span className="badge">Coming soon</span>
-          </div>
-          <div className="hint" style={{ marginTop: 6 }}>{f.d}</div>
-        </div>
-      ))}
     </div>
   )
 }

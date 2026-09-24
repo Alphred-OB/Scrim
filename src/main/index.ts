@@ -12,6 +12,7 @@ import {
 import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
 import { initUpdater } from './updater'
+import { registerSpeechIpc } from './speech'
 import { detectEncoder } from './ffmpeg'
 import { runSelfTest, selfTestDir } from './selftest'
 import { closeSplash, showSplash } from './splash'
@@ -353,6 +354,7 @@ app.whenReady().then(() => {
   recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, showBorder, hideBorder, isOwnUi, iconPath: ICON, openEditor, broadcast })
   registerIpc()
   initUpdater(broadcast)
+  registerSpeechIpc()
   if (!selfTestDir()) showSplash(ICON)
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ExportFormat, ExportSettings, Project } from '@shared/types'
+import type { Aspect, ExportFormat, ExportSettings, Project } from '@shared/types'
 import { api } from '@/lib/api'
 import { playDoneSound } from '@/lib/settings'
 import { DoneBurst, Icon, ProgressViz, Select, Seg, fmtTime, type Option } from '@/ui'
@@ -13,6 +13,14 @@ const FORMATS: { v: ExportFormat; l: string; hint: string }[] = [
   { v: 'webm', l: 'WebM', hint: 'Smaller files for websites. VP9 video with Opus audio.' },
   { v: 'mov', l: 'MOV', hint: 'For Final Cut, Premiere and other editors.' },
   { v: 'gif', l: 'GIF', hint: 'Silent loop for docs and READMEs. Up to 720p and 25 fps to keep files small.' }
+]
+
+/** One click setups for where the video is going. */
+const PRESETS: { id: string; l: string; sub: string; aspect: Aspect; reframe: 'fit' | 'follow'; exp: Partial<ExportSettings> }[] = [
+  { id: 'youtube', l: 'YouTube', sub: '16:9 · 1080p', aspect: '16:9', reframe: 'fit', exp: { format: 'mp4', resolution: 1080, fps: 30 } },
+  { id: 'vertical', l: 'TikTok, Reels, Shorts', sub: '9:16 · follows cursor', aspect: '9:16', reframe: 'follow', exp: { format: 'mp4', resolution: 1080, fps: 30 } },
+  { id: 'linkedin', l: 'LinkedIn, X', sub: '1:1 · follows cursor', aspect: '1:1', reframe: 'follow', exp: { format: 'mp4', resolution: 1080, fps: 30 } },
+  { id: 'gif', l: 'GIF for docs', sub: 'small loop · 15 fps', aspect: '16:9', reframe: 'fit', exp: { format: 'gif', resolution: 480, fps: 15 } }
 ]
 
 const RES_STEPS = [480, 720, 1080, 1440, 2160]
@@ -160,6 +168,30 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'idle' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span className="section-title">Made for</span>
+            <div className="exp-presets">
+              {PRESETS.map((p) => {
+                const on = project.edit.aspect === p.aspect && (project.edit.reframe ?? 'fit') === p.reframe && s.format === p.exp.format && s.resolution === p.exp.resolution && s.fps === p.exp.fps
+                return (
+                  <button
+                    key={p.id}
+                    data-preset={p.id}
+                    className={`exp-preset ${on ? 'on' : ''}`}
+                    onClick={() =>
+                      update((e) => {
+                        e.aspect = p.aspect
+                        e.reframe = p.reframe
+                        Object.assign(e.export, p.exp)
+                      })
+                    }
+                  >
+                    <span className={`exp-shape a${p.aspect.replace(':', 'x')}`} />
+                    <b>{p.l}</b>
+                    <span>{p.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
             <span className="section-title">Format</span>
             <Seg options={FORMATS.map((f) => ({ v: f.v, l: f.l }))} value={s.format} onChange={(v) => set({ format: v as ExportFormat })} />
             <span className="hint">{fmt.hint}</span>

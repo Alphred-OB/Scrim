@@ -1,5 +1,6 @@
 import { drawAnimatedText } from './textAnim'
 import { drawKeys } from './keysOverlay'
+import { drawCaptions } from './captions'
 import type { BlurItem, ClickEvent, EditState, KeyPress, EffectClip, EffectSettings, GradientDef, OverlayClip, TextItem, Transition, TransitionDir, TransitionEase } from '@shared/types'
 import { Track, cursorHiddenAt, sampleTrack } from './cursorTrack'
 import { ZoomState, viewport, zoomAt } from './timeMap'
@@ -30,6 +31,8 @@ export interface RenderInputs {
   bgVideoSize?: [number, number]
   webcam?: { src: CanvasImageSource; w: number; h: number } | null
   overlays?: Map<string, { src: CanvasImageSource; w: number; h: number }>
+  /** brand logo image for edit.watermark */
+  watermark?: { src: CanvasImageSource; w: number; h: number } | null
 }
 
 // ---------------- sizes ----------------
@@ -66,6 +69,29 @@ export interface Layout {
   view: { x: number; y: number; w: number; h: number } // video area in output px
   bar: number
   radius: number
+}
+
+/**
+ * "Follow" reframing: the recording fills the whole video (no frame, no padding) and the visible
+ * window slides along with the cursor. Used for vertical and square videos made from a wide recording.
+ */
+export function followLayout(base: Layout, camera: Track | null, t: number, srcW: number, srcH: number): Layout {
+  const { W, H } = base
+  const A = W / H
+  const c = base.crop
+  let crop = { ...c }
+  const p = camera ? sampleTrack(camera, Math.max(0, t)) : { x: 0.5, y: 0.5 }
+  if (c.w / c.h > A) {
+    const w = c.h * A
+    const cx = p.x * srcW
+    crop = { x: Math.min(c.x + c.w - w, Math.max(c.x, cx - w / 2)), y: c.y, w, h: c.h }
+  } else {
+    const h = c.w / A
+    const cy = p.y * srcH
+    crop = { x: c.x, y: Math.min(c.y + c.h - h, Math.max(c.y, cy - h / 2)), w: c.w, h }
+  }
+  const full = { x: 0, y: 0, w: W, h: H }
+  return { ...base, crop, box: full, view: full, bar: 0, radius: 0 }
 }
 
 export function computeLayout(edit: EditState, srcW: number, srcH: number, W: number, H: number): Layout {
@@ -422,7 +448,8 @@ export class Renderer {
 
   render(ctx: Ctx, W: number, H: number, inp: RenderInputs): { layout: Layout; zoom: ZoomState } {
     const { edit, srcW, srcH, t } = inp
-    const L = computeLayout(edit, srcW, srcH, W, H)
+    const L0 = computeLayout(edit, srcW, srcH, W, H)
+    const L = edit.reframe === 'follow' && edit.aspect !== 'auto' ? followLayout(L0, inp.camera, t, srcW, srcH) : L0
 
     // 1. background
     if (edit.background.type === 'live') {
@@ -472,7 +499,7 @@ export class Renderer {
       if (inFrame) {
         const src = inp.overlays!.get(inFrame.id)!
         ctx.globalAlpha = inFrame.opacity
-        drawFit(ctx, src.src, src.w, src.h, L.view, inFrame.fit)
+        drawFit(ctx, src.src, src.w, src.h, L.view, edit.reframe === 'follow' && L !== L0 ? 'cover' : inFrame.fit)
         ctx.globalAlpha = 1
       } else if (inp.drawFrame) {
         // best quality scaling for the recording itself (text stays crisp when zoomed or shrunk)
@@ -578,14 +605,32 @@ export class Renderer {
       for (const tx of texts) if (t >= tx.start && t <= tx.end) drawAnimatedText(ctx, tx, t, W, H, L.k)
     }
 
+    // 8a. captions from the voice
+    if (edit.captions?.show && edit.transcript) drawCaptions(ctx, edit, t, W, H, L.k)
+
     // 8b. keyboard shortcuts
     if (edit.keys?.show && edit.tracks.keys !== false && inp.keys?.length) drawKeys(ctx, inp.keys, edit.keys, t, W, H, L.k)
+
+    // 8c. brand logo
+    if (edit.watermark && inp.watermark) drawWatermark(ctx, edit.watermark, inp.watermark, W, H)
 
     // 9. transitions at the start, the end and around cuts
     this.applyTransition(ctx, W, H, t, edit, L.k)
 
     return { layout: L, zoom: z }
   }
+}
+
+function drawWatermark(ctx: Ctx, wm: NonNullable<EditState['watermark']>, img: { src: CanvasImageSource; w: number; h: number }, W: number, H: number): void {
+  const w = W * Math.max(0.03, Math.min(0.4, wm.size))
+  const h = (w * img.h) / Math.max(1, img.w)
+  const m = Math.min(W, H) * (wm.margin ?? 0.03)
+  const x = wm.pos.endsWith('left') ? m : W - w - m
+  const y = wm.pos.startsWith('top') ? m : H - h - m
+  ctx.save()
+  ctx.globalAlpha = Math.max(0, Math.min(1, wm.opacity))
+  ctx.drawImage(img.src, x, y, w, h)
+  ctx.restore()
 }
 
 function drawBrowserBar(ctx: Ctx, L: Layout): void {

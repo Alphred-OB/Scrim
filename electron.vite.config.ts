@@ -14,6 +14,9 @@ export default defineConfig({
   renderer: {
     resolve: { alias: { '@shared': resolve('src/shared'), '@': resolve('src/renderer/src') } },
     plugins: [react()],
+    worker: { format: 'es' },
+    // the speech engine loads its own wasm next to itself; pre-bundling would move it (and reload the page)
+    optimizeDeps: { exclude: ['@huggingface/transformers', 'onnxruntime-web'] },
     build: { target: 'chrome130' }
   }
 })

@@ -1,5 +1,5 @@
 import type {
-  AppSettings, Asset, CursorData, CaptureSource, Preset, Project, ProjectSummary, RecordOptions, RecorderStatus, UpdateStatus
+  AppSettings, Asset, CursorData, CaptureSource, Preset, Project, ProjectSummary, RecordOptions, RecorderStatus, UpdateStatus, TranscriptWord
 } from '@shared/types'
 
 export interface MuxJobIn {
@@ -63,6 +63,16 @@ export interface Api {
   notify(title: string, body: string): Promise<void>
   engines(): Promise<{ dda: boolean; platform: string }>
   updateStatus(): Promise<UpdateStatus>
+  /** Groq speech to text; progress comes on 'speech:progress' (0..1) */
+  transcribeGroq(path: string, key: string): Promise<{ words: TranscriptWord[]; lang?: string }>
+  /** 16 kHz mono samples for the offline speech model */
+  speechPcm(path: string): Promise<Float32Array>
+  cleanVoice(src: string, dir: string, strength: number): Promise<string>
+  /** how much the screen changes over time (0 = frozen), one value per `step` seconds */
+  screenChange(path: string): Promise<{ step: number; values: number[] }>
+  guideStills(path: string, times: number[]): Promise<string[]>
+  saveGuide(html: string, outPath: string, pdf: boolean): Promise<string>
+  writeText(p: string, text: string): Promise<void>
   checkForUpdate(): Promise<UpdateStatus>
   installUpdate(): Promise<boolean>
   openEditor(dir: string): void
@@ -80,4 +90,11 @@ export const api: Api = window.api
 export function mediaUrl(path: string | undefined): string {
   if (!path) return ''
   return 'media://file/' + encodeURIComponent(path)
+}
+
+/** Asks where to save a file (the self test answers by itself with a folder). */
+export async function pickSavePath(name: string, ext: string): Promise<string | null> {
+  const dir = (window as unknown as { __saveTo?: string }).__saveTo
+  if (dir) return `${dir}/${name}`
+  return api.saveFile(name, ext)
 }
