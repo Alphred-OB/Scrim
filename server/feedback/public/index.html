@@ -86,11 +86,13 @@
       <p class="fade-up mt-5 text-[13px] text-dim" style="--d:750ms" data-meta>Windows 10 and 11 · Free · No watermark</p>
     </div>
 
-    <!-- the video tilts back and flattens as you scroll -->
-    <div class="mt-20 [perspective:1600px] sm:mt-24" data-scrub="hero">
+    <!-- the laptop leans back and its lid opens as you scroll -->
+    <div class="mt-20 [perspective:1800px] sm:mt-24" data-scrub="hero">
       <div class="fade-up wrap" style="--d:850ms">
-        <div class="origin-top overflow-hidden rounded-[calc(12px+10px*(1-var(--p,0)))] border border-line bg-card will-change-transform [transform:rotateX(calc((1-var(--p,0))*22deg))_scale(calc(0.9+0.1*var(--p,0)))]" data-cursor-text="Scrim in action">
-          <video class="aspect-video w-full bg-black object-cover" src="img/demo.mp4" poster="img/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Scrim turning a plain recording into a polished demo"></video>
+        <div class="mx-auto max-w-[1000px] px-[4%] will-change-transform [transform-style:preserve-3d] [transform:rotateX(calc((1-var(--p,0))*16deg))_scale(calc(0.92+0.08*var(--p,0)))]" data-cursor-text="Scrim in action">
+          <div class="laptop"><div class="laptop-lid will-change-transform [transform:rotateX(calc((1-var(--p,0))*-62deg))]"><div class="laptop-screen aspect-video">
+            <video class="size-full object-cover" src="img/demo.mp4" poster="img/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Scrim turning a plain recording into a polished demo"></video>
+          </div></div><div class="laptop-base"></div></div>
         </div>
       </div>
     </div>
@@ -111,7 +113,7 @@
         <h2 class="reveal h-section max-w-[640px]">Same recording. <span class="serif text-dim">Very different video.</span></h2>
         <p class="reveal max-w-[300px] text-[15px] text-dim" style="--i:1">Drag the handle. Left is what you recorded, right is what Scrim made from it.</p>
       </div>
-      <div class="reveal relative aspect-video cursor-ew-resize touch-pan-y overflow-hidden rounded-[20px] border border-line bg-card select-none" data-compare data-cursor-text="Drag" style="--x:50%">
+      <div class="reveal mx-auto max-w-[1060px] px-[4%]"><div class="laptop"><div class="laptop-lid"><div class="laptop-screen relative aspect-video cursor-ew-resize touch-pan-y select-none" data-compare data-cursor-text="Drag" style="--x:50%">
         <img class="absolute inset-0 size-full object-cover" src="img/after.webp" alt="The same moment after Scrim: zoomed in, framed, with captions" draggable="false" loading="lazy">
         <div class="absolute inset-0 [clip-path:inset(0_calc(100%-var(--x))_0_0)]">
           <img class="absolute inset-0 size-full object-cover" src="img/before.webp" alt="A plain screen recording" draggable="false" loading="lazy">
@@ -123,7 +125,7 @@
             <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg>
           </button>
         </div>
-      </div>
+      </div></div><div class="laptop-base"></div></div></div>
     </div>
   </section>
 
@@ -156,22 +158,22 @@
               </li>
             </ol>
           </div>
-          <div class="relative aspect-[16/10] overflow-hidden rounded-[20px] border border-line bg-card" data-story-stage>
+          <div class="px-[5%]"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]">
             <img class="absolute inset-0 size-full object-cover" src="img/home.webp" alt="Scrim's home screen, ready to record" loading="lazy">
             <img class="absolute inset-0 size-full object-cover will-change-[clip-path,transform]" data-story-img src="img/frame.webp" alt="A recording framed with a smooth zoom" loading="lazy">
             <img class="absolute inset-0 size-full object-cover will-change-[clip-path,transform]" data-story-img src="img/captions.webp" alt="Captions that light up word by word" loading="lazy">
-            <img class="absolute inset-0 size-full bg-bg-2 object-contain p-8 will-change-[clip-path,transform]" data-story-img src="img/export-laptop.webp" alt="The export window with platform presets, on a laptop" loading="lazy">
-          </div>
+            <img class="absolute inset-0 size-full object-cover will-change-[clip-path,transform]" data-story-img src="img/export.webp" alt="The export window with platform presets" loading="lazy">
+          </div></div><div class="laptop-base"></div></div></div>
         </div>
       </div>
     </div>
     <!-- phones and tablets -->
     <div class="wrap space-y-16 py-24 lg:hidden">
       <p class="label">How it works</p>
-      <div class="reveal"><img class="aspect-[16/10] w-full rounded-2xl border border-line object-cover" src="img/home.webp" alt="" loading="lazy"><p class="mt-5 font-mono text-sm text-dim">01</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Record</h3><p class="mt-2 text-ink-2">Pick a screen, a window or a browser tab. Add your mic, PC sound and webcam.</p></div>
-      <div class="reveal"><img class="aspect-[16/10] w-full rounded-2xl border border-line object-cover" src="img/frame.webp" alt="" loading="lazy"><p class="mt-5 font-mono text-sm text-dim">02</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Zooms happen on their own</h3><p class="mt-2 text-ink-2">Every click becomes a smooth zoom on a clean background.</p></div>
-      <div class="reveal"><img class="aspect-[16/10] w-full rounded-2xl border border-line object-cover" src="img/captions.webp" alt="" loading="lazy"><p class="mt-5 font-mono text-sm text-dim">03</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Captions from your voice</h3><p class="mt-2 text-ink-2">Words light up as you say them. Delete a word and it's cut from the video.</p></div>
-      <div class="reveal"><img class="aspect-[16/10] w-full rounded-2xl border border-line bg-bg-2 object-contain p-4" src="img/export-laptop.webp" alt="" loading="lazy"><p class="mt-5 font-mono text-sm text-dim">04</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Share it anywhere</h3><p class="mt-2 text-ink-2">One click for YouTube, TikTok, LinkedIn, a GIF, or a step by step guide.</p></div>
+      <div class="reveal"><div class="px-[6%] pb-2"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/home.webp" alt="" loading="lazy"></div></div><div class="laptop-base"></div></div></div><p class="mt-5 font-mono text-sm text-dim">01</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Record</h3><p class="mt-2 text-ink-2">Pick a screen, a window or a browser tab. Add your mic, PC sound and webcam.</p></div>
+      <div class="reveal"><div class="px-[6%] pb-2"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/frame.webp" alt="" loading="lazy"></div></div><div class="laptop-base"></div></div></div><p class="mt-5 font-mono text-sm text-dim">02</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Zooms happen on their own</h3><p class="mt-2 text-ink-2">Every click becomes a smooth zoom on a clean background.</p></div>
+      <div class="reveal"><div class="px-[6%] pb-2"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/captions.webp" alt="" loading="lazy"></div></div><div class="laptop-base"></div></div></div><p class="mt-5 font-mono text-sm text-dim">03</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Captions from your voice</h3><p class="mt-2 text-ink-2">Words light up as you say them. Delete a word and it's cut from the video.</p></div>
+      <div class="reveal"><div class="px-[6%] pb-2"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/export.webp" alt="" loading="lazy"></div></div><div class="laptop-base"></div></div></div><p class="mt-5 font-mono text-sm text-dim">04</p><h3 class="mt-1 text-2xl font-medium tracking-tight">Share it anywhere</h3><p class="mt-2 text-ink-2">One click for YouTube, TikTok, LinkedIn, a GIF, or a step by step guide.</p></div>
     </div>
   </section>
 
@@ -185,11 +187,11 @@
         </div>
         <div class="-mb-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-24 will-change-transform sm:px-8 lg:mb-0 lg:snap-none lg:overflow-visible lg:pb-0 lg:[padding-left:max(2rem,calc((100vw-1240px)/2+2rem))]" data-rail>
           <article class="group flex w-[82vw] flex-none snap-start flex-col rounded-[20px] border border-line bg-card p-3 sm:w-[420px]">
-            <div class="aspect-[4/3] overflow-hidden rounded-[14px] bg-bg-2"><img class="size-full object-cover transition duration-1000 ease-out-expo group-hover:scale-105" src="img/guide.webp" alt="" loading="lazy"></div>
+            <div class="grid aspect-[4/3] place-items-center overflow-hidden rounded-[14px] bg-bg-2 px-[13%] pb-[3%]"><div class="w-full transition duration-1000 ease-out-expo group-hover:-translate-y-1.5 group-hover:scale-[1.04]"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/guide.webp" alt="" loading="lazy"></div></div><div class="laptop-base"></div></div></div></div>
             <div class="p-3 pt-5"><p class="font-mono text-[12px] text-dim">01</p><h3 class="mt-1 text-xl font-medium tracking-tight">Step by step guides</h3><p class="mt-1.5 text-[15px] text-dim">Every click becomes a numbered step with a screenshot. Save as PDF or a web page.</p></div>
           </article>
           <article class="group flex w-[82vw] flex-none snap-start flex-col rounded-[20px] border border-line bg-card p-3 sm:w-[420px]">
-            <div class="aspect-[4/3] overflow-hidden rounded-[14px] bg-bg-2"><img class="size-full object-cover transition duration-1000 ease-out-expo group-hover:scale-105" src="img/keys.webp" alt="" loading="lazy"></div>
+            <div class="grid aspect-[4/3] place-items-center overflow-hidden rounded-[14px] bg-bg-2 px-[13%] pb-[3%]"><div class="w-full transition duration-1000 ease-out-expo group-hover:-translate-y-1.5 group-hover:scale-[1.04]"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/keys.webp" alt="" loading="lazy"></div></div><div class="laptop-base"></div></div></div></div>
             <div class="p-3 pt-5"><p class="font-mono text-[12px] text-dim">02</p><h3 class="mt-1 text-xl font-medium tracking-tight">Shortcuts on screen</h3><p class="mt-1.5 text-[15px] text-dim">Keys you press show up as clean keycaps. What you type is never recorded.</p></div>
           </article>
           <article class="group flex w-[82vw] flex-none snap-start flex-col rounded-[20px] border border-line bg-card p-3 sm:w-[420px]">
@@ -206,7 +208,7 @@
             <div class="p-3 pt-5"><p class="font-mono text-[12px] text-dim">04</p><h3 class="mt-1 text-xl font-medium tracking-tight">Smart trim</h3><p class="mt-1.5 text-[15px] text-dim">Loading screens and pauses get cut or sped up. You approve every change.</p></div>
           </article>
           <article class="group flex w-[82vw] flex-none snap-start flex-col rounded-[20px] border border-line bg-card p-3 sm:w-[420px]">
-            <div class="relative aspect-[4/3] overflow-hidden rounded-[14px] bg-bg-2"><img class="size-full object-cover opacity-80" src="img/editor.webp" alt="" loading="lazy"><span class="absolute right-5 bottom-5 grid size-20 place-items-center rounded-full border-4 border-card bg-ink text-2xl font-medium text-inv transition duration-700 ease-out-expo group-hover:-translate-x-6 group-hover:-translate-y-4 group-hover:scale-110">AB</span></div>
+            <div class="grid aspect-[4/3] place-items-center overflow-hidden rounded-[14px] bg-bg-2 px-[13%] pb-[3%]"><div class="w-full"><div class="laptop "><div class="laptop-lid"><div class="laptop-screen aspect-[16/10]"><img class="size-full object-cover" src="img/editor.webp" alt="" loading="lazy"><span class="absolute right-[5%] bottom-[7%] grid aspect-square w-[16%] place-items-center rounded-full border-[0.6cqw] border-card bg-ink text-[3.2cqw] font-medium text-inv transition duration-700 ease-out-expo group-hover:-translate-x-[40%] group-hover:-translate-y-[30%] group-hover:scale-110">AB</span></div></div><div class="laptop-base"></div></div></div></div>
             <div class="p-3 pt-5"><p class="font-mono text-[12px] text-dim">05</p><h3 class="mt-1 text-xl font-medium tracking-tight">Webcam bubble</h3><p class="mt-1.5 text-[15px] text-dim">Your face in a circle or rounded box. Drag it anywhere on the preview.</p></div>
           </article>
           <article class="group flex w-[82vw] flex-none snap-start flex-col rounded-[20px] border border-line bg-card p-3 sm:w-[420px]">

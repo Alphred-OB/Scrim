@@ -104,6 +104,31 @@
   .input { @apply rounded-xl border border-line bg-bg px-3.5 py-2.5 text-base font-normal text-ink transition outline-none focus:border-ink; }
 }
 
+
+/* ---------- laptop mockup (pure CSS, solid colors) ----------
+   <div class="laptop"><div class="laptop-lid"><div class="laptop-screen">…</div></div><div class="laptop-base"></div></div>
+   Sizes are percentages of the width, so it scales from a small card to the hero. */
+@layer components {
+  .laptop { @apply relative mx-auto w-full; container-type: inline-size; transform-style: preserve-3d; }
+  .laptop-lid {
+    @apply relative bg-[#0c0c0e];
+    padding: 2.6cqw 2.6cqw 3.4cqw;
+    border-radius: 3.2cqw 3.2cqw 1.2cqw 1.2cqw;
+    box-shadow: 0 0 0 max(1px, 0.25cqw) #3b3c42, 0 4cqw 8cqw -2cqw rgb(0 0 0 / 0.35);
+    transform-origin: 50% 100%;
+  }
+  .laptop-lid::before { content: ''; @apply absolute left-1/2 rounded-full bg-[#23252b]; top: 1cqw; width: 0.9cqw; height: 0.9cqw; transform: translateX(-50%); }
+  .laptop-screen { @apply relative overflow-hidden bg-black; border-radius: 0.8cqw; }
+  .laptop-base {
+    @apply relative bg-[#a3a5ab];
+    width: 116%; margin-left: -8%; height: 2.4cqw; min-height: 6px;
+    border-radius: 0.3cqw 0.3cqw 2.4cqw 2.4cqw;
+    border-top: max(1px, 0.35cqw) solid #d3d5da;
+    box-shadow: inset 0 -0.5cqw 0 #85878d, 0 3cqw 5cqw -1.5cqw rgb(0 0 0 / 0.4);
+  }
+  .laptop-base::after { content: ''; @apply absolute top-0 left-1/2 bg-[#8a8c92]; width: 18%; height: 42%; transform: translateX(-50%); border-radius: 0 0 1.2cqw 1.2cqw; }
+}
+
 /* ---------- entrance animations ---------- */
 /* words that rise out of a line mask, started by .go on an ancestor */
 @utility line-mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.08em; margin-bottom: -0.08em; }
