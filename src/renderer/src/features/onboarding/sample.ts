@@ -312,22 +312,24 @@ function drawFrame(ctx: OffscreenCanvasRenderingContext2D, t: number) {
   }
 }
 
-/** Renders the sample, saves it as a project and returns its folder. */
-export async function makeSampleProject(onProgress?: (p: number) => void): Promise<string> {
+/** Renders the sample, saves it as a project and returns its folder.
+ *  `scale` 2 draws it at 3840 x 2160 (used for sharp website footage). */
+export async function makeSampleProject(onProgress?: (p: number) => void, scale = 1): Promise<string> {
   const { dir, video } = await api.sampleBegin()
-  const canvas = new OffscreenCanvas(W, H)
+  const canvas = new OffscreenCanvas(W * scale, H * scale)
   const ctx = canvas.getContext('2d', { alpha: false })!
   await document.fonts?.load(`600 20px Inter`).catch(() => {})
   await api.fileOpen(video)
   const writable = new WritableStream<StreamTargetChunk>({ write: (chunk) => api.fileWrite(video, chunk.data, chunk.position) })
   const output = new Output({ format: new Mp4OutputFormat(), target: new StreamTarget(writable, { chunked: true }) })
-  const codec = await getFirstEncodableVideoCodec(['avc', 'vp9', 'av1', 'vp8'], { width: W, height: H })
+  const codec = await getFirstEncodableVideoCodec(['avc', 'vp9', 'av1', 'vp8'], { width: W * scale, height: H * scale })
   if (!codec) throw new Error("This PC can't encode the sample video.")
-  const source = new CanvasSource(canvas, { codec, quality: new Quality({ bitrate: 6_000_000, bitrateMode: 'variable' }), keyFrameInterval: 1 })
+  const source = new CanvasSource(canvas, { codec, quality: new Quality({ bitrate: scale > 1 ? 40_000_000 : 6_000_000, bitrateMode: 'variable' }), keyFrameInterval: 1 })
   output.addVideoTrack(source, { frameRate: FPS })
   await output.start()
   const frames = Math.round(SAMPLE_SECONDS * FPS)
   for (let k = 0; k < frames; k++) {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0)
     drawFrame(ctx, k / FPS)
     await source.add(k / FPS, 1 / FPS)
     if (k % 10 === 0) onProgress?.(k / frames)
@@ -337,3 +339,6 @@ export async function makeSampleProject(onProgress?: (p: number) => void): Promi
   onProgress?.(1)
   return api.sampleFinish(dir, sampleCursor(), SAMPLE_SECONDS)
 }
+
+// the self test makes a sharp copy of the sample for the website
+;(window as unknown as { __scrimSample?: (scale: number) => Promise<string> }).__scrimSample = (scale: number) => makeSampleProject(undefined, scale)

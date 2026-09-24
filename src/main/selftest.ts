@@ -63,10 +63,20 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await js('location.reload()')
         await wait(3000)
         await shot('site-home.png')
-        openEditor(env.SCRIM_TEST_DIR!)
+        // SCRIM_TEST_SHOTS=4k first renders the sample app at 3840 x 2160 so zooms stay sharp
+        let dir = env.SCRIM_TEST_DIR!
+        if (env.SCRIM_TEST_SHOTS === '4k') {
+          dir = await js<string>(`(async () => { for (let i = 0; i < 50 && !window.__scrimSample; i++) await new Promise((r) => setTimeout(r, 200)); return window.__scrimSample(2) })()`)
+          log('sharp sample at', dir)
+        }
+        openEditor(dir)
         await wait(5000)
         await js(`document.querySelectorAll('.coach-foot .btn').forEach((b) => /skip|done|got it/i.test(b.textContent) && b.click())`, true).catch(() => {})
+        // a solid brand color behind the recording, like the rest of the site
+        await js(`window.__scrim.patchEdit({ background: { type: 'color', wallpaper: 'aurora', live: { id: 'aurora-flow', speed: 1, colors: ['#0b1026', '#2f6bff', '#a855f7'] }, color: '#ff5a36', gradient: { kind: 'linear', angle: 135, stops: [{ pos: 0, color: '#38bdf8' }, { pos: 1, color: '#0f172a' }] }, blur: 0, dim: 0 } })`)
         await js('window.__scrim.panel("background")')
+        await clickText('button', 'Color').catch(() => {})
+        await js(`window.__scrim.patchEdit({ export: { ...window.__scrim.edit().export, format: 'mp4', resolution: 1080, fps: 30 } })`)
         await js('window.__scrim.seek(2.4)')
         await wait(1500)
         await shot('site-editor.png')
@@ -93,7 +103,7 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         await shot('site-export.png')
         await js(`document.querySelector('.modal .icon-btn')?.click()`, true)
         await js(`window.__scrim.patchEdit({ captions: { show: false } })`)
-        const r = await js(`window.__scrim.export(${JSON.stringify(join(out, 'site-demo.mp4'))}, { resolution: 1080, fps: 30, quality: 'medium', format: 'mp4' })`)
+        const r = await js(`window.__scrim.export(${JSON.stringify(join(out, 'site-demo.mp4'))}, { resolution: ${env.SCRIM_TEST_SHOTS === '4k' ? 1440 : 1080}, fps: ${env.SCRIM_TEST_SHOTS === '4k' ? 60 : 30}, quality: '${env.SCRIM_TEST_SHOTS === '4k' ? 'high' : 'medium'}', format: 'mp4' })`)
         log('demo export', r)
         return app.quit()
       }

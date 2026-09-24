@@ -184,8 +184,10 @@
     transform: translate(-50%, 6px) scale(0.96);
   }
   .hot:hover::after, .hot:focus-visible::after, .hot[data-show]::after { @apply opacity-100; transform: translate(-50%, 0) scale(1); }
-  .hot[style*="left:9"]::after, .hot[style*="left:8"]::after { left: auto; right: 0; transform: none; }
-  .hot[style*="left:2."]::after, .hot[style*="left:5"]::after { left: 0; transform: none; }
+  .hot[data-below]::after { bottom: auto; top: 140%; }
+  .hot[data-align=left]::after { left: 0; transform: translateY(6px); }
+  .hot[data-align=right]::after { left: auto; right: 0; transform: translateY(6px); }
+  .hot[data-align]:is(:hover, :focus-visible, [data-show])::after { transform: none; }
 
   .chip-i { @apply rounded-full border border-line px-3 py-1.5 text-ink-2 transition duration-300 hover:border-ink hover:text-ink; }
 
