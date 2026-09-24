@@ -165,3 +165,5 @@
   & .plus::after { transform: rotate(90deg); }
   &[open] .plus::after { transform: rotate(0deg); }
 }
+
+@utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

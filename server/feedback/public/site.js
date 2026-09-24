@@ -87,7 +87,7 @@
         if (!t) return
         e.preventDefault()
         closeMenu()
-        lenis.scrollTo(t, { offset: -20, duration: 1.4 })
+        lenis.scrollTo(t, { offset: t.matches('[data-chapter]') ? -130 : -20, duration: 1.4 })
         history.replaceState(null, '', u.hash)
       })
     )
@@ -101,6 +101,7 @@
     const y = scrollY
     bar?.toggleAttribute('data-solid', y > 24)
     if (nav && !menuOpen) nav.style.transform = y > 200 && y > lastY + 2 ? 'translateY(-110%)' : y < lastY - 2 || y < 200 ? 'none' : nav.style.transform
+    root.toggleAttribute('data-nav-hidden', nav?.style.transform === 'translateY(-110%)')
     lastY = y
   }
 
@@ -368,6 +369,88 @@
         b.style.translate = `${(e.clientX - r.left - r.width / 2) * 0.18}px ${(e.clientY - r.top - r.height / 2) * 0.3}px`
       })
       b.addEventListener('pointerleave', () => (b.style.translate = ''))
+    })
+  }
+
+
+  // ---------- tour: chapter bar follows what you're reading ----------
+  const chapterLinks = $$('[data-chapters] a')
+  const chapters = $$('[data-chapter]')
+  if (chapterLinks.length && chapters.length) {
+    const bar = $('[data-chapters] nav')
+    let current = ''
+    const spy = () => {
+      const mid = innerHeight * 0.45
+      let on = ''
+      for (const c of chapters) if (c.getBoundingClientRect().top < mid) on = c.id
+      if (on === current) return
+      current = on
+      chapterLinks.forEach((a) => {
+        const hit = a.getAttribute('href') === '#' + on
+        a.toggleAttribute('data-on', hit)
+        if (hit && bar) bar.scrollTo({ left: a.offsetLeft - bar.clientWidth / 2 + a.clientWidth / 2, behavior: 'smooth' })
+      })
+    }
+    addEventListener('scroll', spy, { passive: true })
+    lenis?.on('scroll', spy)
+    spy()
+  }
+
+  // ---------- tour: try the background ----------
+  const look = $('[data-look]')
+  const lookScreen = $('[data-look-screen]')
+  const lookImg = $('[data-look-img]')
+  if (look && lookScreen && lookImg) {
+    $$('[data-bg]', look).forEach((b) =>
+      b.addEventListener('click', () => {
+        $$('[data-bg]', look).forEach((x) => x.setAttribute('aria-pressed', String(x === b)))
+        lookScreen.style.background = b.dataset.bg
+      })
+    )
+    const pad = $('[data-pad]', look)
+    const rad = $('[data-radius]', look)
+    const paint = () => {
+      lookImg.style.width = 100 - Number(pad.value) * 2 + '%'
+      lookImg.style.borderRadius = rad.value + 'px'
+    }
+    pad?.addEventListener('input', paint)
+    rad?.addEventListener('input', paint)
+    paint()
+  }
+
+  // ---------- tour: edit by text ----------
+  const tr = $('[data-transcript]')
+  if (tr) {
+    const words = $$('[data-w]', tr)
+    const out = $('[data-cut]', tr)
+    const len = (w) => 0.18 + w.textContent.length * 0.05 // a rough speaking time per word
+    const style = (w) => {
+      const cut = w.hasAttribute('data-gone')
+      w.className = 'cursor-pointer rounded-md px-0.5 transition duration-300 ' + (cut ? 'text-faint line-through decoration-accent decoration-2' : 'hover:bg-bg-2')
+    }
+    const total = () => {
+      out.textContent = words.filter((w) => w.hasAttribute('data-gone')).reduce((a, w) => a + len(w), 0).toFixed(1) + 's'
+    }
+    words.forEach((w) => {
+      w.setAttribute('role', 'button')
+      w.tabIndex = 0
+      style(w)
+      const flip = () => {
+        w.toggleAttribute('data-gone')
+        style(w)
+        total()
+      }
+      w.addEventListener('click', flip)
+      w.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), flip()))
+    })
+    $('[data-fillers]', tr)?.addEventListener('click', () => {
+      words.filter((w) => w.hasAttribute('data-filler')).forEach((w, i) =>
+        setTimeout(() => {
+          w.setAttribute('data-gone', '')
+          style(w)
+          total()
+        }, i * 140)
+      )
     })
   }
 
