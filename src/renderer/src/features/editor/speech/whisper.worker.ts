@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-// Offline speech to text: Whisper running on this PC (WebGPU when there is one, otherwise the CPU).
+// Offline speech to text: Whisper running on this PC's CPU.
 // The model downloads once (tiny 40 MB, base 80 MB, small 250 MB) and is then kept by the app.
 import { env, pipeline } from '@huggingface/transformers'
 import * as ort from 'onnxruntime-web'
@@ -35,10 +35,9 @@ async function load(model: string) {
       post({ type: 'progress', stage: 'download', p: b ? a / b : 0, mb: Math.round(b / 1e6) })
     }
   }
-  const hasGpu = !!(self.navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu && !!(await (self.navigator as unknown as { gpu: { requestAdapter(): Promise<unknown> } }).gpu.requestAdapter().catch(() => null))
-  const tries: { device: 'webgpu' | 'wasm'; dtype?: unknown }[] = hasGpu
-    ? [{ device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' } }, { device: 'wasm' }]
-    : [{ device: 'wasm' }]
+  // CPU (wasm) only. The GPU path in this onnxruntime build fails to start on some PCs
+  // ("webgpuInit is not a function") and then blocks the CPU path too, so it isn't tried.
+  const tries: { device: 'wasm'; dtype?: unknown }[] = [{ device: 'wasm' }]
   let lastErr: unknown = null
   for (const t of tries) {
     try {
