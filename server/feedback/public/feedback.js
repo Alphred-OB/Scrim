@@ -18,7 +18,7 @@
     form.message.placeholder = t.msg
     $('[data-version-field]').hidden = kind !== 'bug'
     document.querySelectorAll('[data-kind]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.kind === kind)))
-    history.replaceState(null, '', kind === 'idea' ? '/feedback?type=idea' : '/feedback')
+    if (location.protocol !== 'file:') history.replaceState(null, '', location.pathname + (kind === 'idea' ? '?type=idea' : ''))
   }
   document.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => ((kind = b.dataset.kind), apply())))
   apply()
