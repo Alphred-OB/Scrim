@@ -1,6 +1,6 @@
 // Step by step guide: every click in the recording becomes a numbered step with a screenshot and
 // a marked click spot. Titles come from what you said at that moment. Saves as a web page or PDF.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GuideStep } from '@shared/types'
 import { uid } from '@shared/defaults'
 import { plainText, spokenWords } from '@shared/speech'
@@ -35,65 +35,32 @@ export function makeSteps(): GuideStep[] {
   return out.map((s, i) => ({ ...s, title: s.title || `Step ${i + 1}: click here` }))
 }
 
-/** Screenshot of the moment just before a click, with the click spot circled. */
-async function stepImage(path: string, s: GuideStep, marked = true): Promise<string> {
-  const key = `${path}@${s.t.toFixed(3)}@${marked}`
-  const hit = shots.get(key)
-  if (hit) return hit
-  const [b64] = await api.guideStills(path, [Math.max(0, s.t - 0.04)])
-  if (!b64) return ''
-  const img = new Image()
-  img.src = 'data:image/jpeg;base64,' + b64
-  await img.decode()
-  const c = document.createElement('canvas')
-  c.width = img.naturalWidth
-  c.height = img.naturalHeight
-  const x = c.getContext('2d')!
-  x.drawImage(img, 0, 0)
-  if (marked) {
-    const cx = s.x * c.width
-    const cy = s.y * c.height
-    const r = Math.max(18, c.width * 0.022)
-    x.fillStyle = 'rgba(255, 59, 48, 0.18)'
-    x.strokeStyle = '#ff3b30'
-    x.lineWidth = Math.max(3, r * 0.18)
-    x.beginPath()
-    x.arc(cx, cy, r, 0, Math.PI * 2)
-    x.fill()
-    x.stroke()
-    x.fillStyle = '#ff3b30'
-    x.beginPath()
-    x.arc(cx, cy, r * 0.22, 0, Math.PI * 2)
-    x.fill()
-  }
-  const url = c.toDataURL('image/jpeg', 0.86)
-  shots.set(key, url)
-  return url
+// Small pictures for the step list: made only when a card scrolls into view, one at a time,
+// and kept in a small cache so a guide with hundreds of steps stays light.
+const queue: (() => Promise<void>)[] = []
+let busyQ = false
+async function pump() {
+  if (busyQ) return
+  busyQ = true
+  while (queue.length) await queue.shift()!().catch(() => {})
+  busyQ = false
 }
-
-const esc = (s: string) => s.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!)
-
-export async function guideHtml(title: string, steps: GuideStep[], path: string, onStep?: (i: number) => void): Promise<string> {
-  const parts: string[] = []
-  for (let i = 0; i < steps.length; i++) {
-    onStep?.(i)
-    const s = steps[i]
-    const img = await stepImage(path, s)
-    parts.push(`<section class="step"><div class="num">${i + 1}</div><div class="body"><h2>${esc(s.title)}</h2>${s.note ? `<p>${esc(s.note).replace(/\n/g, '<br>')}</p>` : ''}${img ? `<img src="${img}" alt="Step ${i + 1}">` : ''}</div></section>`)
-  }
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
-<style>
-:root{--ink:#16181d;--dim:#5b6170;--line:#e4e6eb;--accent:#ff3b30;--bg:#ffffff}
-@media (prefers-color-scheme:dark){:root{--ink:#eceef2;--dim:#9aa0ad;--line:#2a2d35;--bg:#121318}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,Segoe UI,system-ui,sans-serif}
-main{max-width:920px;margin:0 auto;padding:40px 20px 60px}h1{font-size:30px;margin:0 0 6px}.lead{color:var(--dim);margin:0 0 34px}
-.step{display:flex;gap:18px;padding:24px 0;border-top:1px solid var(--line);break-inside:avoid;page-break-inside:avoid}
-.num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
-.body{flex:1;min-width:0}h2{font-size:18px;margin:4px 0 8px}p{margin:0 0 12px;color:var(--dim)}
-img{width:100%;height:auto;border-radius:10px;border:1px solid var(--line);display:block}
-footer{margin-top:30px;color:var(--dim);font-size:13px}
-@media print{main{padding:0}.step{padding:16px 0}}
-</style></head><body><main><h1>${esc(title)}</h1><p class="lead">${steps.length} step${steps.length === 1 ? '' : 's'}</p>${parts.join('')}<footer>Made with Scrim</footer></main></body></html>`
+function thumb(path: string, t: number): Promise<string> {
+  const key = `${path}@${t.toFixed(3)}`
+  const hit = shots.get(key)
+  if (hit) return Promise.resolve(hit)
+  return new Promise((resolve) => {
+    queue.push(async () => {
+      const [b64] = await api.guideStills(path, [Math.max(0, t - 0.04)])
+      const url = b64 ? 'data:image/jpeg;base64,' + b64 : ''
+      if (url) {
+        shots.set(key, url)
+        if (shots.size > 120) shots.delete(shots.keys().next().value!)
+      }
+      resolve(url)
+    })
+    pump()
+  })
 }
 
 export default function GuidePanel() {
@@ -115,14 +82,15 @@ export default function GuidePanel() {
     const name = project.name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'guide'
     const out = await pickSavePath(`${name} guide.${pdf ? 'pdf' : 'html'}`, pdf ? 'pdf' : 'html')
     if (!out) return
+    const off = api.on('guide:progress', (done: number, total: number) => setBusy(done < total ? `Making step ${done} of ${total - 1}…` : pdf ? 'Making the PDF…' : 'Saving…'))
     try {
-      const html = await guideHtml(project.name, live, project.media.screen.path, (i) => setBusy(`Making step ${i + 1} of ${live.length}…`))
-      setBusy(pdf ? 'Making the PDF…' : 'Saving…')
-      await api.saveGuide(html, out, pdf)
+      setBusy('Starting…')
+      await api.exportGuide({ title: project.name, video: project.media.screen.path, steps: live.map((s) => ({ t: s.t, x: s.x, y: s.y, title: s.title, note: s.note })), outPath: out, pdf })
       api.showItem(out)
     } catch (e) {
       showMessage("Couldn't save the guide", e instanceof Error ? e.message : String(e))
     } finally {
+      off()
       setBusy('')
     }
   }
@@ -163,13 +131,26 @@ export default function GuidePanel() {
 
 function StepCard({ s, n, path, time, set }: { s: GuideStep; n: number; path: string; time: number; set: (p: Partial<GuideStep>, key?: string) => void }) {
   const [img, setImg] = useState('')
+  const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
     let alive = true
-    stepImage(path, s).then((u) => alive && setImg(u)).catch(() => {})
+    const el = box.current
+    if (!el) return
+    // only fetch the picture once the card is (nearly) on screen
+    const io = new IntersectionObserver(
+      (es) => {
+        if (!es.some((x) => x.isIntersecting)) return
+        io.disconnect()
+        thumb(path, s.t).then((u) => alive && setImg(u))
+      },
+      { rootMargin: '300px' }
+    )
+    io.observe(el)
     return () => {
       alive = false
+      io.disconnect()
     }
-  }, [path, s.t, s.x, s.y]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [path, s.t])
   const seek = () => {
     useEditor.getState().setPlaying(false)
     useEditor.getState().setTime(s.t)
@@ -185,7 +166,10 @@ function StepCard({ s, n, path, time, set }: { s: GuideStep; n: number; path: st
           <Icon name={s.off ? 'eyeOff' : 'eye'} size={14} />
         </button>
       </div>
-      {img ? <img className="guide-shot" src={img} alt="" onClick={seek} /> : <div className="guide-shot empty" />}
+      <div ref={box} className="guide-shot-box" onClick={seek}>
+        {img ? <img className="guide-shot" src={img} alt="" /> : <div className="guide-shot empty" />}
+        <span className="guide-mark" style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%` }} />
+      </div>
       <input className="guide-title" value={s.title} placeholder="What to do" onChange={(e) => set({ title: e.target.value }, 'gt-' + s.id)} />
       <textarea className="guide-note" value={s.note} placeholder="Add a note (optional)" rows={2} onChange={(e) => set({ note: e.target.value }, 'gn-' + s.id)} />
     </div>

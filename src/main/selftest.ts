@@ -697,6 +697,23 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         const f = join(out, 'Test a guide.pdf')
         if (!(await until(async () => (await fs.stat(f)).size > 5000, 30000))) throw new Error('no pdf')
         log('guide pdf bytes', (await fs.stat(f)).size)
+        // a long recording: 150 steps must not eat the memory
+        const many = Array.from({ length: 150 }, (_, i) => ({ id: 'm' + i, t: (i % 70) * 0.1 + 0.2, x: (i % 10) / 10 + 0.05, y: 0.5, title: 'Step ' + (i + 1), note: '' }))
+        await js(`window.__scrim.patchEdit({ guide: ${JSON.stringify(many)} })`)
+        await wait(800)
+        let peak = 0
+        const t0 = Date.now()
+        const watch = setInterval(() => (peak = Math.max(peak, process.memoryUsage().rss)), 100)
+        await fs.rm(f, { force: true })
+        await clickText('.btn', 'Save PDF')
+        const done = await until(async () => (await fs.stat(f)).size > 5000, 120000)
+        await clickText('.btn', 'Web page')
+        const fh = join(out, 'Test a guide.html')
+        const done2 = await until(async () => (await fs.stat(fh)).size > 5000, 120000)
+        clearInterval(watch)
+        log('guide 150 steps', JSON.stringify({ pdf: done && (await fs.stat(f)).size, html: done2 && (await fs.stat(fh)).size, secs: (Date.now() - t0) / 1000, mainPeakMB: Math.round(peak / 1e6) }))
+        if (!done || !done2) throw new Error('long guide did not save')
+        await shot('guide-many.png')
       })
       await step('voice clean up', async () => {
         await js('window.__scrim.panel("audio")')

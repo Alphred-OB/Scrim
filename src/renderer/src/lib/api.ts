@@ -73,7 +73,8 @@ export interface Api {
   /** how much the screen changes over time (0 = frozen), one value per `step` seconds */
   screenChange(path: string): Promise<{ step: number; values: number[] }>
   guideStills(path: string, times: number[]): Promise<string[]>
-  saveGuide(html: string, outPath: string, pdf: boolean): Promise<string>
+  /** saves the guide as a web page or PDF; progress comes on 'guide:progress' (done, total) */
+  exportGuide(g: { title: string; video: string; steps: { t: number; x: number; y: number; title: string; note: string }[]; outPath: string; pdf: boolean }): Promise<string>
   writeText(p: string, text: string): Promise<void>
   checkForUpdate(): Promise<UpdateStatus>
   installUpdate(): Promise<boolean>

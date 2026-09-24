@@ -179,34 +179,124 @@ export async function screenChange(path: string): Promise<{ step: number; values
   return { step, values }
 }
 
-/** Still frames (JPEG, base64) at the given times, for the step by step guide. */
-export async function stills(path: string, times: number[], width = 1600): Promise<string[]> {
+// Only two ffmpeg frame grabs at a time. A long recording can have hundreds of clicks, and
+// starting one ffmpeg per step at once used to eat all the memory and CPU.
+let running = 0
+const waiting: (() => void)[] = []
+async function slot<T>(fn: () => Promise<T>): Promise<T> {
+  if (running >= 2) await new Promise<void>((r) => waiting.push(r))
+  running++
+  try {
+    return await fn()
+  } finally {
+    running--
+    waiting.shift()?.()
+  }
+}
+
+function grab(path: string, t: number, width: number, q: number): Promise<Buffer> {
+  return slot(() =>
+    ffmpegOut(['-ss', Math.max(0, t).toFixed(3), '-i', path, '-an', '-sn', '-frames:v', '1', '-vf', `scale='min(${width},iw)':-2:flags=bicubic`, '-q:v', String(q), '-threads', '2', '-f', 'image2', '-c:v', 'mjpeg', '-']).catch(() => Buffer.alloc(0))
+  )
+}
+
+/** Small still frames (JPEG, base64) for the guide's step list. */
+export async function stills(path: string, times: number[], width = 480): Promise<string[]> {
   const out: string[] = []
   for (const t of times) {
-    const buf = await ffmpegOut(['-ss', Math.max(0, t).toFixed(3), '-i', path, '-frames:v', '1', '-vf', `scale='min(${width},iw)':-2`, '-q:v', '3', '-f', 'image2', '-c:v', 'mjpeg', '-']).catch(() => Buffer.alloc(0))
+    const buf = await grab(path, t, width, 6)
     out.push(buf.length ? buf.toString('base64') : '')
   }
   return out
 }
 
-/** Writes the guide as HTML, and as PDF too when asked (printed by a hidden window). */
-export async function saveGuide(html: string, outPath: string, pdf: boolean): Promise<string> {
-  if (!pdf) {
-    await fs.writeFile(outPath, html, 'utf8')
-    return outPath
-  }
-  const tmp = join(tmpdir(), `scrim-guide-${Date.now()}.html`)
-  await fs.writeFile(tmp, html, 'utf8')
-  const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true, javascript: false } })
+export interface GuideExport {
+  title: string
+  video: string
+  steps: { t: number; x: number; y: number; title: string; note: string }[]
+  outPath: string
+  pdf: boolean
+}
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]!)
+
+function guidePage(title: string, count: number): { head: string; foot: string } {
+  const head = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<style>
+:root{--ink:#16181d;--dim:#5b6170;--line:#e4e6eb;--accent:#ff3b30;--bg:#ffffff}
+@media (prefers-color-scheme:dark){:root{--ink:#eceef2;--dim:#9aa0ad;--line:#2a2d35;--bg:#121318}}
+@media print{:root{--ink:#16181d;--dim:#5b6170;--line:#e4e6eb;--bg:#ffffff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,Segoe UI,system-ui,sans-serif}
+main{max-width:920px;margin:0 auto;padding:40px 20px 60px}h1{font-size:30px;margin:0 0 6px}.lead{color:var(--dim);margin:0 0 34px}
+.step{display:flex;gap:18px;padding:24px 0;border-top:1px solid var(--line);break-inside:avoid;page-break-inside:avoid}
+.num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
+.body{flex:1;min-width:0}h2{font-size:18px;margin:4px 0 8px}p{margin:0 0 12px;color:var(--dim)}
+.shot{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.shot img{width:100%;height:auto;display:block}
+.mark{position:absolute;width:5%;aspect-ratio:1;transform:translate(-50%,-50%);border:3px solid var(--accent);border-radius:50%;background:rgba(255,59,48,.16)}
+.mark::after{content:"";position:absolute;left:50%;top:50%;width:24%;height:24%;transform:translate(-50%,-50%);border-radius:50%;background:var(--accent)}
+footer{margin-top:30px;color:var(--dim);font-size:13px}
+@media print{main{padding:0}.step{padding:16px 0}}
+</style></head><body><main><h1>${esc(title)}</h1><p class="lead">${count} step${count === 1 ? '' : 's'}</p>`
+  return { head, foot: '<footer>Made with Scrim</footer></main></body></html>' }
+}
+
+function stepHtml(i: number, s: GuideExport['steps'][number], src: string): string {
+  const mark = `<span class="mark" style="left:${(s.x * 100).toFixed(2)}%;top:${(s.y * 100).toFixed(2)}%"></span>`
+  return `<section class="step"><div class="num">${i + 1}</div><div class="body"><h2>${esc(s.title)}</h2>${s.note ? `<p>${esc(s.note).replace(/\n/g, '<br>')}</p>` : ''}<div class="shot"><img src="${src}" alt="Step ${i + 1}">${mark}</div></div></section>`
+}
+
+/**
+ * Saves the guide as a web page (pictures inside the file) or a PDF. Pictures are made one by
+ * one into a temp folder and written straight to the file, so even hundreds of steps never sit
+ * in memory at once.
+ */
+export async function exportGuide(g: GuideExport, onProgress: (done: number, total: number) => void): Promise<string> {
+  const dir = await fs.mkdtemp(join(tmpdir(), 'scrim-guide-'))
   try {
-    await win.loadFile(tmp)
-    const data = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 } })
-    await fs.writeFile(outPath, data)
+    const n = g.steps.length
+    const files: string[] = []
+    for (let i = 0; i < n; i++) {
+      const buf = await grab(g.video, Math.max(0, g.steps[i].t - 0.04), g.pdf ? 1280 : 1600, g.pdf ? 5 : 4)
+      const f = join(dir, `step-${i + 1}.jpg`)
+      await fs.writeFile(f, buf)
+      files.push(buf.length ? f : '')
+      onProgress(i + 1, n + 1)
+    }
+    const { head, foot } = guidePage(g.title, n)
+    if (!g.pdf) {
+      const part = g.outPath + '.part'
+      const fh = await fs.open(part, 'w')
+      try {
+        await fh.write(head)
+        for (let i = 0; i < n; i++) {
+          const src = files[i] ? 'data:image/jpeg;base64,' + (await fs.readFile(files[i])).toString('base64') : ''
+          await fh.write(stepHtml(i, g.steps[i], src))
+        }
+        await fh.write(foot)
+      } finally {
+        await fh.close()
+      }
+      await fs.rm(g.outPath, { force: true })
+      await fs.rename(part, g.outPath)
+      onProgress(n + 1, n + 1)
+      return g.outPath
+    }
+    const page = join(dir, 'guide.html')
+    await fs.writeFile(page, head + g.steps.map((s, i) => stepHtml(i, s, files[i] ? `step-${i + 1}.jpg` : '')).join('') + foot, 'utf8')
+    const win = new BrowserWindow({ show: false, width: 1000, height: 800, webPreferences: { javascript: false, sandbox: true } })
+    try {
+      await win.loadFile(page)
+      const data = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 } })
+      await fs.writeFile(g.outPath, data)
+    } finally {
+      win.destroy()
+    }
+    onProgress(n + 1, n + 1)
+    return g.outPath
   } finally {
-    win.destroy()
-    await fs.rm(tmp, { force: true }).catch(() => {})
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
   }
-  return outPath
 }
 
 export function registerSpeechIpc(): void {
@@ -216,6 +306,6 @@ export function registerSpeechIpc(): void {
   ipcMain.handle('voice:clean', (_e, src: string, dir: string, strength: number) => cleanVoice(src, dir, strength))
   ipcMain.handle('tidy:screen', (_e, path: string) => screenChange(path))
   ipcMain.handle('guide:stills', (_e, path: string, times: number[]) => stills(path, times))
-  ipcMain.handle('guide:save', (_e, html: string, outPath: string, pdf: boolean) => saveGuide(html, outPath, pdf))
+  ipcMain.handle('guide:export', (e, g: GuideExport) => exportGuide(g, (done, total) => e.sender.send('guide:progress', done, total)))
   ipcMain.handle('file:writeText', (_e, p: string, text: string) => fs.writeFile(p, text, 'utf8'))
 }

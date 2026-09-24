@@ -1286,3 +1286,8 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .exp-shape.a9x16 { width: 16px; height: 28px; }
 .exp-shape.a1x1 { width: 25px; height: 25px; }
 .btn.ghost.on { background: var(--accent-soft); color: var(--accent-2); }
+.guide-shot-box { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; }
+.guide-shot-box .guide-shot { border-radius: 8px; }
+.guide-mark { position: absolute; width: 7%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 2px solid var(--danger); border-radius: 50%; background: color-mix(in srgb, var(--danger) 18%, transparent); pointer-events: none; }
+.guide-mark::after { content: ''; position: absolute; left: 50%; top: 50%; width: 26%; height: 26%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--danger); }
+.guide-shot-box img.guide-shot { aspect-ratio: auto; height: auto; object-fit: fill; }
