@@ -8,169 +8,341 @@
 <meta property="og:title" content="Scrim: screen recordings that look edited">
 <meta property="og:description" content="Smooth zooms, captions, a polished cursor and one click exports for YouTube, TikTok and step by step guides.">
 <meta property="og:image" content="img/frame.webp">
+<meta name="theme-color" content="#09090b">
 <link rel="icon" href="favicon.png">
+<script src="theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
-<header class="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur-md">
-  <div class="mx-auto max-w-[1160px] px-5 flex h-16 items-center gap-5.5">
-    <a class="flex items-center gap-2.5 text-lg font-extrabold" href="index.html"><img class="size-7 rounded-lg" src="img/icon.png" alt="">Scrim</a>
-    <nav class="ml-auto flex items-center gap-5.5 text-[14.5px] font-medium text-ink-2">
-      <a class="hidden hover:text-ink md:inline" href="#features">Features</a>
-      <a class="hidden hover:text-ink md:inline" href="#how">How it works</a>
-      <a class="hidden hover:text-ink md:inline" href="#faq">FAQ</a>
-      <a class="hidden hover:text-ink md:inline" href="feedback.html">Feedback</a>
-      <a class="btn btn-primary btn-sm" href="/download" data-download>Download</a>
+<!--header-->
+<header class="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-xl">
+  <div class="wrap flex h-16 items-center gap-6">
+    <a class="flex items-center gap-2.5 font-display text-xl font-extrabold tracking-tight" href="index.html"><img class="size-8 rounded-[9px]" src="img/icon.png" alt="">Scrim</a>
+    <nav class="ml-4 hidden items-center gap-1 text-[14.5px] font-medium text-ink-2 lg:flex">
+      <a class="rounded-full px-3.5 py-2 transition hover:bg-card-hi hover:text-ink" href="index.html#features">Features</a>
+      <a class="rounded-full px-3.5 py-2 transition hover:bg-card-hi hover:text-ink" href="index.html#how">How it works</a>
+      <a class="rounded-full px-3.5 py-2 transition hover:bg-card-hi hover:text-ink" href="index.html#faq">FAQ</a>
+      <a class="rounded-full px-3.5 py-2 transition hover:bg-card-hi hover:text-ink" href="feedback.html">Feedback</a>
     </nav>
+    <div class="ml-auto flex items-center gap-2.5">
+      <div class="flex items-center gap-0.5 rounded-full border border-line bg-card p-1" role="group" aria-label="Color theme">
+        <button type="button" data-theme-set="light" title="Light" aria-label="Light theme" class="grid size-7.5 cursor-pointer place-items-center rounded-full text-dim transition hover:text-ink aria-pressed:bg-card-hi aria-pressed:text-ink aria-pressed:shadow-sm"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg></button>
+        <button type="button" data-theme-set="system" title="Match my computer" aria-label="Match my computer" class="grid size-7.5 cursor-pointer place-items-center rounded-full text-dim transition hover:text-ink aria-pressed:bg-card-hi aria-pressed:text-ink aria-pressed:shadow-sm"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12.5" rx="2.5"/><path d="M8.5 20.5h7M12 16.5v4"/></svg></button>
+        <button type="button" data-theme-set="dark" title="Dark" aria-label="Dark theme" class="grid size-7.5 cursor-pointer place-items-center rounded-full text-dim transition hover:text-ink aria-pressed:bg-card-hi aria-pressed:text-ink aria-pressed:shadow-sm"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg></button>
+      </div>
+      <a class="btn btn-primary btn-sm hidden sm:inline-flex" href="/download" data-download>Download</a>
+      <button type="button" class="grid size-10 cursor-pointer place-items-center rounded-full border border-line bg-card lg:hidden" data-menu-btn aria-expanded="false" aria-label="Menu"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
   </div>
+  <nav class="border-t border-line bg-bg lg:hidden" data-menu hidden>
+    <div class="wrap flex flex-col py-3 text-[17px] font-semibold">
+      <a class="border-b border-line py-3" href="index.html#features">Features</a>
+      <a class="border-b border-line py-3" href="index.html#how">How it works</a>
+      <a class="border-b border-line py-3" href="index.html#faq">FAQ</a>
+      <a class="border-b border-line py-3" href="feedback.html">Report a problem</a>
+      <a class="py-3" href="feedback.html?type=idea">Suggest a feature</a>
+      <a class="btn btn-primary mt-3 mb-2" href="/download" data-download>Download free for Windows</a>
+    </div>
+  </nav>
 </header>
+<!--/header-->
 
 <main>
-  <div class="mx-auto max-w-[1160px] px-5 pt-18 pb-10 text-center">
-    <span class="inline-flex items-center gap-2 rounded-full border border-line bg-card py-1.5 pr-3 pl-2 text-[13px] text-ink-2"><b class="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">New</b> Captions from your voice and step by step guides</span>
-    <h1 class="mx-auto mt-5.5 mb-4.5 max-w-[900px] text-[clamp(38px,6.2vw,72px)] leading-[1.04] font-black tracking-[-0.035em]">Screen recordings that look <em class="text-accent not-italic">edited</em>. Automatically.</h1>
-    <p class="mx-auto mb-7.5 max-w-[680px] text-[clamp(17px,2vw,20px)] text-ink-2">Record your screen and Scrim adds smooth zooms where you click, a clean frame, a polished cursor and captions. Export for YouTube, TikTok or as a step by step guide in minutes.</p>
-    <div class="flex flex-wrap justify-center gap-3">
-      <a class="btn btn-primary" href="/download" data-download>
-        <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
-        Download free for Windows
+  <!-- hero -->
+  <section class="dots relative overflow-hidden border-b border-line">
+    <div class="wrap relative pt-16 pb-20 text-center sm:pt-24">
+      <a href="#features" class="reveal group inline-flex items-center gap-2.5 rounded-full border border-line bg-card py-1.5 pr-4 pl-1.5 text-[13.5px] text-ink-2 shadow-sm transition hover:border-line-2">
+        <span class="rounded-full bg-accent px-2.5 py-0.5 text-xs font-bold text-white">New</span>
+        Captions from your voice and step by step guides
+        <svg class="size-3.5 transition group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
       </a>
-      <a class="btn" href="#how">See how it works</a>
-    </div>
-    <div class="mt-3.5 text-[13px] text-dim" data-meta>Windows 10 and 11 · Free</div>
-    <div class="mx-auto mt-13.5 max-w-[1060px] rounded-[22px] border border-line bg-card p-2.5 shadow-[0_40px_90px_rgb(0_0_0/0.35)]">
-      <video class="aspect-video w-full rounded-[14px] bg-black object-cover" src="img/demo.mp4" poster="img/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Scrim turning a plain recording into a polished demo"></video>
-    </div>
-  </div>
-
-  <section id="features" class="py-21">
-    <div class="mx-auto max-w-[1160px] px-5">
-      <div class="reveal mb-10 text-center">
-        <div class="eyebrow">What Scrim does for you</div>
-        <h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">Record once. It already looks produced.</h2>
-        <p class="text-ink-2 text-[17.5px] max-w-[640px] mx-auto">No keyframes, no timelines full of tiny edits. Scrim watches your clicks, typing and voice, and does the tedious parts for you.</p>
+      <h1 class="reveal mx-auto mt-7 max-w-[1000px] text-[clamp(44px,8vw,104px)] leading-[0.95] font-extrabold tracking-[-0.045em]">
+        Screen recordings that look <span class="relative inline-block text-accent">edited<svg class="absolute -bottom-2 left-0 h-3 w-full text-accent sm:-bottom-3 sm:h-4" viewBox="0 0 200 14" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"><path d="M3 10C45 3 120 2 197 8"/></svg></span>.
+      </h1>
+      <p class="reveal lead mx-auto mt-8 max-w-[640px]">Hit record and use your app like normal. Scrim adds smooth zooms where you click, a clean frame, a polished cursor and captions from your voice. No editing skills needed.</p>
+      <div class="reveal mt-9 flex flex-wrap justify-center gap-3">
+        <a class="btn btn-primary h-13 px-7 text-base" href="/download" data-download>
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+          Download free for Windows
+        </a>
+        <a class="btn h-13 px-7 text-base" href="#how">
+          <svg class="size-4.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+          See how it works
+        </a>
+      </div>
+      <div class="reveal mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[13px] text-dim" data-meta-row>
+        <span data-meta>Windows 10 and 11</span>
+        <span class="flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-ok"></span>Free, no watermark</span>
+        <span class="flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-ok"></span>No account needed</span>
       </div>
 
-      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1fr_1.25fr]">
-        <div class="">
-          <div class="eyebrow">Automatic polish</div>
-          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Zooms that follow your clicks</h3>
-          <p class="mb-3.5 text-ink-2">Every click becomes a smooth zoom, so viewers always see what matters. Your recording sits on a clean background with rounded corners and a soft shadow.</p>
-          <ul class="tick-list grid gap-2">
-            <li>Smooth cursor with click ripples and optional click sounds</li>
-            <li>Wallpapers, live backgrounds, your own image or brand color</li>
-            <li>Fine tune any zoom by dragging it on the timeline</li>
-          </ul>
+      <div class="reveal relative mx-auto mt-16 max-w-[1080px]">
+        <div class="overflow-hidden rounded-[22px] border border-line-2 bg-card shadow-[0_50px_120px_-20px_rgb(0_0_0/0.45)]">
+          <div class="flex h-10 items-center gap-2 border-b border-line bg-card-hi px-4">
+            <span class="size-3 rounded-full bg-[#ff5f57]"></span><span class="size-3 rounded-full bg-[#febc2e]"></span><span class="size-3 rounded-full bg-[#28c840]"></span>
+            <span class="mx-auto -translate-x-7 text-xs font-medium text-dim">product-demo.scrim</span>
+          </div>
+          <video class="aspect-video w-full bg-black object-cover" src="img/demo.mp4" poster="img/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Scrim turning a plain recording into a polished demo"></video>
         </div>
-        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="img/frame.webp" alt="A recording framed on an orange background with a zoomed in dialog" loading="lazy" width="1550" height="872"></div>
-      </div>
-
-      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1.25fr_1fr]">
-        <div class="md:order-2">
-          <div class="eyebrow">Captions and editing by text</div>
-          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Say it once, fix it in the text</h3>
-          <p class="mb-3.5 text-ink-2">Scrim turns what you say into captions that light up word by word. Delete words in the transcript and they're cut from the video. Remove every "um" and long pause in one click.</p>
-          <ul class="tick-list grid gap-2">
-            <li>Six caption styles, your font and colors</li>
-            <li>Works offline on your PC, or fast online with Groq</li>
-            <li>Save subtitle files for YouTube and LinkedIn</li>
-          </ul>
-        </div>
-        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="img/captions.webp" alt="The captions page with karaoke style captions on the video" loading="lazy" width="1600" height="1000"></div>
-      </div>
-
-      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1fr_1.25fr]">
-        <div class="">
-          <div class="eyebrow">Step by step guides</div>
-          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Your recording, as a written guide</h3>
-          <p class="mb-3.5 text-ink-2">Every click becomes a numbered step with a screenshot and the spot circled. Titles come from what you said. Save it as a PDF or a web page and send it to your team or customers.</p>
-          <ul class="tick-list grid gap-2">
-            <li>Edit titles, add notes, leave out steps</li>
-            <li>Great for onboarding, support and how-tos</li>
-          </ul>
-        </div>
-        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="img/guide.webp" alt="A list of guide steps made from clicks" loading="lazy" width="1600" height="1000"></div>
-      </div>
-
-      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1.25fr_1fr]">
-        <div class="md:order-2">
-          <div class="eyebrow">Share anywhere</div>
-          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">One click for every platform</h3>
-          <p class="mb-3.5 text-ink-2">Pick where it's going and Scrim sets it up: YouTube, TikTok, Reels, Shorts, LinkedIn, X, or a small GIF for your docs. Vertical videos follow your cursor, so nothing important gets cut off.</p>
-          <ul class="tick-list grid gap-2">
-            <li>Sharp exports up to your screen's full resolution</li>
-            <li>Uses your graphics card when it can, so exports are quick</li>
-          </ul>
-        </div>
-        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="img/export.webp" alt="The export window with presets for YouTube, TikTok, LinkedIn and GIF" loading="lazy" width="1600" height="1000"></div>
-      </div>
-
-      <div class="reveal mt-9 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="7" height="10" rx="2"/><rect x="14" y="7" width="7" height="10" rx="2"/><path d="M12 4v3M12 17v3"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Smart trim</h4><p class="text-[14.5px] text-dim">Finds the slow parts, like pages loading or you looking for a window, and speeds them up or cuts them.</p></div>
-        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M6 10h2M11 10h2M16 10h2M8 14.5h8"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Shortcuts on screen</h4><p class="text-[14.5px] text-dim">Keyboard shortcuts you press show up as clean keycaps, so viewers can follow along. Your typing is never recorded.</p></div>
-        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.5 9a4.3 4.3 0 0 1 0 6M18.3 6.3a8.2 8.2 0 0 1 0 11.4"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Clear voice</h4><p class="text-[14.5px] text-dim">Removes fan hum, keyboard noise and room echo, and evens out your volume. Any microphone sounds good.</p></div>
-        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="6.5"/><circle cx="12" cy="10" r="2.6"/><path d="M8 20.5h8M12 16.5v4"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Webcam bubble</h4><p class="text-[14.5px] text-dim">Add your face in a circle or rounded box, anywhere on the video. Move and resize it right on the preview.</p></div>
-        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8l2.3 1.6 2.8-.1.9 2.6 2.2 1.7-.9 2.6.9 2.6-2.2 1.7-.9 2.6-2.8-.1L12 21.2l-2.3-1.6-2.8.1-.9-2.6-2.2-1.7.9-2.6-.9-2.6 2.2-1.7.9-2.6 2.8.1z"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Brand kit</h4><p class="text-[14.5px] text-dim">Save your logo, colors, font, intro and outro once. Put them on any video in one click.</p></div>
-        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><path d="M4 4l16 16"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Hide private info</h4><p class="text-[14.5px] text-dim">Blur or block out emails, passwords and customer names. It stays hidden even when the view zooms in.</p></div>
+        <div class="chip animate-float absolute top-[18%] -left-6 hidden md:inline-flex"><span class="grid size-6 place-items-center rounded-full bg-violet text-white"><svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M11 8.5v5M8.5 11h5"/></svg></span>Auto zoom 2x</div>
+        <div class="chip animate-float-late absolute top-[46%] -right-8 hidden md:inline-flex"><span class="grid size-6 place-items-center rounded-full bg-accent text-white"><svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M7 12.5h4M13 12.5h4"/></svg></span>Captions on</div>
+        <div class="chip animate-float absolute -bottom-5 left-[12%] hidden md:inline-flex"><span class="grid size-6 place-items-center rounded-full bg-ok text-white"><svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Exported 4K in 38s</div>
+        <div class="chip animate-float-late absolute right-[10%] -bottom-5 hidden lg:inline-flex"><span class="size-2.5 animate-blink rounded-full bg-accent"></span>REC 02:14</div>
       </div>
     </div>
   </section>
 
-  <section id="how" class="bg-bg-2 py-21">
-    <div class="mx-auto max-w-[1160px] px-5">
-      <div class="reveal mb-10 text-center">
-        <div class="eyebrow">How it works</div>
-        <h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">From idea to shared video in minutes</h2>
+  <!-- what people make -->
+  <div class="overflow-hidden border-b border-line bg-bg-2 py-5" aria-label="What people make with Scrim">
+    <div class="animate-marquee flex w-max gap-10 text-[15px] font-semibold whitespace-nowrap text-dim hover:[animation-play-state:paused]">
+      <span>Product demos</span><span class="text-accent">✦</span><span>Tutorials</span><span class="text-accent">✦</span><span>Customer onboarding</span><span class="text-accent">✦</span><span>Bug reports</span><span class="text-accent">✦</span><span>Sales videos</span><span class="text-accent">✦</span><span>Course lessons</span><span class="text-accent">✦</span><span>Release notes</span><span class="text-accent">✦</span><span>Support answers</span><span class="text-accent">✦</span><span>Social clips</span><span class="text-accent">✦</span>
+      <span aria-hidden="true">Product demos</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Tutorials</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Customer onboarding</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Bug reports</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Sales videos</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Course lessons</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Release notes</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Support answers</span><span class="text-accent" aria-hidden="true">✦</span><span aria-hidden="true">Social clips</span><span class="text-accent" aria-hidden="true">✦</span>
+    </div>
+  </div>
+
+  <!-- showcase -->
+  <section id="features" class="py-24 sm:py-32">
+    <div class="wrap">
+      <div class="reveal max-w-[760px]">
+        <div class="eyebrow"><span class="h-0.5 w-6 bg-accent"></span>What Scrim does for you</div>
+        <h2 class="h2">Record once. It already looks produced.</h2>
+        <p class="lead max-w-[600px]">No keyframes, no timelines full of tiny edits. Scrim watches your clicks, typing and voice, and does the slow parts for you.</p>
       </div>
-      <ol class="reveal grid gap-3.5 md:grid-cols-3">
-        <li class="card"><span class="mb-3 grid size-7 place-items-center rounded-full bg-accent text-sm font-extrabold text-white">1</span><h4 class="mb-1.5 text-[17px] font-bold">Record</h4><p class="text-[14.5px] text-dim">Pick your screen, a window or a browser tab. Add your mic, PC sound and webcam. A small bar lets you pause or stop, and it never shows up in the video.</p></li>
-        <li class="card"><span class="mb-3 grid size-7 place-items-center rounded-full bg-accent text-sm font-extrabold text-white">2</span><h4 class="mb-1.5 text-[17px] font-bold">Polish</h4><p class="text-[14.5px] text-dim">Scrim adds the zooms, frame and cursor for you. Tweak anything on a simple timeline: cut, speed up, add text, captions, music and transitions.</p></li>
-        <li class="card"><span class="mb-3 grid size-7 place-items-center rounded-full bg-accent text-sm font-extrabold text-white">3</span><h4 class="mb-1.5 text-[17px] font-bold">Share</h4><p class="text-[14.5px] text-dim">Export for YouTube, TikTok, LinkedIn, a GIF, or a step by step guide. Your files stay on your PC.</p></li>
+
+      <div class="reveal mt-14 grid items-start gap-8 lg:grid-cols-[380px_1fr] lg:gap-12" data-showcase>
+        <div class="-mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-2 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0" role="tablist">
+          <button type="button" role="tab" data-tab="0" aria-selected="true" class="group relative w-[78%] flex-none cursor-pointer snap-start overflow-hidden rounded-2xl border border-line bg-card p-5 text-left transition aria-selected:border-line-2 aria-selected:bg-card-hi sm:w-[46%] lg:w-full">
+            <span class="flex items-center gap-3 font-display text-lg font-bold"><span class="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5 16 16M11 8.5v5M8.5 11h5"/></svg></span>Zooms that follow your clicks</span>
+            <span class="mt-2.5 block text-[14.5px] leading-relaxed text-ink-2">Every click becomes a smooth zoom. Your recording sits on a clean background with rounded corners, a soft shadow and a smooth cursor.</span>
+            <span class="absolute inset-x-0 bottom-0 h-0.5 bg-line"><span class="block h-full bg-accent" data-bar></span></span>
+          </button>
+          <button type="button" role="tab" data-tab="1" aria-selected="false" class="group relative w-[78%] flex-none cursor-pointer snap-start overflow-hidden rounded-2xl border border-line bg-card p-5 text-left transition aria-selected:border-line-2 aria-selected:bg-card-hi sm:w-[46%] lg:w-full">
+            <span class="flex items-center gap-3 font-display text-lg font-bold"><span class="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="M7 12.5h4M13.5 12.5H17M7 15.5h7"/></svg></span>Captions and editing by text</span>
+            <span class="mt-2.5 block text-[14.5px] leading-relaxed text-ink-2">Captions light up word by word. Delete words in the transcript and they're cut from the video. Remove every "um" in one click.</span>
+            <span class="absolute inset-x-0 bottom-0 h-0.5 bg-line"><span class="block h-full bg-accent" data-bar></span></span>
+          </button>
+          <button type="button" role="tab" data-tab="2" aria-selected="false" class="group relative w-[78%] flex-none cursor-pointer snap-start overflow-hidden rounded-2xl border border-line bg-card p-5 text-left transition aria-selected:border-line-2 aria-selected:bg-card-hi sm:w-[46%] lg:w-full">
+            <span class="flex items-center gap-3 font-display text-lg font-bold"><span class="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9l4 4v13H6z"/><path d="M9.5 11h6M9.5 14.5h6M9.5 18h3.5"/></svg></span>Step by step guides</span>
+            <span class="mt-2.5 block text-[14.5px] leading-relaxed text-ink-2">Every click becomes a numbered step with a screenshot and the spot circled. Save it as a PDF or a web page.</span>
+            <span class="absolute inset-x-0 bottom-0 h-0.5 bg-line"><span class="block h-full bg-accent" data-bar></span></span>
+          </button>
+          <button type="button" role="tab" data-tab="3" aria-selected="false" class="group relative w-[78%] flex-none cursor-pointer snap-start overflow-hidden rounded-2xl border border-line bg-card p-5 text-left transition aria-selected:border-line-2 aria-selected:bg-card-hi sm:w-[46%] lg:w-full">
+            <span class="flex items-center gap-3 font-display text-lg font-bold"><span class="grid size-9 place-items-center rounded-xl bg-accent-soft text-accent"><svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5M7.5 8 12 3.5 16.5 8"/><path d="M4.5 13.5v5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5"/></svg></span>One click for every platform</span>
+            <span class="mt-2.5 block text-[14.5px] leading-relaxed text-ink-2">YouTube, TikTok, Reels, LinkedIn, X or a GIF. Vertical videos follow your cursor so nothing gets cut off.</span>
+            <span class="absolute inset-x-0 bottom-0 h-0.5 bg-line"><span class="block h-full bg-accent" data-bar></span></span>
+          </button>
+        </div>
+        <div class="relative overflow-hidden rounded-3xl border border-line-2 bg-card p-2 shadow-[0_40px_100px_-30px_rgb(0_0_0/0.45)]">
+          <div class="relative aspect-[16/10] overflow-hidden rounded-[18px] bg-bg-2">
+            <img data-panel="0" class="absolute inset-0 size-full object-cover transition duration-500" src="img/frame.webp" alt="A recording framed on an orange background with a zoomed in dialog" width="1550" height="872">
+            <img data-panel="1" class="absolute inset-0 size-full object-cover opacity-0 transition duration-500" src="img/captions.webp" alt="The captions page with karaoke style captions on the video" loading="lazy" width="1600" height="1000">
+            <img data-panel="2" class="absolute inset-0 size-full object-cover opacity-0 transition duration-500" src="img/guide.webp" alt="A list of guide steps made from clicks" loading="lazy" width="1600" height="1000">
+            <img data-panel="3" class="absolute inset-0 size-full object-cover opacity-0 transition duration-500" src="img/export.webp" alt="The export window with presets for YouTube, TikTok, LinkedIn and GIF" loading="lazy" width="1600" height="1000">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- bento -->
+  <section class="border-t border-line bg-bg-2 py-24 sm:py-32">
+    <div class="wrap">
+      <div class="reveal mx-auto max-w-[720px] text-center">
+        <div class="eyebrow">And a lot more</div>
+        <h2 class="h2">Small touches that make it feel pro</h2>
+      </div>
+      <div class="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <!-- captions -->
+        <div class="reveal card flex flex-col overflow-hidden lg:col-span-2">
+          <div class="grid flex-1 place-items-center rounded-2xl border border-line bg-bg-2 px-6 py-10">
+            <p class="text-center font-display text-[clamp(20px,2.6vw,30px)] leading-snug font-bold">
+              <span class="animate-word rounded-md px-1.5">Click</span> <span class="animate-word rounded-md px-1.5 [animation-delay:1s]">export</span> <span class="animate-word rounded-md px-1.5 [animation-delay:2s]">and</span> <span class="animate-word rounded-md px-1.5 [animation-delay:3s]">you're done.</span>
+            </p>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Captions from your voice</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Six styles, your font and colors. Runs offline on your PC, or fast online with Groq. Save subtitle files too.</p>
+        </div>
+        <!-- shortcuts -->
+        <div class="reveal card flex flex-col">
+          <div class="grid flex-1 place-items-center rounded-2xl border border-line bg-bg-2 py-10">
+            <div class="flex items-center gap-2">
+              <span class="kbd animate-key">Ctrl</span><span class="text-dim">+</span><span class="kbd animate-key [animation-delay:0.15s]">Shift</span><span class="text-dim">+</span><span class="kbd animate-key [animation-delay:0.3s]">P</span>
+            </div>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Shortcuts on screen</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Shortcuts you press show up as clean keycaps. What you type is never recorded.</p>
+        </div>
+        <!-- voice -->
+        <div class="reveal card flex flex-col">
+          <div class="flex flex-1 items-center justify-center gap-1 rounded-2xl border border-line bg-bg-2 py-10" aria-hidden="true">
+            <span class="h-10 w-1.5 animate-bar rounded-full bg-accent"></span><span class="h-16 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.2s]"></span><span class="h-8 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.4s]"></span><span class="h-20 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.1s]"></span><span class="h-12 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.3s]"></span><span class="h-16 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.5s]"></span><span class="h-9 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.25s]"></span><span class="h-14 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.45s]"></span><span class="h-7 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.15s]"></span><span class="h-12 w-1.5 animate-bar rounded-full bg-accent [animation-delay:.35s]"></span>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Clear voice</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Removes fan hum, keyboard noise and echo, and evens out your volume. Any mic sounds good.</p>
+        </div>
+        <!-- smart trim -->
+        <div class="reveal card flex flex-col lg:col-span-2">
+          <div class="flex flex-1 flex-col justify-center gap-3 rounded-2xl border border-line bg-bg-2 px-6 py-10" aria-hidden="true">
+            <div class="flex h-10 gap-1.5">
+              <span class="flex-[3] rounded-lg bg-sky"></span>
+              <span class="flex flex-[2] items-center justify-center rounded-lg border-2 border-dashed border-accent text-xs font-bold text-accent">Cut</span>
+              <span class="flex-[4] rounded-lg bg-sky"></span>
+              <span class="flex flex-[1.5] items-center justify-center rounded-lg border-2 border-dashed border-sun text-xs font-bold text-sun">4x</span>
+              <span class="flex-[3] rounded-lg bg-sky"></span>
+            </div>
+            <div class="flex h-6 gap-1.5 opacity-70"><span class="flex-[5] rounded-md bg-violet"></span><span class="flex-[2]"></span><span class="flex-[6] rounded-md bg-violet"></span></div>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Smart trim</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Finds the slow parts, like pages loading or you hunting for a window, and speeds them up or cuts them. You approve every change.</p>
+        </div>
+        <!-- webcam -->
+        <div class="reveal card flex flex-col">
+          <div class="relative flex-1 rounded-2xl border border-line bg-bg-2 py-16">
+            <div class="absolute inset-4 rounded-xl border border-line bg-card"></div>
+            <div class="absolute right-7 bottom-7 grid size-16 place-items-center rounded-full border-4 border-card bg-violet font-display text-xl font-bold text-white shadow-lg">AB</div>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Webcam bubble</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Your face in a circle or rounded box. Move and resize it right on the preview.</p>
+        </div>
+        <!-- brand -->
+        <div class="reveal card flex flex-col">
+          <div class="flex flex-1 items-center justify-center gap-3 rounded-2xl border border-line bg-bg-2 py-10" aria-hidden="true">
+            <span class="size-11 rounded-full bg-accent"></span><span class="size-11 rounded-full bg-ink"></span><span class="size-11 rounded-full bg-sun"></span>
+            <span class="ml-2 font-display text-4xl font-extrabold">Aa</span>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Brand kit</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Save your logo, colors, font, intro and outro once. Use them on any video in one click.</p>
+        </div>
+        <!-- privacy -->
+        <div class="reveal card flex flex-col">
+          <div class="flex flex-1 flex-col justify-center gap-2.5 rounded-2xl border border-line bg-bg-2 px-8 py-10 text-sm" aria-hidden="true">
+            <div class="flex items-center gap-3"><span class="w-14 text-dim">Name</span><span class="font-semibold">Ama Mensah</span></div>
+            <div class="flex items-center gap-3"><span class="w-14 text-dim">Email</span><span class="h-5 flex-1 rounded-md bg-line-2"></span></div>
+            <div class="flex items-center gap-3"><span class="w-14 text-dim">Card</span><span class="h-5 flex-1 rounded-md bg-line-2"></span></div>
+          </div>
+          <h3 class="mt-6 text-xl font-bold">Hide private info</h3>
+          <p class="mt-1.5 text-[15px] text-dim">Block out emails, passwords and customer names. It stays hidden even when the view zooms in.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- numbers -->
+  <section class="border-t border-line">
+    <div class="wrap grid grid-cols-2 lg:grid-cols-4">
+      <div class="reveal border-line py-12 pr-4 lg:border-r"><div class="font-display text-[clamp(44px,5vw,64px)] leading-none font-extrabold tracking-tight">0</div><p class="mt-3 text-[15px] text-dim">keyframes to set by hand</p></div>
+      <div class="reveal border-line py-12 pl-4 lg:border-r lg:pl-8"><div class="font-display text-[clamp(44px,5vw,64px)] leading-none font-extrabold tracking-tight">1 click</div><p class="mt-3 text-[15px] text-dim">to export for any platform</p></div>
+      <div class="reveal border-t border-line py-12 pr-4 lg:border-t-0 lg:border-r lg:pl-8"><div class="font-display text-[clamp(44px,5vw,64px)] leading-none font-extrabold tracking-tight">4K</div><p class="mt-3 text-[15px] text-dim">sharp exports, up to your screen's full size</p></div>
+      <div class="reveal border-t border-line py-12 pl-4 lg:border-t-0 lg:pl-8"><div class="font-display text-[clamp(44px,5vw,64px)] leading-none font-extrabold tracking-tight text-accent">100%</div><p class="mt-3 text-[15px] text-dim">of your videos stay on your PC</p></div>
+    </div>
+  </section>
+
+  <!-- how it works -->
+  <section id="how" class="border-t border-line bg-bg-2 py-24 sm:py-32">
+    <div class="wrap">
+      <div class="reveal mx-auto max-w-[720px] text-center">
+        <div class="eyebrow">How it works</div>
+        <h2 class="h2">From idea to shared video in minutes</h2>
+      </div>
+      <ol class="relative mt-16 grid gap-10 md:grid-cols-3 md:gap-6">
+        <li class="pointer-events-none absolute top-7 right-[16%] left-[16%] hidden border-t-2 border-dashed border-line-2 md:block" aria-hidden="true"></li>
+        <li class="reveal relative text-center">
+          <div class="mx-auto grid size-14 place-items-center rounded-2xl bg-accent font-display text-2xl font-extrabold text-white shadow-[0_10px_30px_rgb(255_61_46/0.35)]">1</div>
+          <h3 class="mt-6 text-2xl font-bold">Record</h3>
+          <p class="mx-auto mt-2 max-w-[320px] text-[15px] text-ink-2">Pick your screen, a window or a browser tab. Add your mic, PC sound and webcam. The small control bar never shows up in the video.</p>
+        </li>
+        <li class="reveal relative text-center">
+          <div class="mx-auto grid size-14 place-items-center rounded-2xl border border-line-2 bg-card font-display text-2xl font-extrabold">2</div>
+          <h3 class="mt-6 text-2xl font-bold">Polish</h3>
+          <p class="mx-auto mt-2 max-w-[320px] text-[15px] text-ink-2">Zooms, frame and cursor are already done. Tweak anything on a simple timeline: cut, speed up, add text, music and transitions.</p>
+        </li>
+        <li class="reveal relative text-center">
+          <div class="mx-auto grid size-14 place-items-center rounded-2xl border border-line-2 bg-card font-display text-2xl font-extrabold">3</div>
+          <h3 class="mt-6 text-2xl font-bold">Share</h3>
+          <p class="mx-auto mt-2 max-w-[320px] text-[15px] text-ink-2">Export for YouTube, TikTok, LinkedIn, a GIF, or a step by step guide. Your files stay on your PC.</p>
+        </li>
       </ol>
     </div>
   </section>
 
-  <section id="faq" class="py-21">
-    <div class="mx-auto max-w-[1160px] px-5">
-      <div class="reveal mb-10 text-center"><h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">Questions</h2></div>
-      <div class="reveal mx-auto max-w-[780px]">
-        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Is Scrim free?</summary><p class="mt-2.5 text-ink-2">Yes. Download it and use every feature for free. There's no watermark on your videos.</p></details>
-        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Which computers does it run on?</summary><p class="mt-2.5 text-ink-2">Windows 10 and 11, for now. A graphics card makes recording and exporting faster, but it isn't required.</p></details>
-        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Do my recordings leave my computer?</summary><p class="mt-2.5 text-ink-2">No. Recordings, projects and exports stay on your PC. Captions can run fully offline. If you choose Groq for faster captions, only the sound is sent to be transcribed. Crash reports are off unless you turn them on. Read the <a class="text-accent underline underline-offset-2" href="privacy.html">privacy page</a>.</p></details>
-        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Windows says "Unknown publisher" when I install it. Is it safe?</summary><p class="mt-2.5 text-ink-2">Yes. That message appears for new apps that aren't signed yet. Click "More info", then "Run anyway". Scrim updates itself after that.</p></details>
-        <details class="faq-item border-b border-line px-1 py-4.5"><summary>How do updates work?</summary><p class="mt-2.5 text-ink-2">Scrim checks for new versions quietly and downloads them in the background. When one is ready, one click restarts into it.</p></details>
-        <details class="faq-item border-b border-line px-1 py-4.5"><summary>I found a bug, or I have an idea.</summary><p class="mt-2.5 text-ink-2">We'd love to hear it. Use <a class="text-accent underline underline-offset-2" href="feedback.html">Report a problem</a> or <a class="text-accent underline underline-offset-2" href="feedback.html?type=idea">Suggest a feature</a>, or the help button inside the app.</p></details>
+  <!-- faq -->
+  <section id="faq" class="border-t border-line py-24 sm:py-32">
+    <div class="wrap grid gap-12 lg:grid-cols-[1fr_1.4fr] lg:gap-20">
+      <div class="reveal">
+        <div class="eyebrow">Questions</div>
+        <h2 class="h2">Good to know</h2>
+        <p class="lead">Something else on your mind? We read every message.</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a class="btn" href="feedback.html">Report a problem</a>
+          <a class="btn" href="feedback.html?type=idea">Suggest a feature</a>
+        </div>
+      </div>
+      <div class="reveal">
+        <details class="faq-item border-b border-line py-5" open><summary>Is Scrim free?</summary><p class="mt-3 pr-12 text-ink-2">Yes. Download it and use every feature for free. There's no watermark on your videos and no account to make.</p></details>
+        <details class="faq-item border-b border-line py-5"><summary>Which computers does it run on?</summary><p class="mt-3 pr-12 text-ink-2">Windows 10 and 11, for now. A graphics card makes recording and exporting faster, but it isn't required.</p></details>
+        <details class="faq-item border-b border-line py-5"><summary>Do my recordings leave my computer?</summary><p class="mt-3 pr-12 text-ink-2">No. Recordings, projects and exports stay on your PC. Captions can run fully offline. If you choose Groq for faster captions, only the sound is sent to be turned into text. Crash reports are off unless you turn them on. Read the <a class="font-semibold text-accent underline underline-offset-4" href="privacy.html">privacy page</a>.</p></details>
+        <details class="faq-item border-b border-line py-5"><summary>Windows says "Unknown publisher". Is it safe?</summary><p class="mt-3 pr-12 text-ink-2">Yes. That message shows for new apps that aren't signed yet. Click "More info", then "Run anyway". Scrim keeps itself updated after that.</p></details>
+        <details class="faq-item border-b border-line py-5"><summary>How do updates work?</summary><p class="mt-3 pr-12 text-ink-2">Scrim checks for new versions quietly and downloads them in the background. When one is ready, one click restarts into it.</p></details>
       </div>
     </div>
   </section>
 
-  <section class="pb-21">
-    <div class="mx-auto max-w-[1160px] px-5">
-      <div class="reveal rounded-[26px] border border-line bg-card px-6 py-16 text-center">
-        <h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">Make your next demo look great</h2>
-        <p class="text-ink-2 text-[17.5px] max-w-[640px] mx-auto mb-6.5">Free for Windows. Set up in a minute.</p>
-        <a class="btn btn-primary" href="/download" data-download>
-          <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
-          Download free for Windows
-        </a>
-      </div>
+  <!-- closing -->
+  <section class="px-5 pb-24">
+    <div class="reveal relative mx-auto max-w-[1200px] overflow-hidden rounded-[32px] bg-accent px-6 py-20 text-center text-white sm:py-28">
+      <svg class="absolute -top-16 -left-16 size-64 text-white/10" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="10" aria-hidden="true"><circle cx="50" cy="50" r="40"/></svg>
+      <svg class="absolute -right-10 -bottom-20 size-80 text-black/10" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true"><circle cx="50" cy="50" r="46"/></svg>
+      <img class="relative mx-auto size-18 rounded-[20px] shadow-[0_16px_40px_rgb(0_0_0/0.25)]" src="img/icon.png" alt="">
+      <h2 class="relative mx-auto mt-8 max-w-[760px] text-[clamp(36px,5.5vw,68px)] leading-[1] font-extrabold tracking-[-0.04em]">Make your next demo look great</h2>
+      <p class="relative mt-5 text-lg text-white/85">Free for Windows. Set up in a minute.</p>
+      <a class="relative mt-9 inline-flex h-14 items-center gap-2.5 rounded-full bg-[#111113] px-8 text-base font-semibold text-white transition hover:-translate-y-0.5 hover:bg-black" href="/download" data-download>
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+        Download free for Windows
+      </a>
     </div>
   </section>
 </main>
 
-<footer class="border-t border-line pt-8.5 pb-11 text-sm text-dim">
-  <div class="mx-auto max-w-[1160px] px-5 flex flex-wrap items-center gap-5.5">
+<!--footer-->
+<footer class="border-t border-line bg-bg-2">
+  <div class="wrap grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+    <div>
+      <a class="flex items-center gap-2.5 font-display text-xl font-extrabold" href="index.html"><img class="size-8 rounded-[9px]" src="img/icon.png" alt="">Scrim</a>
+      <p class="mt-4 max-w-[300px] text-[14.5px] text-dim">Screen recordings that look edited. Made in Ghana by Erudite African Network.</p>
+    </div>
+    <div>
+      <h3 class="font-sans text-sm font-semibold">Product</h3>
+      <ul class="mt-4 space-y-2.5 text-[14.5px] text-dim">
+        <li><a class="transition hover:text-ink" href="index.html#features">Features</a></li>
+        <li><a class="transition hover:text-ink" href="index.html#how">How it works</a></li>
+        <li><a class="transition hover:text-ink" href="/download">Download</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="font-sans text-sm font-semibold">Help</h3>
+      <ul class="mt-4 space-y-2.5 text-[14.5px] text-dim">
+        <li><a class="transition hover:text-ink" href="feedback.html">Report a problem</a></li>
+        <li><a class="transition hover:text-ink" href="feedback.html?type=idea">Suggest a feature</a></li>
+        <li><a class="transition hover:text-ink" href="index.html#faq">FAQ</a></li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="font-sans text-sm font-semibold">Company</h3>
+      <ul class="mt-4 space-y-2.5 text-[14.5px] text-dim">
+        <li><a class="transition hover:text-ink" href="privacy.html">Privacy</a></li>
+        <li><a class="transition hover:text-ink" href="https://eruditeafricannetwork.com">Erudite African Network</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap flex flex-wrap items-center justify-between gap-3 border-t border-line py-6 text-[13px] text-dim">
     <span>© <span data-year></span> Erudite African Network</span>
-    <nav class="ml-auto flex flex-wrap gap-4.5">
-      <a class="hover:text-ink" href="feedback.html">Report a problem</a>
-      <a class="hover:text-ink" href="feedback.html?type=idea">Suggest a feature</a>
-      <a class="hover:text-ink" href="privacy.html">Privacy</a>
-    </nav>
+    <span data-meta>Windows 10 and 11</span>
   </div>
 </footer>
+<!--/footer-->
 <script src="site.js" defer></script>
 </body>
 </html>
