@@ -1291,3 +1291,13 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .guide-mark { position: absolute; width: 7%; aspect-ratio: 1; transform: translate(-50%, -50%); border: 2px solid var(--danger); border-radius: 50%; background: color-mix(in srgb, var(--danger) 18%, transparent); pointer-events: none; }
 .guide-mark::after { content: ''; position: absolute; left: 50%; top: 50%; width: 26%; height: 26%; transform: translate(-50%, -50%); border-radius: 50%; background: var(--danger); }
 .guide-shot-box img.guide-shot { aspect-ratio: auto; height: auto; object-fit: fill; }
+
+/* ---------- feedback form and crash report question ---------- */
+.dlg.fb { width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; }
+.fb-head { display: flex; align-items: center; justify-content: space-between; }
+.fb-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+.fb-field textarea { resize: vertical; min-height: 96px; }
+.fb-warn { padding: 9px 12px; border-radius: 10px; font-size: 12.5px; background: color-mix(in srgb, var(--danger) 12%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); color: var(--text); }
+.fb-done { display: flex; flex-direction: column; gap: 6px; }
+.fb-done .dlg-ico { background: color-mix(in srgb, var(--ok, #30d158) 16%, transparent); color: var(--ok, #30d158); }
+.upd-card.consent { left: 18px; right: auto; width: 380px; }

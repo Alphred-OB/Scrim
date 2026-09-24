@@ -6,6 +6,9 @@ import { join } from 'path'
 
 let file = ''
 
+/** Path of the log file ('' if logging couldn't start). */
+export const logFile = (): string => file
+
 function write(level: string, parts: unknown[]): void {
   if (!file) return
   const text = parts.map((p) => (p instanceof Error ? `${p.message}\n${p.stack}` : typeof p === 'string' ? p : JSON.stringify(p))).join(' ')

@@ -22,6 +22,10 @@ import '@fontsource/jetbrains-mono/400.css'
 import '@fontsource/jetbrains-mono/700.css'
 import './styles/tokens.css'
 import './styles/app.css'
+import * as Sentry from '@sentry/electron/renderer'
 import App from '@/App'
+
+// errors in this window go to the main process, which decides whether to send them (opt in)
+Sentry.init({})
 
 createRoot(document.getElementById('root')!).render(<App />)

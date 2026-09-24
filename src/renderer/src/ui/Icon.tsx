@@ -69,6 +69,7 @@ const ICONS: Record<string, ReactNode> = {
   keyframe: P('M12 2L2 12l10 10 10-10z'),
   alert: <>{P('M12 3.5L2.5 20h19z')}{P('M12 10v4.5')}<circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none" /></>,
   info: <><circle cx="12" cy="12" r="9" />{P('M12 11v5.5')}<circle cx="12" cy="7.8" r="0.9" fill="currentColor" stroke="none" /></>,
+  check: P('M5 12.5l4.5 4.5L19 7.5'),
   update: <>{P('M12 4v11M7.5 10.5L12 15l4.5-4.5')}{P('M5 19.5h14')}</>,
   palette: <>{P('M12 2C6.5 2 2 6.5 2 12c0 3.6 2 6 5 6 .6 0 1-.4 1-1 0-.3-.1-.5-.2-.7-.3-.4-.5-.9-.5-1.5 0-1.7 1.3-3 3-3h1.8c3.4 0 6.2-2.8 6.2-6.2C22 5.6 17.5 2 12 2z')}<circle cx="7.5" cy="10.5" r="1.5" /><circle cx="12" cy="7.5" r="1.5" /><circle cx="16.5" cy="10.5" r="1.5" /></>
 }

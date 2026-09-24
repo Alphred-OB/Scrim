@@ -6,6 +6,7 @@ import { useSettings, matches } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
 import { maybeAutoStart, startTour, takeQueuedTour, useTour } from '@/features/onboarding/tours'
 import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
+import { helpMenu } from '@/lib/feedback'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { useEditor, flushSave, Panel } from './state/store'
 import { timeBus } from './state/timeBus'
@@ -344,7 +345,7 @@ function EditorView() {
             </div>
           )}
         </div>
-        <button className="icon-btn" title="Show me around" onClick={() => startTour('editor')}><Icon name="help" /></button>
+        <button className="icon-btn" title="Help, report a problem, suggest a feature" onClick={(e) => openContextMenu(e, helpMenu(() => startTour('editor')))}><Icon name="help" /></button>
         <button className="icon-btn" title={`Settings (${kb('settings')})`} onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
         <button data-tour="export" className="btn primary sm" style={{ marginLeft: 4, height: 32 }} onClick={() => { useEditor.getState().setPlaying(false); setExporting(true) }}><Icon name="download" size={15} /> Export</button>
       </header>

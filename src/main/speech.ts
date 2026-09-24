@@ -179,12 +179,12 @@ export async function screenChange(path: string): Promise<{ step: number; values
   return { step, values }
 }
 
-// Only two ffmpeg frame grabs at a time. A long recording can have hundreds of clicks, and
+// Only three ffmpeg frame grabs at a time. A long recording can have hundreds of clicks, and
 // starting one ffmpeg per step at once used to eat all the memory and CPU.
 let running = 0
 const waiting: (() => void)[] = []
 async function slot<T>(fn: () => Promise<T>): Promise<T> {
-  if (running >= 2) await new Promise<void>((r) => waiting.push(r))
+  if (running >= 3) await new Promise<void>((r) => waiting.push(r))
   running++
   try {
     return await fn()
@@ -255,14 +255,22 @@ export async function exportGuide(g: GuideExport, onProgress: (done: number, tot
   const dir = await fs.mkdtemp(join(tmpdir(), 'scrim-guide-'))
   try {
     const n = g.steps.length
-    const files: string[] = []
-    for (let i = 0; i < n; i++) {
-      const buf = await grab(g.video, Math.max(0, g.steps[i].t - 0.04), g.pdf ? 1280 : 1600, g.pdf ? 5 : 4)
-      const f = join(dir, `step-${i + 1}.jpg`)
-      await fs.writeFile(f, buf)
-      files.push(buf.length ? f : '')
-      onProgress(i + 1, n + 1)
+    const files: string[] = new Array(n).fill('')
+    let next = 0
+    let done = 0
+    // a few pictures at a time (the grab queue caps how many ffmpegs run at once)
+    const worker = async () => {
+      while (next < n) {
+        const i = next++
+        const buf = await grab(g.video, Math.max(0, g.steps[i].t - 0.04), 1400, 4)
+        if (buf.length) {
+          files[i] = join(dir, `step-${i + 1}.jpg`)
+          await fs.writeFile(files[i], buf)
+        }
+        onProgress(++done, n + 1)
+      }
     }
+    await Promise.all([worker(), worker(), worker()])
     const { head, foot } = guidePage(g.title, n)
     if (!g.pdf) {
       const part = g.outPath + '.part'

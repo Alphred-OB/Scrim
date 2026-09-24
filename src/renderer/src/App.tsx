@@ -10,6 +10,7 @@ import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost, DialogHost } from '@/ui'
 import { UpdateBanner } from '@/lib/update'
+import { CrashConsent, FeedbackHost } from '@/lib/feedback'
 import Onboarding from '@/features/onboarding/Onboarding'
 import { PracticeLoader } from '@/features/onboarding/practice'
 import CoachMarks from '@/features/onboarding/CoachMarks'
@@ -76,6 +77,8 @@ export default function App() {
       <ContextMenuHost />
       <DialogHost />
       <UpdateBanner />
+      <FeedbackHost />
+      {!route.startsWith('/editor') && <CrashConsent />}
       {settingsLoaded && !settings.onboarded && <Onboarding />}
       <CoachMarks />
       <PracticeLoader />

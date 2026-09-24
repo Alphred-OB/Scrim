@@ -43,3 +43,22 @@ name on the certificate. From then on the updater refuses any installer not sign
 
 SmartScreen can still warn for a little while on a brand new certificate until enough people have
 installed the signed app; that goes away by itself as it builds reputation.
+
+## Crash reports and feedback
+
+Both are off until you fill in `src/shared/config.ts`, then build a new version.
+
+**Feedback ("Report a problem", "Suggest a feature")** goes to the small service in
+`server/feedback`. Put it online with Render (see `server/feedback/README.md`), give it your own
+domain, and set `FEEDBACK_URL` to that address. Reports land in the dashboard at `/admin`.
+If someone is offline, the report waits on their PC and is sent the next time Scrim starts.
+
+**Crash reports** go to Sentry, and only for people who said yes (Scrim asks once, and it's in
+Settings, General, Privacy and help).
+
+1. Make a free account at sentry.io and a project of type **Electron**.
+2. Copy the project's DSN into `SENTRY_DSN`.
+3. In the project settings, under Security and Privacy, turn on "Prevent Storing of IP Addresses".
+
+Scrim already removes the user's name, home folder, computer name and API keys from every report,
+and never sends videos, pictures or files with a crash.

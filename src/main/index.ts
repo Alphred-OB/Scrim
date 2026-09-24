@@ -13,6 +13,8 @@ import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
 import { initUpdater } from './updater'
 import { registerSpeechIpc } from './speech'
+import { registerFeedbackIpc } from './feedback'
+import { initCrashReports, registerCrashIpc } from './crash'
 import { detectEncoder } from './ffmpeg'
 import { runSelfTest, selfTestDir } from './selftest'
 import { closeSplash, showSplash } from './splash'
@@ -21,6 +23,7 @@ import './rpc'
 import { startLog } from './log'
 
 startLog()
+initCrashReports() // before the app is ready, so crashes in every window are caught (sends nothing unless allowed)
 
 registerSchemes()
 // keep things smooth on low end GPUs/CPUs
@@ -364,6 +367,8 @@ app.whenReady().then(() => {
   registerIpc()
   initUpdater(broadcast)
   registerSpeechIpc()
+  registerFeedbackIpc()
+  registerCrashIpc()
   if (!selfTestDir()) showSplash(ICON_PNG)
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast

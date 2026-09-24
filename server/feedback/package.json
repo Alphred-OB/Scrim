@@ -1,0 +1,17 @@
+{
+  "name": "scrim-feedback",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Receives bug reports and feature ideas from the Scrim app, with a small dashboard to read them.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

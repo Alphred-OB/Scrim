@@ -3,6 +3,7 @@ import type { CaptureSource, Corner, ProjectSummary, RecorderStatus, WebcamRecor
 import { api, mediaUrl } from '@/lib/api'
 import { webcamConstraints } from '@/lib/mediaCapture'
 import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu, askConfirm, showMessage } from '@/ui'
+import { helpMenu, openFeedback } from '@/lib/feedback'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { matches, useSettings } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
@@ -252,12 +253,17 @@ export default function Launcher() {
         <button
           data-tour="help"
           className="icon-btn"
-          title="Take the tour"
-          onClick={() => {
-            setTab('home')
-            const s = useSettings.getState()
-            s.save({ onboarded: false, toursSeen: (s.settings.toursSeen ?? []).filter((t) => t !== 'home') })
-          }}
+          title="Help, report a problem, suggest a feature"
+          onClick={(e) =>
+            openContextMenu(
+              e,
+              helpMenu(() => {
+                setTab('home')
+                const s = useSettings.getState()
+                s.save({ onboarded: false, toursSeen: (s.settings.toursSeen ?? []).filter((t) => t !== 'home') })
+              })
+            )
+          }
         >
           <Icon name="help" />
         </button>
@@ -266,7 +272,8 @@ export default function Launcher() {
 
       {status.state === 'error' && (
         <div className="fade-in" style={{ margin: '14px 22px 0', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,69,58,.12)', border: '1px solid rgba(255,69,58,.3)', whiteSpace: 'pre-wrap', fontSize: 12.5 }}>
-          <b>Recording failed.</b> {status.error}
+          <b>Recording failed.</b> {status.error}{' '}
+          <button className="link" onClick={() => openFeedback('bug', { title: 'Recording failed', message: `The recording failed with this message:\n${status.error ?? ''}\n\nWhat I was recording: ` })}>Report this problem</button>
         </div>
       )}
 

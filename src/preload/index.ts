@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
+// lets errors in any window reach the crash reporter in the main process (sends nothing unless allowed)
+import '@sentry/electron/preload'
 
 const invoke = (ch: string, ...a: unknown[]) => ipcRenderer.invoke(ch, ...a)
 
@@ -52,6 +54,11 @@ const api = {
   transcribeGroq: (path: string, key: string) => invoke('speech:groq', path, key),
   speechPcm: (path: string) => invoke('speech:pcm', path),
   pickSpeech: (paths: string[]) => invoke('speech:pick', paths),
+  sendFeedback: (f: unknown) => invoke('feedback:send', f),
+  feedbackEnabled: () => invoke('feedback:enabled'),
+  openLogFolder: () => invoke('feedback:logFolder'),
+  crashEnabled: () => invoke('crash:enabled'),
+  crashTest: () => invoke('crash:test'),
   cleanVoice: (src: string, dir: string, strength: number) => invoke('voice:clean', src, dir, strength),
   screenChange: (path: string) => invoke('tidy:screen', path),
   guideStills: (path: string, times: number[]) => invoke('guide:stills', path, times),

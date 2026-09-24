@@ -69,6 +69,12 @@ export interface Api {
   speechPcm(path: string): Promise<Float32Array>
   /** index of the first file with real sound in it, or -1 */
   pickSpeech(paths: string[]): Promise<number>
+  /** sends a problem report or idea; queued: saved to send later (offline) */
+  sendFeedback(f: { kind: 'bug' | 'idea'; title: string; message: string; email?: string; logs?: boolean; screenshot?: boolean }): Promise<{ id: number; queued?: boolean }>
+  feedbackEnabled(): Promise<boolean>
+  openLogFolder(): Promise<void>
+  crashEnabled(): Promise<boolean>
+  crashTest(): Promise<boolean>
   cleanVoice(src: string, dir: string, strength: number): Promise<string>
   /** how much the screen changes over time (0 = frozen), one value per `step` seconds */
   screenChange(path: string): Promise<{ step: number; values: number[] }>

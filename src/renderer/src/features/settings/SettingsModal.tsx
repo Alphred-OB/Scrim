@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { Icon, ProgressViz, PROGRESS_STYLES, Select, Seg, Slider, Toggle } from '@/ui'
 import AppearanceTab from './AppearanceTab'
 import { UpdateSettings } from '@/lib/update'
+import { PrivacySettings } from '@/lib/feedback'
 
 type Tab = 'general' | 'shortcuts' | 'export' | 'appearance' | 'ai'
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -113,6 +114,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
           {tab === 'general' && <UpdateSettings />}
+          {tab === 'general' && <PrivacySettings />}
 
           {tab === 'shortcuts' && (
             <div className="section">
