@@ -17,7 +17,7 @@
   document.querySelectorAll('.reveal').forEach((el) => (io ? io.observe(el) : el.classList.add('in')))
 
   // pause the hero video when it's off screen (saves battery)
-  const v = document.querySelector('.stage video')
+  const v = document.querySelector('main video')
   if (v && 'IntersectionObserver' in window) {
     new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? v.play().catch(() => {}) : v.pause()))).observe(v)
   }

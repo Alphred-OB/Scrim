@@ -21,6 +21,13 @@ Since the site and the feedback live together, one domain covers both, for examp
 
 Note: Render's free database is deleted after 30 days on the free plan; switch it to the cheapest paid plan (or point `DATABASE_URL` at a free Neon database) for anything you want to keep.
 
+## Styling
+
+The site uses Tailwind CSS v4. The source is `styles/site.css` (colors, the button and card classes);
+everything else is utility classes in `public/*.html`. After changing classes run `npm run css`
+(or `npm run css:watch` while working). The built `public/site.css` is committed so the site works
+without a build, and Render rebuilds it on every deploy.
+
 ## API
 
 `POST /v1/feedback` with header `x-scrim-client: scrim-desktop` and JSON:

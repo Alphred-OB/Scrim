@@ -2,16 +2,25 @@
   "name": "scrim-feedback",
   "version": "1.0.0",
   "private": true,
-  "description": "Receives bug reports and feature ideas from the Scrim app, with a small dashboard to read them.",
+  "description": "The Scrim website, plus the service that receives bug reports and feature ideas and a small dashboard to read them.",
   "type": "module",
   "main": "src/index.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/index.js",
+    "css": "tailwindcss -i styles/site.css -o public/site.css --minify",
+    "css:watch": "tailwindcss -i styles/site.css -o public/site.css --watch",
+    "build": "npm run css",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "express": "^4.21.2",
     "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
   }
 }

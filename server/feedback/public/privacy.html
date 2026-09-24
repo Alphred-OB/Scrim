@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy · Scrim</title>
+<meta name="description" content="What Scrim sends and what stays on your computer.">
 <link rel="icon" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,38 +12,47 @@
 <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header class="nav">
-  <div class="wrap">
-    <a class="logo" href="/"><img src="/img/icon.png" alt="">Scrim</a>
-    <nav class="nav-links"><a href="/feedback">Feedback</a><a class="btn small primary" href="/download">Download</a></nav>
+<header class="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur-md">
+  <div class="mx-auto max-w-[1160px] px-5 flex h-16 items-center gap-5.5">
+    <a class="flex items-center gap-2.5 text-lg font-extrabold" href="/"><img class="size-7 rounded-lg" src="/img/icon.png" alt="">Scrim</a>
+    <nav class="ml-auto flex items-center gap-5.5 text-[14.5px] font-medium text-ink-2">
+      <a class="hidden hover:text-ink md:inline" href="/#features">Features</a>
+      <a class="hidden hover:text-ink md:inline" href="/#faq">FAQ</a>
+      <a class="hidden hover:text-ink md:inline" href="/feedback">Feedback</a>
+      <a class="btn btn-primary btn-sm" href="/download">Download</a>
+    </nav>
   </div>
 </header>
-<main class="page wrap prose">
-  <h2 style="font-size:40px;margin-top:0">Privacy</h2>
-  <p>Scrim is made by Erudite African Network. This page explains, in plain words, what leaves your computer and what doesn't.</p>
 
-  <h2>Your recordings stay on your PC</h2>
-  <p>Recordings, projects and exported videos are saved on your computer only. Scrim has no account and no cloud storage, and it doesn't upload your videos anywhere.</p>
+<main class="mx-auto max-w-[1160px] px-5 pt-14 pb-22">
+  <div class="mx-auto max-w-[760px] text-ink-2">
+  <h1 class="mb-4 text-[40px] leading-tight font-extrabold tracking-[-0.025em] text-ink">Privacy</h1>
+  <p class="mt-3">Scrim is made by Erudite African Network. This page explains, in plain words, what leaves your computer and what doesn't.</p>
 
-  <h2>Captions</h2>
-  <p>You choose how captions are made. On your PC (offline), nothing is sent anywhere; the speech model is downloaded once from Hugging Face. With Groq, only the sound of your recording is sent to Groq to be turned into text, using your own Groq key.</p>
+  <h2 class="mt-8.5 mb-2 text-2xl font-bold tracking-tight text-ink">Your recordings stay on your PC</h2>
+  <p class="mt-3">Recordings, projects and exported videos are saved on your computer only. Scrim has no account and no cloud storage, and it doesn't upload your videos anywhere.</p>
 
-  <h2>Crash reports (off unless you say yes)</h2>
-  <p>If you turn them on, Scrim sends a report to Sentry when something breaks: the error, the app version and basic facts like Windows version and memory. Your name, home folder, computer name and keys are removed first. Videos, pictures and files are never included. Turn it off any time in Settings.</p>
+  <h2 class="mt-8.5 mb-2 text-2xl font-bold tracking-tight text-ink">Captions</h2>
+  <p class="mt-3">You choose how captions are made. On your PC (offline), nothing is sent anywhere; the speech model is downloaded once from Hugging Face. With Groq, only the sound of your recording is sent to Groq to be turned into text, using your own Groq key.</p>
 
-  <h2>Problem reports and ideas</h2>
-  <p>When you send one from the app or this website, we receive what you wrote, your email if you gave it, and anything you chose to attach (the app log with your name and folders removed, or a picture). We use it only to fix problems and improve Scrim, and we don't share it. We keep a scrambled version of your internet address for an hour to stop spam.</p>
+  <h2 class="mt-8.5 mb-2 text-2xl font-bold tracking-tight text-ink">Crash reports (off unless you say yes)</h2>
+  <p class="mt-3">If you turn them on, Scrim sends a report to Sentry when something breaks: the error, the app version and basic facts like Windows version and memory. Your name, home folder, computer name and keys are removed first. Videos, pictures and files are never included. Turn it off any time in Settings.</p>
 
-  <h2>Updates</h2>
-  <p>Scrim checks GitHub for new versions. GitHub sees that a copy of Scrim asked, like any download.</p>
+  <h2 class="mt-8.5 mb-2 text-2xl font-bold tracking-tight text-ink">Problem reports and ideas</h2>
+  <p class="mt-3">When you send one from the app or this website, we receive what you wrote, your email if you gave it, and anything you chose to attach (the app log with your name and folders removed, or a picture). We use it only to fix problems and improve Scrim, and we don't share it. We keep a scrambled version of your internet address for an hour to stop spam.</p>
 
-  <h2>Questions</h2>
-  <p>Ask us through the <a href="/feedback">feedback page</a>, and we can also delete anything you've sent us.</p>
+  <h2 class="mt-8.5 mb-2 text-2xl font-bold tracking-tight text-ink">Updates</h2>
+  <p class="mt-3">Scrim checks GitHub for new versions. GitHub sees that a copy of Scrim asked, like any download.</p>
+
+  <h2 class="mt-8.5 mb-2 text-2xl font-bold tracking-tight text-ink">Questions</h2>
+  <p class="mt-3">Ask us through the <a class="text-accent underline underline-offset-2" href="/feedback">feedback page</a>, and we can also delete anything you've sent us.</p>
+  </div>
 </main>
-<footer>
-  <div class="wrap">
+
+<footer class="border-t border-line pt-8.5 pb-11 text-sm text-dim">
+  <div class="mx-auto max-w-[1160px] px-5 flex flex-wrap items-center gap-5.5">
     <span>© <span data-year></span> Erudite African Network</span>
-    <nav><a href="/">Home</a><a href="/feedback">Feedback</a></nav>
+    <nav class="ml-auto flex flex-wrap gap-4.5"><a class="hover:text-ink" href="/">Home</a><a class="hover:text-ink" href="/feedback">Feedback</a></nav>
   </div>
 </footer>
 <script src="/site.js" defer></script>

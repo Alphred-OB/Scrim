@@ -17,7 +17,7 @@
     form.title.placeholder = t.ph
     form.message.placeholder = t.msg
     $('[data-version-field]').hidden = kind !== 'bug'
-    document.querySelectorAll('[data-kind]').forEach((b) => b.classList.toggle('on', b.dataset.kind === kind))
+    document.querySelectorAll('[data-kind]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.kind === kind)))
     history.replaceState(null, '', kind === 'idea' ? '/feedback?type=idea' : '/feedback')
   }
   document.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => ((kind = b.dataset.kind), apply())))

@@ -15,145 +15,145 @@
 <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-<header class="nav">
-  <div class="wrap">
-    <a class="logo" href="/"><img src="/img/icon.png" alt="">Scrim</a>
-    <nav class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#how">How it works</a>
-      <a href="#faq">FAQ</a>
-      <a href="/feedback">Feedback</a>
-      <a class="btn small primary" href="/download" data-download>Download</a>
+<header class="sticky top-0 z-20 border-b border-line bg-bg/90 backdrop-blur-md">
+  <div class="mx-auto max-w-[1160px] px-5 flex h-16 items-center gap-5.5">
+    <a class="flex items-center gap-2.5 text-lg font-extrabold" href="/"><img class="size-7 rounded-lg" src="/img/icon.png" alt="">Scrim</a>
+    <nav class="ml-auto flex items-center gap-5.5 text-[14.5px] font-medium text-ink-2">
+      <a class="hidden hover:text-ink md:inline" href="#features">Features</a>
+      <a class="hidden hover:text-ink md:inline" href="#how">How it works</a>
+      <a class="hidden hover:text-ink md:inline" href="#faq">FAQ</a>
+      <a class="hidden hover:text-ink md:inline" href="/feedback">Feedback</a>
+      <a class="btn btn-primary btn-sm" href="/download" data-download>Download</a>
     </nav>
   </div>
 </header>
 
 <main>
-  <div class="hero wrap">
-    <span class="pill"><b>New</b> Captions from your voice and step by step guides</span>
-    <h1>Screen recordings that look <em>edited</em>. Automatically.</h1>
-    <p class="lead">Record your screen and Scrim adds smooth zooms where you click, a clean frame, a polished cursor and captions. Export for YouTube, TikTok or as a step by step guide in minutes.</p>
-    <div class="cta">
-      <a class="btn primary" href="/download" data-download>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+  <div class="mx-auto max-w-[1160px] px-5 pt-18 pb-10 text-center">
+    <span class="inline-flex items-center gap-2 rounded-full border border-line bg-card py-1.5 pr-3 pl-2 text-[13px] text-ink-2"><b class="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">New</b> Captions from your voice and step by step guides</span>
+    <h1 class="mx-auto mt-5.5 mb-4.5 max-w-[900px] text-[clamp(38px,6.2vw,72px)] leading-[1.04] font-black tracking-[-0.035em]">Screen recordings that look <em class="text-accent not-italic">edited</em>. Automatically.</h1>
+    <p class="mx-auto mb-7.5 max-w-[680px] text-[clamp(17px,2vw,20px)] text-ink-2">Record your screen and Scrim adds smooth zooms where you click, a clean frame, a polished cursor and captions. Export for YouTube, TikTok or as a step by step guide in minutes.</p>
+    <div class="flex flex-wrap justify-center gap-3">
+      <a class="btn btn-primary" href="/download" data-download>
+        <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
         Download free for Windows
       </a>
       <a class="btn" href="#how">See how it works</a>
     </div>
-    <div class="meta" data-meta>Windows 10 and 11 · Free</div>
-    <div class="stage">
-      <video src="/img/demo.mp4" poster="/img/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Scrim turning a plain recording into a polished demo"></video>
+    <div class="mt-3.5 text-[13px] text-dim" data-meta>Windows 10 and 11 · Free</div>
+    <div class="mx-auto mt-13.5 max-w-[1060px] rounded-[22px] border border-line bg-card p-2.5 shadow-[0_40px_90px_rgb(0_0_0/0.35)]">
+      <video class="aspect-video w-full rounded-[14px] bg-black object-cover" src="/img/demo.mp4" poster="/img/demo-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="Scrim turning a plain recording into a polished demo"></video>
     </div>
   </div>
 
-  <section id="features">
-    <div class="wrap">
-      <div class="head center reveal">
+  <section id="features" class="py-21">
+    <div class="mx-auto max-w-[1160px] px-5">
+      <div class="reveal mb-10 text-center">
         <div class="eyebrow">What Scrim does for you</div>
-        <h2>Record once. It already looks produced.</h2>
-        <p class="sub">No keyframes, no timelines full of tiny edits. Scrim watches your clicks, typing and voice, and does the tedious parts for you.</p>
+        <h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">Record once. It already looks produced.</h2>
+        <p class="text-ink-2 text-[17.5px] max-w-[640px] mx-auto">No keyframes, no timelines full of tiny edits. Scrim watches your clicks, typing and voice, and does the tedious parts for you.</p>
       </div>
 
-      <div class="row reveal">
-        <div class="text">
+      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1fr_1.25fr]">
+        <div class="">
           <div class="eyebrow">Automatic polish</div>
-          <h3>Zooms that follow your clicks</h3>
-          <p>Every click becomes a smooth zoom, so viewers always see what matters. Your recording sits on a clean background with rounded corners and a soft shadow.</p>
-          <ul>
+          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Zooms that follow your clicks</h3>
+          <p class="mb-3.5 text-ink-2">Every click becomes a smooth zoom, so viewers always see what matters. Your recording sits on a clean background with rounded corners and a soft shadow.</p>
+          <ul class="tick-list grid gap-2">
             <li>Smooth cursor with click ripples and optional click sounds</li>
             <li>Wallpapers, live backgrounds, your own image or brand color</li>
             <li>Fine tune any zoom by dragging it on the timeline</li>
           </ul>
         </div>
-        <div class="shot"><img src="/img/frame.webp" alt="A recording framed on an orange background with a zoomed in dialog" loading="lazy" width="1550" height="872"></div>
+        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="/img/frame.webp" alt="A recording framed on an orange background with a zoomed in dialog" loading="lazy" width="1550" height="872"></div>
       </div>
 
-      <div class="row flip reveal">
-        <div class="text">
+      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1.25fr_1fr]">
+        <div class="md:order-2">
           <div class="eyebrow">Captions and editing by text</div>
-          <h3>Say it once, fix it in the text</h3>
-          <p>Scrim turns what you say into captions that light up word by word. Delete words in the transcript and they're cut from the video. Remove every "um" and long pause in one click.</p>
-          <ul>
+          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Say it once, fix it in the text</h3>
+          <p class="mb-3.5 text-ink-2">Scrim turns what you say into captions that light up word by word. Delete words in the transcript and they're cut from the video. Remove every "um" and long pause in one click.</p>
+          <ul class="tick-list grid gap-2">
             <li>Six caption styles, your font and colors</li>
             <li>Works offline on your PC, or fast online with Groq</li>
             <li>Save subtitle files for YouTube and LinkedIn</li>
           </ul>
         </div>
-        <div class="shot"><img src="/img/captions.webp" alt="The captions page with karaoke style captions on the video" loading="lazy" width="1600" height="1000"></div>
+        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="/img/captions.webp" alt="The captions page with karaoke style captions on the video" loading="lazy" width="1600" height="1000"></div>
       </div>
 
-      <div class="row reveal">
-        <div class="text">
+      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1fr_1.25fr]">
+        <div class="">
           <div class="eyebrow">Step by step guides</div>
-          <h3>Your recording, as a written guide</h3>
-          <p>Every click becomes a numbered step with a screenshot and the spot circled. Titles come from what you said. Save it as a PDF or a web page and send it to your team or customers.</p>
-          <ul>
+          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">Your recording, as a written guide</h3>
+          <p class="mb-3.5 text-ink-2">Every click becomes a numbered step with a screenshot and the spot circled. Titles come from what you said. Save it as a PDF or a web page and send it to your team or customers.</p>
+          <ul class="tick-list grid gap-2">
             <li>Edit titles, add notes, leave out steps</li>
             <li>Great for onboarding, support and how-tos</li>
           </ul>
         </div>
-        <div class="shot"><img src="/img/guide.webp" alt="A list of guide steps made from clicks" loading="lazy" width="1600" height="1000"></div>
+        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="/img/guide.webp" alt="A list of guide steps made from clicks" loading="lazy" width="1600" height="1000"></div>
       </div>
 
-      <div class="row flip reveal">
-        <div class="text">
+      <div class="reveal grid items-center gap-6 py-8.5 md:gap-12 md:grid-cols-[1.25fr_1fr]">
+        <div class="md:order-2">
           <div class="eyebrow">Share anywhere</div>
-          <h3>One click for every platform</h3>
-          <p>Pick where it's going and Scrim sets it up: YouTube, TikTok, Reels, Shorts, LinkedIn, X, or a small GIF for your docs. Vertical videos follow your cursor, so nothing important gets cut off.</p>
-          <ul>
+          <h3 class="mt-2 mb-3 text-[28px] leading-[1.15] font-bold tracking-[-0.02em]">One click for every platform</h3>
+          <p class="mb-3.5 text-ink-2">Pick where it's going and Scrim sets it up: YouTube, TikTok, Reels, Shorts, LinkedIn, X, or a small GIF for your docs. Vertical videos follow your cursor, so nothing important gets cut off.</p>
+          <ul class="tick-list grid gap-2">
             <li>Sharp exports up to your screen's full resolution</li>
             <li>Uses your graphics card when it can, so exports are quick</li>
           </ul>
         </div>
-        <div class="shot"><img src="/img/export.webp" alt="The export window with presets for YouTube, TikTok, LinkedIn and GIF" loading="lazy" width="1600" height="1000"></div>
+        <div class="overflow-hidden rounded-2xl border border-line bg-card shadow-[0_24px_60px_rgb(0_0_0/0.25)]"><img class="h-auto w-full" src="/img/export.webp" alt="The export window with presets for YouTube, TikTok, LinkedIn and GIF" loading="lazy" width="1600" height="1000"></div>
       </div>
 
-      <div class="grid reveal" style="margin-top:36px">
-        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="7" height="10" rx="2"/><rect x="14" y="7" width="7" height="10" rx="2"/><path d="M12 4v3M12 17v3"/></svg></div><h4>Smart trim</h4><p>Finds the slow parts, like pages loading or you looking for a window, and speeds them up or cuts them.</p></div>
-        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M6 10h2M11 10h2M16 10h2M8 14.5h8"/></svg></div><h4>Shortcuts on screen</h4><p>Keyboard shortcuts you press show up as clean keycaps, so viewers can follow along. Your typing is never recorded.</p></div>
-        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.5 9a4.3 4.3 0 0 1 0 6M18.3 6.3a8.2 8.2 0 0 1 0 11.4"/></svg></div><h4>Clear voice</h4><p>Removes fan hum, keyboard noise and room echo, and evens out your volume. Any microphone sounds good.</p></div>
-        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="6.5"/><circle cx="12" cy="10" r="2.6"/><path d="M8 20.5h8M12 16.5v4"/></svg></div><h4>Webcam bubble</h4><p>Add your face in a circle or rounded box, anywhere on the video. Move and resize it right on the preview.</p></div>
-        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8l2.3 1.6 2.8-.1.9 2.6 2.2 1.7-.9 2.6.9 2.6-2.2 1.7-.9 2.6-2.8-.1L12 21.2l-2.3-1.6-2.8.1-.9-2.6-2.2-1.7.9-2.6-.9-2.6 2.2-1.7.9-2.6 2.8.1z"/></svg></div><h4>Brand kit</h4><p>Save your logo, colors, font, intro and outro once. Put them on any video in one click.</p></div>
-        <div class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><path d="M4 4l16 16"/></svg></div><h4>Hide private info</h4><p>Blur or block out emails, passwords and customer names. It stays hidden even when the view zooms in.</p></div>
+      <div class="reveal mt-9 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="7" height="10" rx="2"/><rect x="14" y="7" width="7" height="10" rx="2"/><path d="M12 4v3M12 17v3"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Smart trim</h4><p class="text-[14.5px] text-dim">Finds the slow parts, like pages loading or you looking for a window, and speeds them up or cuts them.</p></div>
+        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="3"/><path d="M6 10h2M11 10h2M16 10h2M8 14.5h8"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Shortcuts on screen</h4><p class="text-[14.5px] text-dim">Keyboard shortcuts you press show up as clean keycaps, so viewers can follow along. Your typing is never recorded.</p></div>
+        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path d="M15.5 9a4.3 4.3 0 0 1 0 6M18.3 6.3a8.2 8.2 0 0 1 0 11.4"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Clear voice</h4><p class="text-[14.5px] text-dim">Removes fan hum, keyboard noise and room echo, and evens out your volume. Any microphone sounds good.</p></div>
+        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="6.5"/><circle cx="12" cy="10" r="2.6"/><path d="M8 20.5h8M12 16.5v4"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Webcam bubble</h4><p class="text-[14.5px] text-dim">Add your face in a circle or rounded box, anywhere on the video. Move and resize it right on the preview.</p></div>
+        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8l2.3 1.6 2.8-.1.9 2.6 2.2 1.7-.9 2.6.9 2.6-2.2 1.7-.9 2.6-2.8-.1L12 21.2l-2.3-1.6-2.8.1-.9-2.6-2.2-1.7.9-2.6-.9-2.6 2.2-1.7.9-2.6 2.8.1z"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Brand kit</h4><p class="text-[14.5px] text-dim">Save your logo, colors, font, intro and outro once. Put them on any video in one click.</p></div>
+        <div class="card"><div class="mb-3.5 grid size-10 place-items-center rounded-[11px] bg-accent-soft text-accent"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><path d="M4 4l16 16"/></svg></div><h4 class="mb-1.5 text-[17px] font-bold">Hide private info</h4><p class="text-[14.5px] text-dim">Blur or block out emails, passwords and customer names. It stays hidden even when the view zooms in.</p></div>
       </div>
     </div>
   </section>
 
-  <section id="how" style="background:var(--bg-2)">
-    <div class="wrap">
-      <div class="head center reveal">
+  <section id="how" class="bg-bg-2 py-21">
+    <div class="mx-auto max-w-[1160px] px-5">
+      <div class="reveal mb-10 text-center">
         <div class="eyebrow">How it works</div>
-        <h2>From idea to shared video in minutes</h2>
+        <h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">From idea to shared video in minutes</h2>
       </div>
-      <div class="steps reveal">
-        <div class="card"><h4>Record</h4><p>Pick your screen, a window or a browser tab. Add your mic, PC sound and webcam. A small bar lets you pause or stop, and it never shows up in the video.</p></div>
-        <div class="card"><h4>Polish</h4><p>Scrim adds the zooms, frame and cursor for you. Tweak anything on a simple timeline: cut, speed up, add text, captions, music and transitions.</p></div>
-        <div class="card"><h4>Share</h4><p>Export for YouTube, TikTok, LinkedIn, a GIF, or a step by step guide. Your files stay on your PC.</p></div>
+      <ol class="reveal grid gap-3.5 md:grid-cols-3">
+        <li class="card"><span class="mb-3 grid size-7 place-items-center rounded-full bg-accent text-sm font-extrabold text-white">1</span><h4 class="mb-1.5 text-[17px] font-bold">Record</h4><p class="text-[14.5px] text-dim">Pick your screen, a window or a browser tab. Add your mic, PC sound and webcam. A small bar lets you pause or stop, and it never shows up in the video.</p></li>
+        <li class="card"><span class="mb-3 grid size-7 place-items-center rounded-full bg-accent text-sm font-extrabold text-white">2</span><h4 class="mb-1.5 text-[17px] font-bold">Polish</h4><p class="text-[14.5px] text-dim">Scrim adds the zooms, frame and cursor for you. Tweak anything on a simple timeline: cut, speed up, add text, captions, music and transitions.</p></li>
+        <li class="card"><span class="mb-3 grid size-7 place-items-center rounded-full bg-accent text-sm font-extrabold text-white">3</span><h4 class="mb-1.5 text-[17px] font-bold">Share</h4><p class="text-[14.5px] text-dim">Export for YouTube, TikTok, LinkedIn, a GIF, or a step by step guide. Your files stay on your PC.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="faq" class="py-21">
+    <div class="mx-auto max-w-[1160px] px-5">
+      <div class="reveal mb-10 text-center"><h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">Questions</h2></div>
+      <div class="reveal mx-auto max-w-[780px]">
+        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Is Scrim free?</summary><p class="mt-2.5 text-ink-2">Yes. Download it and use every feature for free. There's no watermark on your videos.</p></details>
+        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Which computers does it run on?</summary><p class="mt-2.5 text-ink-2">Windows 10 and 11, for now. A graphics card makes recording and exporting faster, but it isn't required.</p></details>
+        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Do my recordings leave my computer?</summary><p class="mt-2.5 text-ink-2">No. Recordings, projects and exports stay on your PC. Captions can run fully offline. If you choose Groq for faster captions, only the sound is sent to be transcribed. Crash reports are off unless you turn them on. Read the <a class="text-accent underline underline-offset-2" href="/privacy">privacy page</a>.</p></details>
+        <details class="faq-item border-b border-line px-1 py-4.5"><summary>Windows says "Unknown publisher" when I install it. Is it safe?</summary><p class="mt-2.5 text-ink-2">Yes. That message appears for new apps that aren't signed yet. Click "More info", then "Run anyway". Scrim updates itself after that.</p></details>
+        <details class="faq-item border-b border-line px-1 py-4.5"><summary>How do updates work?</summary><p class="mt-2.5 text-ink-2">Scrim checks for new versions quietly and downloads them in the background. When one is ready, one click restarts into it.</p></details>
+        <details class="faq-item border-b border-line px-1 py-4.5"><summary>I found a bug, or I have an idea.</summary><p class="mt-2.5 text-ink-2">We'd love to hear it. Use <a class="text-accent underline underline-offset-2" href="/feedback">Report a problem</a> or <a class="text-accent underline underline-offset-2" href="/feedback?type=idea">Suggest a feature</a>, or the help button inside the app.</p></details>
       </div>
     </div>
   </section>
 
-  <section id="faq">
-    <div class="wrap">
-      <div class="head center reveal"><h2>Questions</h2></div>
-      <div class="faq reveal">
-        <details><summary>Is Scrim free?</summary><p>Yes. Download it and use every feature for free. There's no watermark on your videos.</p></details>
-        <details><summary>Which computers does it run on?</summary><p>Windows 10 and 11, for now. A graphics card makes recording and exporting faster, but it isn't required.</p></details>
-        <details><summary>Do my recordings leave my computer?</summary><p>No. Recordings, projects and exports stay on your PC. Captions can run fully offline. If you choose Groq for faster captions, only the sound is sent to be transcribed. Crash reports are off unless you turn them on. Read the <a href="/privacy">privacy page</a>.</p></details>
-        <details><summary>Windows says "Unknown publisher" when I install it. Is it safe?</summary><p>Yes. That message appears for new apps that aren't signed yet. Click "More info", then "Run anyway". Scrim updates itself after that.</p></details>
-        <details><summary>How do updates work?</summary><p>Scrim checks for new versions quietly and downloads them in the background. When one is ready, one click restarts into it.</p></details>
-        <details><summary>I found a bug, or I have an idea.</summary><p>We'd love to hear it. Use <a href="/feedback">Report a problem</a> or <a href="/feedback?type=idea">Suggest a feature</a>, or the help button inside the app.</p></details>
-      </div>
-    </div>
-  </section>
-
-  <section>
-    <div class="wrap">
-      <div class="band reveal">
-        <h2>Make your next demo look great</h2>
-        <p class="sub" style="margin:0 auto 26px">Free for Windows. Set up in a minute.</p>
-        <a class="btn primary" href="/download" data-download>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+  <section class="pb-21">
+    <div class="mx-auto max-w-[1160px] px-5">
+      <div class="reveal rounded-[26px] border border-line bg-card px-6 py-16 text-center">
+        <h2 class="text-[clamp(30px,4vw,46px)] leading-[1.1] font-extrabold tracking-[-0.025em] mt-2.5 mb-3.5">Make your next demo look great</h2>
+        <p class="text-ink-2 text-[17.5px] max-w-[640px] mx-auto mb-6.5">Free for Windows. Set up in a minute.</p>
+        <a class="btn btn-primary" href="/download" data-download>
+          <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
           Download free for Windows
         </a>
       </div>
@@ -161,13 +161,13 @@
   </section>
 </main>
 
-<footer>
-  <div class="wrap">
+<footer class="border-t border-line pt-8.5 pb-11 text-sm text-dim">
+  <div class="mx-auto max-w-[1160px] px-5 flex flex-wrap items-center gap-5.5">
     <span>© <span data-year></span> Erudite African Network</span>
-    <nav>
-      <a href="/feedback">Report a problem</a>
-      <a href="/feedback?type=idea">Suggest a feature</a>
-      <a href="/privacy">Privacy</a>
+    <nav class="ml-auto flex flex-wrap gap-4.5">
+      <a class="hover:text-ink" href="/feedback">Report a problem</a>
+      <a class="hover:text-ink" href="/feedback?type=idea">Suggest a feature</a>
+      <a class="hover:text-ink" href="/privacy">Privacy</a>
     </nav>
   </div>
 </footer>
