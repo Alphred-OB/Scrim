@@ -33,7 +33,7 @@ export function drawKeys(ctx: Ctx, keys: KeyPress[] | undefined, s: KeySettings,
   const scale = 0.85 + 0.15 * (1 - Math.pow(1 - inP, 3)) + (inP < 1 ? Math.sin(inP * Math.PI) * 0.04 : 0)
   if (alpha <= 0) return
 
-  const size = 34 * k * s.size
+  const size = 56 * k * s.size
   const pad = size * 0.42
   const gap = size * 0.34
   ctx.save()
