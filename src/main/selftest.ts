@@ -263,6 +263,29 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         if (snd !== 'pop') throw new Error('sound not picked: ' + snd)
       })
 
+      await step('keyboard shortcuts on the video', async () => {
+        await js('window.__scrim.seek(0.95)')
+        await wait(600)
+        await shot('keys-preview.png')
+        await click('[data-tour="tool-keys"]')
+        await wait(700)
+        await shot('keys-panel.png')
+        await js(`document.querySelectorAll('.keys-look')[3].click()`, true)
+        await js(`document.querySelectorAll('.keys-pos-btn')[2].click()`, true)
+        await wait(500)
+        await shot('keys-panel-custom.png')
+        const painted: number[] = []
+        for (let i = 0; i < 6; i++) {
+          painted.push(await js<number>(`(() => { const c = document.querySelector('.keys-preview'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n })()`))
+          await wait(330)
+        }
+        log('keys preview painted', JSON.stringify(painted))
+        if (Math.max(...painted) === 0) throw new Error('keys preview is empty')
+        const n = await js<number>('document.querySelectorAll(".tl-key").length')
+        log('key chips', n)
+        if (n !== 3) throw new Error('expected 3 key chips, got ' + n)
+      })
+
       await step('zoom eye toggle', async () => {
         const before = (await state()).zoomEnabled
         await js(`document.querySelectorAll('.tl-head').forEach((h) => h.textContent.includes('Zoom') && h.querySelector('.tl-eye')?.setAttribute('id', 'eye-zoom'))`)

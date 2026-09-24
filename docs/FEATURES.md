@@ -23,6 +23,7 @@ The real cursor is hidden in the video. Scrim logs where it goes and every click
 | Media | Imported videos and images. Drag, trim, right click for full screen or mute. |
 | Zoom | Click an empty spot to add a zoom. Drag, trim, right click for follow or pin, and zoom amount. |
 | Clicks | Every click you made. Click a dot to turn that effect on or off. |
+| Keys | Every shortcut recorded. Click to jump directly there, right-click to hide/show individual presses. |
 | Text | Click an empty spot to add text. |
 | Blur | Redactions for passwords, API keys and sensitive info. Drag, resize on canvas, trim edges. |
 | Microphone / System audio | Waveforms. The speaker icon mutes. |
@@ -40,6 +41,14 @@ Wallpapers (24), Live (animated: aurora, orbit, concentric, contour, waves, boke
 
 ## Cursor and clicks
 19 cursor styles in five groups: Classic (macOS, Windows, outline), Simple, Pointy (including neon), Touch (dot, touch circle, ring) and Special (hand, crosshair, pen). Style it with fill, outline, outline width, size, shadow and opacity. Motion has smoothing, sway and hide when not moving. The spotlight can glow, dim everything else, or draw a ring. Choose when it shows (always, while moving, on clicks), and set its color, strength, darkness, size and edge softness. Click effects: ripple, ring or pulse, with color and bounce.
+
+## Keyboard Shortcuts Overlay
+Recorded shortcuts (e.g. `Ctrl+C`, `Ctrl+Shift+P`, `Enter`, arrows) display as beautiful animated keycaps overlaid on the video. Plain typing is never recorded to protect passwords and private text.
+- **Styling:** Dark, Light, Blue Accent, or Custom keycap color with automated luminance-aware text coloring.
+- **Positioning:** 6 spatial locations (Top-Left, Top, Top-Right, Bottom-Left, Bottom, Bottom-Right).
+- **Animation & Timing:** Pop, Slide, or Fade in/out; configurable hold duration (time on screen) and corner roundness (square to pill).
+- **Formatting:** Display words (`Ctrl`, `Shift`, `Alt`, `Win`) or macOS-style symbols (`⌃`, `⇧`, `⌥`, `⊞`).
+- **Granular Control:** Timeline track with per-shortcut click-to-seek, right-click toggle, and full list view in the Keys inspector with show-all and hide-all controls.
 
 ## Text
 Add from the Text panel, the Text track or **T**. Drag on the preview to move it (it snaps to the center). Drag the white corner to resize, and double click to type directly on the video. Styles include font, size, bold, italic, underline, alignment, color, box, letter spacing, shadow and animation (fade, slide, pop, typewriter).

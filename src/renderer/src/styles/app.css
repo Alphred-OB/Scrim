@@ -1128,8 +1128,13 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .keys-pos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 12px; background: var(--stage); aspect-ratio: 16 / 7; }
 .keys-pos-btn { position: relative; border: 1.5px solid var(--line-2); border-radius: 8px; background: transparent; cursor: pointer; }
 .keys-pos-btn:hover { border-color: var(--text-2); }
-.keys-pos-btn.on { border-color: var(--accent); background: var(--accent-soft); }
-.keys-pos-btn i { position: absolute; width: 26px; height: 9px; border-radius: 3px; background: var(--text-2); left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.keys-pos-btn i { position: absolute; width: 24px; height: 8px; border-radius: 3px; background: var(--text-2); }
+.keys-pos-btn i.top-left { left: 8px; top: 8px; }
+.keys-pos-btn i.top { left: 50%; top: 8px; transform: translateX(-50%); }
+.keys-pos-btn i.top-right { right: 8px; top: 8px; }
+.keys-pos-btn i.bottom-left { left: 8px; bottom: 8px; }
+.keys-pos-btn i.bottom { left: 50%; bottom: 8px; transform: translateX(-50%); }
+.keys-pos-btn i.bottom-right { right: 8px; bottom: 8px; }
 .keys-pos-btn.on i { background: var(--accent); }
 /* Keys rail icon: the keys press one after another on hover, and once on click */
 .rail-icon-keys .ri-key { transform-box: fill-box; transform-origin: center; transition: transform 0.2s var(--ease), opacity 0.2s; }

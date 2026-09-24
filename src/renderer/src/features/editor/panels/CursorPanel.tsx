@@ -180,11 +180,14 @@ export default function CursorPanel() {
           )}
           <span className="hint">Plays in the preview and goes into the export. Clicks cut out of the video stay silent.</span>
         </Section>
-
-        <Section title="Keyboard shortcuts">
-          <button className="btn" onClick={() => useEditor.getState().setPanel('keys')}><Icon name="keyboard" size={15} /> Open the Keys page</button>
-        </Section>
       </div>
+
+      <Section title="Keyboard shortcuts">
+        <button className="btn" style={{ width: '100%' }} onClick={() => useEditor.getState().setPanel('keys')}>
+          <Icon name="keyboard" size={15} /> Open Keys & Shortcuts panel
+        </button>
+        <span className="hint">Configure keycap style, size, animations, positions, and per-key visibility.</span>
+      </Section>
     </div>
   )
 }

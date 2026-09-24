@@ -116,24 +116,31 @@ function KeysPreview({ settings, combos }: { settings: KeySettings; combos: stri
     let raf = 0
     let last = 0
     const t0 = performance.now()
-    const loop = (now: number) => {
+    const loop = () => {
       raf = requestAnimationFrame(loop)
+      const now = performance.now()
       if (now - last < 33 || document.hidden) return
       last = now
       const dpr = Math.min(2, window.devicePixelRatio || 1)
-      const W = c.clientWidth * dpr
-      const H = c.clientHeight * dpr
+      const W = Math.round(c.clientWidth * dpr)
+      const H = Math.round(c.clientHeight * dpr)
+      if (!W || !H) return
       if (c.width !== W || c.height !== H) {
         c.width = W
         c.height = H
       }
       const { settings: s, combos: list } = live.current
       ctx.clearRect(0, 0, W, H)
-      const cycle = s.hold + 0.5
-      const t = (now - t0) / 1000
+      const cycle = (s.hold || 1.4) + 0.5
+      const t = Math.max(0, (now - t0) / 1000)
       const combo = list[Math.floor(t / cycle) % list.length]
-      // same proportions as a 1080p video
-      drawKeycaps(ctx, combo, { ...s, hold: s.hold }, t % cycle, W, H, H / 1080 * 2.2)
+      if (!combo?.length) return
+      try {
+        // same proportions as a 1080p video
+        drawKeycaps(ctx, combo, s, t % cycle, W, H, (H / 1080) * 2.2)
+      } catch (e) {
+        console.warn('[keys] preview failed', e)
+      }
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)

@@ -75,7 +75,7 @@ export function defaultEdit(duration: number): EditState {
     effectClips: [],
     blurs: [],
     leadIn: 0,
-    tracks: { media: true, text: true, audio: true, effects: true, blurs: true }
+    tracks: { media: true, text: true, audio: true, effects: true, blurs: true, keys: true }
   }
 }
 

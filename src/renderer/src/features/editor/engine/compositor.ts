@@ -579,7 +579,7 @@ export class Renderer {
     }
 
     // 8b. keyboard shortcuts
-    if (edit.keys?.show && inp.keys?.length) drawKeys(ctx, inp.keys, edit.keys, t, W, H, L.k)
+    if (edit.keys?.show && edit.tracks.keys !== false && inp.keys?.length) drawKeys(ctx, inp.keys, edit.keys, t, W, H, L.k)
 
     // 9. transitions at the start, the end and around cuts
     this.applyTransition(ctx, W, H, t, edit, L.k)

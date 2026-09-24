@@ -14,7 +14,8 @@ const dur = 8
 const samples = []
 for (let t = 0; t <= dur; t += 1 / 60) samples.push({ t: +t.toFixed(3), x: 0.5 + 0.3 * Math.cos(t), y: 0.5 + 0.3 * Math.sin(t * 1.3) })
 const clicks = [1.2, 1.9, 4.5, 6.2].map((t) => ({ t, x: 0.5 + 0.3 * Math.cos(t), y: 0.5 + 0.3 * Math.sin(t * 1.3), button: 1, up: t + 0.1 }))
-const cursor: CursorData = { width: 1920, height: 1080, samples, clicks }
+const keys = [{ t: 0.8, keys: ['Ctrl', 'Shift', 'P'] }, { t: 2.2, keys: ['Enter'] }, { t: 5.0, keys: ['Ctrl', 'S'] }]
+const cursor: CursorData = { width: 1920, height: 1080, samples, clicks, keys }
 writeFileSync(join(dir, 'cursor.json'), JSON.stringify(cursor))
 const edit = defaultEdit(dur)
 edit.zoom.segments = autoZoomFromClicks(cursor, dur)

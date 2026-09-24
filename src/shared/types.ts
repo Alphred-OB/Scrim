@@ -391,7 +391,7 @@ export interface EditState {
    */
   leadIn: number
   /** eye / speaker buttons on the timeline tracks */
-  tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean; blurs?: boolean }
+  tracks: { media: boolean; text: boolean; audio: boolean; effects: boolean; blurs?: boolean; keys?: boolean }
 }
 
 export interface Project {

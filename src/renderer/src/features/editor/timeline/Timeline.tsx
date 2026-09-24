@@ -405,7 +405,24 @@ export default function Timeline() {
   if (edit.zoom.segments.length || spareOn === 'zoom')
     rows.push({ key: 'zoom', base: 'zoom', label: 'Zoom', icon: 'zoom', color: COLORS.zoom, kind: 'zoom', h: TRACK_H, toggle: eye(edit.zoom.enabled, () => update((e) => (e.zoom.enabled = !e.zoom.enabled)), 'Turn all zooms on or off') })
   if (keyPresses.length)
-    rows.push({ key: 'keys', base: 'keys', label: 'Keys', icon: 'keyboard', color: '#5b6478', h: TRACK_H, toggle: eye(edit.keys.show, () => update((e) => (e.keys.show = !e.keys.show)), 'Show or hide keyboard shortcuts') })
+    rows.push({
+      key: 'keys',
+      base: 'keys',
+      label: 'Keys',
+      icon: 'keyboard',
+      color: '#5b6478',
+      h: TRACK_H,
+      toggle: eye(
+        edit.keys.show && edit.tracks.keys !== false,
+        () =>
+          update((e) => {
+            const next = !(e.keys.show && e.tracks.keys !== false)
+            e.keys.show = next
+            e.tracks.keys = next
+          }),
+        'Show or hide keyboard shortcuts'
+      )
+    })
   pushLanes('text', lanesOf(edit.texts, spareOn === 'text'), { label: 'Text', icon: 'text', color: COLORS.text, kind: 'text', toggle: eye(edit.tracks.text, () => update((e) => (e.tracks.text = !e.tracks.text)), 'Show or hide all text') })
   pushLanes('blur', lanesOf(edit.blurs ?? [], spareOn === 'blur'), { label: 'Blur', icon: 'eyeOff', color: COLORS.blur, kind: 'blur', toggle: eye(edit.tracks.blurs !== false, () => update((e) => (e.tracks.blurs = !(e.tracks.blurs !== false))), 'Show or hide blur regions') })
   pushLanes('overlay', lanesOf(edit.overlays, spareOn === 'overlay'), { label: 'Media', icon: 'image', color: COLORS.overlay, kind: 'overlay', toggle: eye(edit.tracks.media, () => update((e) => (e.tracks.media = !e.tracks.media)), 'Show or hide all media') })
@@ -733,7 +750,7 @@ export default function Timeline() {
               return (
                 <button
                   key={'k' + id}
-                  className={`tl-key ${hidden || !edit.keys.show ? 'off' : ''}`}
+                  className={`tl-key ${hidden || !edit.keys.show || edit.tracks.keys === false ? 'off' : ''}`}
                   style={{ left: XS(kp.t), top: top('keys') + 5, height: TRACK_H - 10, minWidth: Math.max(18, edit.keys.hold * pps) }}
                   title={`${kp.keys.join(' + ')}${hidden ? ' (hidden)' : ''}. Right click to ${hidden ? 'show' : 'hide'} it.`}
                   onPointerDown={(e) => e.stopPropagation()}
