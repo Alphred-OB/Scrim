@@ -5,7 +5,10 @@
   const $ = (s, el = document) => el.querySelector(s)
   const $$ = (s, el = document) => [...el.querySelectorAll(s)]
   const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v))
-  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches
+  // People with Windows animation effects off still get the page's motion, just without
+  // smooth scrolling, the intro and the cursor (the parts that can feel like too much).
+  const calm = false
+  const lessMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
   const desktop = () => innerWidth >= 1024
 
@@ -57,7 +60,7 @@
     first = !sessionStorage.getItem('scrim-intro')
     sessionStorage.setItem('scrim-intro', '1')
   } catch {}
-  if (curtain && first && !calm && $('[data-hero]')) {
+  if (curtain && first && !lessMotion && $('[data-hero]')) {
     curtain.hidden = false
     setTimeout(() => root.classList.add('go'), 850)
     setTimeout(() => curtain.remove(), 1800)
@@ -68,7 +71,7 @@
 
   // ---------- smooth scroll ----------
   let lenis = null
-  if (window.Lenis && !calm) {
+  if (window.Lenis && !lessMotion) {
     lenis = new Lenis({ lerp: 0.09, smoothWheel: true })
     const raf = (t) => {
       lenis.raf(t)
@@ -319,7 +322,7 @@
 
   // ---------- cursor ----------
   const cur = $('[data-cursor]')
-  if (cur && fine && !calm) {
+  if (cur && fine && !lessMotion) {
     cur.hidden = false
     cur.classList.remove('hidden')
     const dot = $('[data-cursor-dot]', cur)
@@ -358,7 +361,7 @@
   }
 
   // ---------- magnetic buttons ----------
-  if (fine && !calm) {
+  if (fine && !lessMotion) {
     $$('.btn').forEach((b) => {
       b.addEventListener('pointermove', (e) => {
         const r = b.getBoundingClientRect()

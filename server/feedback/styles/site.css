@@ -76,9 +76,6 @@
   @keyframes vt-out { to { opacity: 0; transform: translateY(-40px) scale(0.98); } }
   @keyframes vt-in { from { opacity: 0; transform: translateY(60px); } }
 
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; transition-duration: 0s !important; }
-  }
 }
 
 @layer components {
@@ -125,9 +122,6 @@
   transition: opacity 1s var(--ease-out-expo), transform 1.2s var(--ease-out-expo), filter 1s var(--ease-out-expo);
   transition-delay: calc(var(--i, 0) * 90ms);
   &.in { opacity: 1; transform: none; filter: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .rise, .fade-up, .reveal { opacity: 1 !important; transform: none !important; filter: none !important; }
 }
 
 /* the first visit intro */
