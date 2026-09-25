@@ -98,6 +98,8 @@ export const api: Api = window.api
 /** Turns an absolute path into a URL the renderer can load (served by the media:// protocol). */
 export function mediaUrl(path: string | undefined): string {
   if (!path) return ''
+  // the browser demo already has real URLs (the website, or files picked as blob: URLs)
+  if (/^(https?:|blob:|data:)/.test(path)) return path
   return 'media://file/' + encodeURIComponent(path)
 }
 

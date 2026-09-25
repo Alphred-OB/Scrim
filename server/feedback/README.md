@@ -28,6 +28,17 @@ everything else is utility classes in `public/*.html`. Smooth scrolling is Lenis
 (or `npm run css:watch` while working). The built `public/site.css` is committed so the site works
 without a build, and Render rebuilds it on every deploy.
 
+## The live editor demo (`/app`)
+
+`public/app` is Scrim's real editor built for the browser, opening a sample project from `public/app/demo`.
+Edits stay in the visitor's browser and exports download straight from the page (MP4 or WebM).
+Recording, captions from speech, GIFs and guides need the desktop app.
+The build is committed, so Render doesn't need the app's code. To refresh it, from the repo root: `npm run build:web`.
+
+## Trying the site locally
+
+`npm start` works without a database too (feedback is just switched off), then open http://localhost:3000.
+
 ## API
 
 `POST /v1/feedback` with header `x-scrim-client: scrim-desktop` and JSON:

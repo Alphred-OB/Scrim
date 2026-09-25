@@ -40,6 +40,7 @@
       <nav class="ml-6 hidden items-center gap-7 text-[14px] md:flex">
         <a class="link" href="index.html#how">How it works</a>
         <a class="link" href="index.html#tour">Tour</a>
+        <a class="link" href="app/">Live editor</a>
         <a class="link" href="index.html#uses">Use cases</a>
         <a class="link" href="index.html#faq">FAQ</a>
         <a class="link" href="feedback.html">Feedback</a>
@@ -63,6 +64,7 @@
     <div class="flex flex-col text-[40px] leading-[1.15] font-medium tracking-[-0.04em]">
       <a class="border-b border-line py-3" href="index.html#how">How it works</a>
       <a class="border-b border-line py-3" href="index.html#tour">Tour</a>
+      <a class="border-b border-line py-3" href="app/">Live editor</a>
       <a class="border-b border-line py-3" href="index.html#uses">Use cases</a>
       <a class="border-b border-line py-3" href="index.html#faq">FAQ</a>
       <a class="border-b border-line py-3" href="feedback.html">Feedback</a>
@@ -92,7 +94,7 @@
           <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
           <span class="roll"><span>Download for Windows</span><span aria-hidden="true">Download for Windows</span></span>
         </a>
-        <a class="btn btn-line h-13 px-7" href="#how"><span class="roll"><span>See how it works</span><span aria-hidden="true">See how it works</span></span></a>
+        <a class="btn btn-line h-13 px-7" href="app/"><span class="roll"><span>Try it in your browser</span><span aria-hidden="true">Try it in your browser</span></span></a>
       </div>
       <p class="fade-up mt-5 text-[13px] text-dim" style="--d:750ms" data-meta>Windows 10 and 11 · Free · No watermark</p>
     </div>
@@ -137,6 +139,35 @@
           </button>
         </div>
       </div></div><div class="laptop-base"></div></div></div>
+    </div>
+  </section>
+
+  <!-- the real editor, running in the browser -->
+  <section id="live" class="border-t border-line py-28 sm:py-36">
+    <div class="wrap grid items-center gap-14 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
+      <div>
+        <p class="label flex items-center gap-2.5"><span class="pulse-dot size-1.5 rounded-full bg-ok"></span>Live demo</p>
+        <h2 class="reveal h-section mt-5">The real editor. <span class="serif text-dim">Right here.</span></h2>
+        <p class="reveal mt-5 max-w-[420px] text-[17px] text-ink-2">Change the background, drag the zooms, cut clips, restyle the captions, then export the video. Nothing to install.</p>
+        <div class="reveal mt-9 flex flex-wrap items-center gap-3">
+          <a class="btn btn-ink h-13 px-7" href="app/">
+            <svg class="size-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>
+            <span class="roll"><span>Open the editor</span><span aria-hidden="true">Open the editor</span></span>
+          </a>
+          <span class="text-[13px] text-dim">Best on a computer, in Chrome or Edge.</span>
+        </div>
+      </div>
+      <a href="app/" class="reveal group block px-[4%]" data-cursor-text="Open" aria-label="Open the live editor">
+        <div class="laptop"><div class="laptop-lid"><div class="laptop-screen relative aspect-[16/10]">
+          <img class="size-full object-cover transition duration-1000 ease-out-expo group-hover:scale-[1.03]" src="img/editor.webp" alt="Scrim's editor" loading="lazy">
+          <div class="absolute inset-0 grid place-items-center bg-black/25 transition duration-500 group-hover:bg-black/10">
+            <span class="flex items-center gap-[1.2cqw] rounded-full bg-white py-[1.4cqw] pr-[2.6cqw] pl-[1.6cqw] text-[2.2cqw] font-medium text-black shadow-2xl transition duration-500 ease-out-expo group-hover:scale-105">
+              <span class="grid size-[4.4cqw] place-items-center rounded-full bg-accent text-white"><svg class="size-[45%]" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg></span>
+              Try it in your browser
+            </span>
+          </div>
+        </div></div><div class="laptop-base"></div></div>
+      </a>
     </div>
   </section>
 

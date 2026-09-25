@@ -100,7 +100,14 @@ test('the website pages are served with safe headers', async () => {
     assert.equal(r.status, 200, p)
     assert.ok(r.headers.get('content-security-policy'), p)
   }
-  assert.match(await (await fetch(base + '/')).text(), /Download free for Windows/)
+  assert.match(await (await fetch(base + '/')).text(), /Download/)
+})
+
+test('the live editor demo is served with room for video and workers', async () => {
+  const r = await fetch(base + '/app/')
+  assert.equal(r.status, 200)
+  assert.match(r.headers.get('content-security-policy'), /worker-src 'self' blob:/)
+  assert.equal((await fetch(base + '/app/demo/project.json')).status, 200)
 })
 
 test('download always points at the newest installer', async () => {

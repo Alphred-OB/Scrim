@@ -12,7 +12,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist": "electron-vite build && electron-builder --win --x64 --publish never",
-    "release": "electron-vite build && electron-builder --win --x64 --publish always"
+    "release": "electron-vite build && electron-builder --win --x64 --publish always",
+    "build:web": "node -e \"require('fs').rmSync('server/feedback/public/app/assets',{recursive:true,force:true})\" && vite build --config vite.web.config.ts && node -e \"require('fs').renameSync('server/feedback/public/app/web.html','server/feedback/public/app/index.html')\""
   },
   "dependencies": {
     "@sentry/electron": "^7.20.0",

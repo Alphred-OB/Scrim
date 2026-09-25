@@ -34,6 +34,8 @@ export function createApp(db, opts = {}) {
       'X-Frame-Options': 'DENY',
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'"
     })
+    // the live editor demo plays and exports video in the page, which needs blob: and workers
+    if (_req.path.startsWith('/app')) res.set('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; worker-src 'self' blob:; connect-src 'self' blob: data:; frame-ancestors 'none'")
     next()
   })
   app.get('/health', (_req, res) => res.json({ ok: true }))
@@ -54,6 +56,7 @@ export function createApp(db, opts = {}) {
 
   // ---------------- from the app ----------------
   app.post('/v1/feedback', express.json({ limit: '7mb' }), async (req, res) => {
+    if (!db) return res.status(503).json({ error: 'Feedback is off on this server.' })
     try {
       // a light filter for random bots; the app always sends this
       if (!CLIENTS.has(req.get('x-scrim-client') ?? '')) return res.status(403).json({ error: 'Not allowed' })
@@ -99,6 +102,7 @@ export function createApp(db, opts = {}) {
 
   // ---------------- dashboard ----------------
   const auth = (req, res, next) => {
+    if (!db) return res.status(503).type('text').send('Set DATABASE_URL to use the dashboard.')
     if (!adminPass) return res.status(503).type('text').send('Set ADMIN_PASSWORD to use the dashboard.')
     const [scheme, token] = (req.get('authorization') ?? '').split(' ')
     if (scheme === 'Basic' && token) {
