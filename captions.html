@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Captions and AI · Scrim</title>
+<meta name="description" content="Generate captions from your voice, edit the video by deleting words, and use your own Groq AI key or run it offline.">
+<meta property="og:title" content="Captions and AI · Scrim">
+<meta property="og:description" content="Generate captions from your voice, edit the video by deleting words, and use your own Groq AI key or run it offline.">
+<meta property="og:image" content="img/captions.webp">
+<meta name="theme-color" content="#f4f5f7">
+<link rel="icon" href="favicon.png">
+<script src="theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="wow.css">
+</head>
+<body>
+<!-- first visit intro -->
+<div class="curtain pointer-events-none fixed inset-0 z-[100] grid place-items-center bg-ink" data-curtain hidden>
+  <img class="curtain-mark size-14 rounded-2xl" src="img/icon.png" alt="">
+</div>
+<!-- our own pointer (desktop only), styled like Scrim's cursor with click ripples -->
+<div class="pointer-events-none fixed inset-0 z-[95] hidden" data-pointer data-style="arrow" aria-hidden="true">
+  <div class="absolute top-0 left-0 will-change-transform" data-p-trail>
+    <div class="grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-ink/30 text-[12px] font-medium whitespace-nowrap text-inv transition-[width,height,background-color,border-color,opacity] duration-500 ease-out-expo" data-p-ring><span class="scale-50 opacity-0 transition duration-300" data-p-label></span></div>
+  </div>
+  <div class="absolute top-0 left-0 will-change-transform" data-p-pos>
+    <svg class="block w-[22px] -translate-x-[5px] -translate-y-[3px] drop-shadow-[0_2px_3px_rgb(0_0_0/0.3)] transition-transform duration-300 ease-out-expo" viewBox="0 0 24 24" data-p-arrow><path d="M5 3l14 8-6.2 1.6L10 19z" fill="var(--p-fill, var(--c-ink))" stroke="var(--c-bg)" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <span class="absolute top-0 left-0 hidden size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink transition-transform duration-300 ease-out-expo" data-p-dot></span>
+  </div>
+</div>
+
+<!--header-->
+<header class="fixed inset-x-0 top-0 z-50 transition-transform duration-500 ease-out-expo [view-transition-name:nav]" data-nav>
+  <div class="wrap">
+    <div class="mt-3 flex h-14 items-center gap-6 rounded-full border border-transparent px-2 pl-4 transition-[background-color,border-color] duration-500 data-[solid]:border-line data-[solid]:bg-bg/80 data-[solid]:backdrop-blur-xl" data-nav-bar>
+      <a class="flex items-center gap-2 text-[17px] font-semibold tracking-tight" href="index.html"><img class="size-7 rounded-[8px]" src="img/icon.png" alt="">Scrim</a>
+      <nav class="ml-6 hidden items-center gap-7 text-[14px] md:flex">
+        <a class="link" href="features.html">Features</a>
+        <a class="link" href="captions.html" aria-current="page">Captions and AI</a>
+        <a class="link" href="script.html">Script</a>
+        <a class="link" href="editing.html">Editing</a>
+        <a class="link" href="install.html">Download</a>
+        <a class="link" href="feedback.html">Feedback</a>
+      </nav>
+      <div class="ml-auto flex items-center gap-2">
+        <button type="button" data-sound class="relative grid size-10 cursor-pointer place-items-center rounded-full text-ink-2 transition hover:bg-bg-2 hover:text-ink" aria-label="Sound effects" aria-pressed="true">
+          <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/><path data-sound-on d="M15.5 9a4.3 4.3 0 0 1 0 6M18.3 6.3a8.2 8.2 0 0 1 0 11.4"/><path data-sound-off class="hidden" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+        </button>
+        <button type="button" data-theme-toggle class="theme-pill" role="switch" aria-label="Switch light or dark theme">
+          <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+          <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+          <span class="thumb">
+            <svg data-icon-sun viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+            <svg data-icon-moon viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+          </span>
+        </button>
+        <a class="btn btn-ink hidden h-10 px-5 text-[14px] sm:inline-flex" href="https://github.com/Alphred-OB/Scrim/releases/latest" data-download><span class="roll"><span>Download</span><span aria-hidden="true">Download</span></span></a>
+        <button type="button" class="grid size-10 cursor-pointer place-items-center rounded-full md:hidden" data-menu-btn aria-expanded="false" aria-label="Menu">
+          <span class="relative block h-3 w-5"><span class="absolute top-0 left-0 h-px w-full bg-ink transition duration-500 ease-out-expo" data-l1></span><span class="absolute bottom-0 left-0 h-px w-full bg-ink transition duration-500 ease-out-expo" data-l2></span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <nav class="fixed inset-0 -z-10 flex flex-col justify-end bg-bg px-5 pb-10 transition-[clip-path] duration-700 ease-in-out-quart [clip-path:inset(0_0_100%_0)] data-[open]:[clip-path:inset(0_0_0_0)] md:hidden" data-menu>
+    <div class="flex flex-col text-[40px] leading-[1.15] font-medium tracking-[-0.04em]">
+      <a class="border-b border-line py-3" href="features.html">Features</a>
+      <a class="border-b border-line py-3" href="captions.html">Captions and AI</a>
+      <a class="border-b border-line py-3" href="script.html">Script</a>
+      <a class="border-b border-line py-3" href="editing.html">Editing</a>
+      <a class="border-b border-line py-3" href="install.html">Download</a>
+      <a class="border-b border-line py-3" href="feedback.html">Feedback</a>
+    </div>
+    <a class="btn btn-ink mt-8 h-14 text-base" href="https://github.com/Alphred-OB/Scrim/releases/latest" data-download>Download free for Windows</a>
+  </nav>
+</header>
+<!--/header-->
+
+<main>
+  <section class="relative pt-36 pb-20 sm:pt-44 sm:pb-28">
+    <div class="wrap">
+      <p class="label fade-up" style="--d:100ms">Captions and AI</p>
+      <h1 class="fade-up mt-6 max-w-[1000px] text-[clamp(44px,7.4vw,112px)] leading-[0.94] font-medium tracking-[-0.055em]" style="--d:200ms">Captions from your voice. <span class="serif text-accent">Edit by editing words.</span></h1>
+      <p class="fade-up mt-8 max-w-[580px] text-[clamp(16px,1.5vw,19px)] text-ink-2" style="--d:350ms">Scrim listens to your recording, writes the words, times every one, and lets you cut the video by deleting text. Use your own AI key for speed, or keep it all on your PC.</p>
+      <div class="fade-up mt-10 flex flex-wrap items-center gap-3" style="--d:500ms"><a class="btn btn-ink h-13 px-7" href="https://github.com/Alphred-OB/Scrim/releases/latest" data-download><i class="size-[18px]" data-i="DirectboxReceive"></i><span class="roll"><span>Download for Windows</span><span aria-hidden="true">Download for Windows</span></span></a><a class="btn btn-line h-13 px-7" href="#ai"><span class="roll"><span>Add your AI key</span><span aria-hidden="true">Add your AI key</span></span></a></div>
+    </div>
+  </section>
+
+  <!-- generate -->
+  <section class="border-t border-line py-24 sm:py-32">
+    <div class="wrap grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
+      <div>
+        <p class="label">01 · Generate</p>
+        <h2 class="reveal h-section mt-5">One click. <span class="serif text-dim">Every word timed.</span></h2>
+        <ol class="reveal mt-9 space-y-5 text-[16px] text-ink-2" style="--i:1">
+          <li class="flex gap-4"><span class="font-mono text-dim">1</span><span><b class="text-ink">Record with your mic on.</b> Scrim keeps your voice on its own track, so it reads clean.</span></li>
+          <li class="flex gap-4"><span class="font-mono text-dim">2</span><span><b class="text-ink">Open Captions and press Generate.</b> Words appear with the exact moment you said them.</span></li>
+          <li class="flex gap-4"><span class="font-mono text-dim">3</span><span><b class="text-ink">Pick a style.</b> One or two lines, size, position, colors. It updates live in the preview.</span></li>
+        </ol>
+        <p class="reveal mt-8 text-[14px] text-dim" style="--i:2">Works for any language Whisper understands. Export the captions as a subtitle file too.</p>
+      </div>
+      <div class="reveal px-[4%]" style="--i:1"><div class="laptop"><div class="laptop-lid"><div class="laptop-screen relative aspect-video">
+        <img class="size-full object-cover" src="img/before.webp" alt="A recording with captions on it" loading="lazy">
+        <p class="absolute inset-x-[6%] bottom-[9%] text-center text-[3.6cqw] leading-[1.2] font-bold text-white [text-shadow:0_0.3cqw_1.2cqw_rgb(0_0_0/0.7)]" data-karaoke><span data-k>Scrim</span> <span data-k>writes</span> <span data-k>the</span> <span data-k>captions</span> <span data-k>while</span> <span data-k>you</span> <span data-k>talk.</span> </p>
+      </div></div><div class="laptop-base"></div></div></div>
+    </div>
+  </section>
+
+  <!-- styles -->
+  <section class="border-t border-line py-24 sm:py-32">
+    <div class="wrap">
+      <p class="label">02 · Styles</p>
+      <h2 class="reveal h-section mt-5 max-w-[760px]">Six looks. <span class="serif text-dim">Make one yours.</span></h2>
+      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><div class="reveal rounded-[18px] border border-line bg-card p-6" style="--i:0"><div class="grid aspect-[16/8] place-items-center rounded-xl bg-bg-2 text-center text-[19px] font-semibold">Karaoke</div><p class="mt-4 text-[15px] font-medium">Karaoke</p></div><div class="reveal rounded-[18px] border border-line bg-card p-6" style="--i:1"><div class="grid aspect-[16/8] place-items-center rounded-xl bg-bg-2 text-center text-[19px] font-semibold">Bold</div><p class="mt-4 text-[15px] font-medium">Bold</p></div><div class="reveal rounded-[18px] border border-line bg-card p-6" style="--i:2"><div class="grid aspect-[16/8] place-items-center rounded-xl bg-bg-2 text-center text-[19px] font-semibold">Clean</div><p class="mt-4 text-[15px] font-medium">Clean</p></div><div class="reveal rounded-[18px] border border-line bg-card p-6" style="--i:0"><div class="grid aspect-[16/8] place-items-center rounded-xl bg-bg-2 text-center text-[19px] font-semibold">Box</div><p class="mt-4 text-[15px] font-medium">Box</p></div><div class="reveal rounded-[18px] border border-line bg-card p-6" style="--i:1"><div class="grid aspect-[16/8] place-items-center rounded-xl bg-bg-2 text-center text-[19px] font-semibold">Neon</div><p class="mt-4 text-[15px] font-medium">Neon</p></div><div class="reveal rounded-[18px] border border-line bg-card p-6" style="--i:2"><div class="grid aspect-[16/8] place-items-center rounded-xl bg-bg-2 text-center text-[19px] font-semibold">Minimal</div><p class="mt-4 text-[15px] font-medium">Minimal</p></div></div>
+    </div>
+  </section>
+
+  <!-- edit by text -->
+  <section class="border-t border-line py-24 sm:py-32">
+    <div class="wrap grid items-center gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+      <div>
+        <p class="label">03 · Edit by text</p>
+        <h2 class="reveal h-section mt-5">Tap a word <span class="serif text-dim">to cut it.</span></h2>
+        <p class="reveal mt-5 max-w-[380px] text-[16px] text-ink-2" style="--i:1">The transcript is a control surface. Delete a word, a sentence or every filler word, and the video follows. Undo brings it back.</p>
+      </div>
+      <div class="reveal" style="--i:1">
+          <div class="rounded-[22px] border border-line bg-card p-6 sm:p-8" data-transcript>
+            <div class="mb-5 flex items-center gap-3"><span class="grid size-8 place-items-center rounded-full bg-ink text-inv"><svg class="size-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg></span><div class="h-1 flex-1 overflow-hidden rounded-full bg-line"><div class="h-full w-full origin-left bg-ink transition-transform duration-500 ease-out-expo" data-tr-bar></div></div><span class="font-mono text-[12px] text-dim tabular-nums" data-tr-len>0:06.4</span></div>
+            <p class="text-[clamp(20px,2vw,26px)] leading-[1.7] tracking-[-0.01em]"><span data-w>So</span> <span data-w data-filler>um</span> <span data-w>today</span> <span data-w>I'll</span> <span data-w>show</span> <span data-w>you</span> <span data-w data-filler>uh</span> <span data-w>how</span> <span data-w>to</span> <span data-w>create</span> <span data-w>a</span> <span data-w data-filler>like</span> <span data-w>new</span> <span data-w>project</span> <span data-w data-filler>you know</span> <span data-w>in</span> <span data-w>under</span> <span data-w>a</span> <span data-w>minute.</span></p>
+            <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5 text-[13px]">
+              <span class="text-dim"><span class="font-medium text-ink tabular-nums" data-cut>0.0s</span> cut</span>
+              <div class="flex gap-2"><button type="button" class="cursor-pointer rounded-full px-3.5 py-1.5 text-dim transition hover:text-ink" data-tr-reset>Reset</button><button type="button" class="cursor-pointer rounded-full bg-ink px-3.5 py-1.5 font-medium text-inv transition active:scale-95" data-fillers>Remove every "um"</button></div>
+            </div>
+          </div>
+    </div>
+  </section>
+
+  <!-- AI keys -->
+  <section id="ai" class="border-t border-line py-24 sm:py-32">
+    <div class="wrap grid items-start gap-14 lg:grid-cols-[1fr_1fr] lg:gap-20">
+      <div>
+        <p class="label">04 · AI keys</p>
+        <h2 class="reveal h-section mt-5">Bring your key. <span class="serif text-dim">Or bring nothing.</span></h2>
+        <p class="reveal mt-5 max-w-[460px] text-[16px] text-ink-2" style="--i:1">Scrim has no AI subscription and no account. For fast, accurate captions you can paste a free Groq key. Prefer privacy? Choose This PC and Whisper runs offline.</p>
+        <ol class="reveal mt-9 space-y-5 text-[16px] text-ink-2" style="--i:2">
+          <li class="flex gap-4"><span class="font-mono text-dim">1</span><span>Get a free key at <b class="text-ink">console.groq.com</b>, under API Keys.</span></li>
+          <li class="flex gap-4"><span class="font-mono text-dim">2</span><span>In Scrim open <b class="text-ink">Settings, then AI</b>, and paste it in the Groq API key box.</span></li>
+          <li class="flex gap-4"><span class="font-mono text-dim">3</span><span>Leave it on <b class="text-ink">Automatic</b>. Groq is used, and your PC takes over if Groq is unreachable.</span></li>
+        </ol>
+        <p class="reveal mt-8 text-[14px] text-dim" style="--i:3">Your key is stored only on your PC. Nothing is sent anywhere unless you choose Groq, and then only the audio to be transcribed.</p>
+      </div>
+      <div class="reveal rounded-[22px] border p-6 text-[#f2f3f7] sm:p-8" style="--i:1;background:#0b0c0f;border-color:#2b2c34" data-engine-demo>
+        <p class="font-mono text-[11px] tracking-[0.14em] uppercase" style="color:#8b8e9a">Speech to text</p>
+        <div class="mt-4 grid grid-cols-3 gap-1 rounded-xl p-1" style="background:#121318">
+          <button type="button" class="cursor-pointer rounded-lg px-3 py-2.5 text-[13.5px] transition" data-engine="auto" aria-pressed="true">Automatic</button>
+          <button type="button" class="cursor-pointer rounded-lg px-3 py-2.5 text-[13.5px] transition" data-engine="groq" aria-pressed="false">Groq (online)</button>
+          <button type="button" class="cursor-pointer rounded-lg px-3 py-2.5 text-[13.5px] transition" data-engine="local" aria-pressed="false">This PC (offline)</button>
+        </div>
+        <p class="mt-4 min-h-[44px] text-[14px]" style="color:#c3c5cf" data-engine-text>Groq is used, and this PC takes over if Groq is unreachable.</p>
+        <p class="mt-6 font-mono text-[11px] tracking-[0.14em] uppercase" style="color:#8b8e9a">Groq API key</p>
+        <div class="mt-3 flex items-center gap-2 rounded-xl border px-4 py-3 font-mono text-[13.5px]" style="background:#121318;border-color:#2b2c34"><span class="flex-1" style="color:#c3c5cf">gsk_••••••••••••••••••••••</span><span class="text-[12px]" style="color:#ff3b30">Saved on this PC</span></div>
+        <p class="mt-3 text-[13px]" style="color:#8b8e9a">Get a free key at console.groq.com. It is stored only on this PC.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- more ways it helps -->
+  <section class="border-t border-line py-24 sm:py-32">
+    <div class="wrap">
+      <p class="label">05 · And more</p>
+      <h2 class="reveal h-section mt-5 max-w-[760px]">The same engine <span class="serif text-dim">does more.</span></h2>
+      <div class="mt-14 grid border-t border-l border-line sm:grid-cols-2 lg:grid-cols-3">
+        <div class="reveal wow-card relative border-r border-b border-line p-8"><div class="wow-ico"><i data-i="DocumentText" data-v="b"></i></div><h3 class="text-[21px] font-medium tracking-[-0.02em]">Guide step titles</h3><p class="mt-3 text-[15px] text-dim">Step by step guides get a clear title for every click, written from what you said.</p></div>
+        <div class="reveal wow-card relative border-r border-b border-line p-8" style="--i:1"><div class="wow-ico"><i data-i="Scissor" data-v="b"></i></div><h3 class="text-[21px] font-medium tracking-[-0.02em]">Remove every "um"</h3><p class="mt-3 text-[15px] text-dim">One button cuts the filler words. You see exactly how many seconds you saved.</p></div>
+        <div class="reveal wow-card relative border-r border-b border-line p-8" style="--i:2"><div class="wow-ico"><i data-i="Microphone2" data-v="b"></i></div><h3 class="text-[21px] font-medium tracking-[-0.02em]">Clear voice</h3><p class="mt-3 text-[15px] text-dim">Fan hum, keyboard clicks and echo are removed on your PC, and your volume is evened out.</p></div>
+      </div>
+    </div>
+  </section>
+<!-- closing: the words grow as you arrive -->
+  <section class="relative isolate overflow-hidden border-t border-line py-32 sm:py-44" data-scrub="end">
+    <div class="wow-end-glow" aria-hidden="true"></div>
+    <div class="wrap text-center">
+      <h2 class="mx-auto text-[clamp(52px,11vw,176px)] leading-[0.88] font-medium tracking-[-0.06em] [transform:scale(calc(0.8+0.2*var(--p,0)))] [opacity:calc(0.2+0.8*var(--p,0))]">Record once.<br><span class="serif text-dim">Share everywhere.</span></h2>
+      <a class="btn btn-ink mt-14 h-14 px-8 text-base" href="https://github.com/Alphred-OB/Scrim/releases/latest" data-download>
+        <svg class="size-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></svg>
+        <span class="roll"><span>Download free for Windows</span><span aria-hidden="true">Download free for Windows</span></span>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<!--footer-->
+<footer class="border-t border-line">
+  <div class="wow-wordmark" data-scrub="end" aria-hidden="true">Scrim</div>
+  <div class="wrap grid gap-10 py-16 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
+    <div>
+      <a class="flex items-center gap-2 text-[17px] font-semibold tracking-tight" href="index.html"><img class="size-7 rounded-[8px]" src="img/icon.png" alt="">Scrim</a>
+      <p class="mt-4 max-w-[280px] text-[14px] text-dim">Screen recordings that look edited. Made in Ghana by AOB.</p>
+    </div>
+    <div class="text-[14px]"><p class="label mb-4">Product</p><ul class="space-y-2.5"><li><a class="link" href="features.html">Features</a></li><li><a class="link" href="captions.html">Captions and AI</a></li><li><a class="link" href="script.html">Script</a></li><li><a class="link" href="editing.html">Editing</a></li><li><a class="link" href="install.html">Download</a></li></ul></div>
+    <div class="text-[14px]"><p class="label mb-4">Help</p><ul class="space-y-2.5"><li><a class="link" href="feedback.html">Report a problem</a></li><li><a class="link" href="feedback.html?type=idea">Suggest a feature</a></li><li><a class="link" href="install.html#faq">FAQ</a></li></ul></div>
+    <div class="text-[14px]"><p class="label mb-4">Company</p><ul class="space-y-2.5"><li><a class="link" href="privacy.html">Privacy</a></li></ul></div>
+  </div>
+  <div class="wrap flex flex-wrap items-center justify-between gap-4 border-t border-line py-6 text-[13px] text-dim">
+    <span>© <span data-year></span> AOB</span>
+    <div class="flex items-center gap-1 rounded-full border border-line p-1" role="group" aria-label="Theme">
+      <button type="button" data-theme-set="light" class="cursor-pointer rounded-full px-3 py-1 transition hover:text-ink aria-pressed:bg-bg-2 aria-pressed:text-ink">Light</button>
+      <button type="button" data-theme-set="dark" class="cursor-pointer rounded-full px-3 py-1 transition hover:text-ink aria-pressed:bg-bg-2 aria-pressed:text-ink">Dark</button>
+    </div>
+  </div>
+</footer>
+<!--/footer-->
+<script src="vendor/lenis.min.js" defer></script>
+<script src="site.js" defer></script>
+<script src="icons.js" defer></script>
+<script src="wow.js" defer></script>
+</body>
+</html>
