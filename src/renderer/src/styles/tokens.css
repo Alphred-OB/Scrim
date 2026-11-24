@@ -19,6 +19,7 @@
   --accent: #0a84ff;
   --accent-2: #3d9bff;
   --accent-soft: rgba(10, 132, 255, 0.16);
+  --accent-strong: #0071e3; /* a button fill that carries white text at 4.5:1 (--accent is only 3.7:1) */
   --on-accent: #ffffff;
   --danger: #ff453a;
   --ok: #30d158;

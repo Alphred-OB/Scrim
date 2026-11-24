@@ -13,7 +13,7 @@ ignores it, the update installs the next time they quit.
    `set GH_TOKEN=ghp_...` (cmd) or `$env:GH_TOKEN="ghp_..."` (PowerShell).
 3. Run `npm run release`. This builds the installer and uploads `Scrim-Setup-x.y.z.exe`,
    its `.blockmap` and `latest.yml` to a release on github.com/Alphred-OB/Scrim.
-4. Open the release on GitHub, write the notes (the first line shows on the update card) and publish it.
+4. Open the release on GitHub, write the notes and publish it. Write them as short plain lines, one change each (a `- ` list is fine, up to 6 lines): they become the "What's new" list on the update screen, and the first line is the corner card's text.
    Installed apps only see published releases, not drafts.
 
 `npm run dist` still builds an installer locally without uploading anything.

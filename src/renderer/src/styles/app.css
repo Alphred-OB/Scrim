@@ -1283,6 +1283,45 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .upd-row { display: flex; align-items: center; gap: 12px; }
 .upd-bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s var(--ease); }
+
+/* ---- full screen update page (see lib/update.tsx) ---- */
+.updscr { position: fixed; inset: 0; z-index: 800; box-sizing: border-box; display: flex; padding: 64px 24px 48px; overflow-y: auto; background: var(--bg); color: var(--text); animation: fadeIn 0.2s var(--ease) both; }
+.updscr:focus { outline: none; }
+.updscr-col { width: 100%; max-width: 560px; margin: auto; display: flex; flex-direction: column; align-items: center; gap: 32px; animation: fadeIn 0.25s var(--ease) both; }
+.updscr-head { display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center; }
+.updscr[data-kind='restarting'] .updscr-col { gap: 40px; }
+.updscr-logo { width: 72px; height: 72px; flex: none; }
+.updscr-warn { width: 72px; height: 72px; flex: none; border-radius: 22px; display: grid; place-items: center; background: rgba(255, 214, 10, 0.14); color: var(--warn); }
+:root[data-theme='light'] .updscr-warn { background: rgba(154, 91, 0, 0.12); color: #9a5b00; }
+.updscr-text { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.updscr h1 { margin: 0; font-size: 40px; line-height: 1.1; font-weight: 700; letter-spacing: -0.025em; text-wrap: balance; }
+.updscr-text p { margin: 0; max-width: 460px; font-size: 16px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+.updscr-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.updscr-btn { height: 48px; padding: 0 24px; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--line-2); background: transparent; color: var(--text); font-size: 16px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+.updscr-btn:hover { background: var(--card-hi); }
+.updscr-btn.primary { padding: 0 28px; border-color: transparent; background: var(--accent-strong); color: var(--on-accent-strong, #fff); font-weight: 600; }
+.updscr-btn.primary:hover { background: var(--accent-strong); filter: brightness(1.12); }
+.updscr-btn:disabled { opacity: 0.6; cursor: default; }
+.updscr-btn:focus-visible, .updscr-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 3px; }
+.updscr-link { font-size: 14px; line-height: 1.4; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
+.updscr-link:hover { color: var(--text); }
+.updscr-prog { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 10px; }
+.updscr-prog-row { display: flex; align-items: baseline; justify-content: space-between; font-size: 14px; color: var(--text-2); }
+.updscr-prog-row b { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.updscr-bar { width: 100%; max-width: 440px; height: 8px; border-radius: 99px; background: var(--line-2); overflow: hidden; }
+.updscr-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width 0.3s var(--ease); }
+.updscr-bar i.ind { width: 35%; transition: none; animation: updSlide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes updSlide { from { transform: translateX(-110%); } to { transform: translateX(300%); } }
+.updscr-notes { width: 100%; box-sizing: border-box; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg-2); }
+.updscr-notes h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.updscr-notes ul { margin: 0; padding: 0; list-style: none; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+.updscr-notes li { padding: 10px 0; border-top: 1px solid var(--line); }
+.updscr-notes li:last-child { padding-bottom: 0; }
+.updscr-hint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--dim); text-align: center; }
+@media (prefers-reduced-motion: reduce) {
+  .updscr, .updscr-col { animation: none; }
+  .updscr-bar i.ind { animation: none; width: 100%; opacity: 0.45; }
+}
 @keyframes updBob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(2px) } }
 
 /* ---------- Redesigned Cursor Panel & Hover Clip Popovers ---------- */

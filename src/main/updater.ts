@@ -1,6 +1,7 @@
 import { app, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { UpdateStatus } from '@shared/types'
+import { releaseNoteLines } from '@shared/updateNotes'
 
 // Updates come from GitHub Releases (see "publish" in electron-builder.yml). New versions download
 // quietly in the background; the app then offers a one click restart, or installs on the next quit.
@@ -14,11 +15,7 @@ const set = (s: Partial<UpdateStatus>): void => {
   send(status)
 }
 
-const notesText = (n: unknown): string | undefined => {
-  if (typeof n === 'string') return n.replace(/<[^>]+>/g, '').trim().slice(0, 600) || undefined
-  if (Array.isArray(n)) return notesText(n.map((x) => (x as { note?: string }).note ?? '').join('\n'))
-  return undefined
-}
+const notesText = (n: unknown): string | undefined => releaseNoteLines(n).join('\n') || undefined
 
 export function initUpdater(broadcast: (channel: string, payload: unknown) => void): void {
   send = (s) => broadcast('update:status', s)
@@ -40,15 +37,17 @@ export function initUpdater(broadcast: (channel: string, payload: unknown) => vo
   u.logger = { info: (m: unknown) => console.log('[update]', m), warn: (m: unknown) => console.warn('[update]', m), error: (m: unknown) => console.error('[update]', m), debug: () => {} }
   u.on('checking-for-update', () => set({ state: 'checking', error: undefined }))
   u.on('update-available', (i) => set({ state: 'downloading', version: i.version, progress: 0, notes: notesText(i.releaseNotes) }))
-  u.on('update-not-available', () => set({ state: 'latest' }))
+  u.on('update-not-available', () => set({ state: 'latest', version: undefined }))
   u.on('download-progress', (p) => set({ state: 'downloading', progress: Math.round(p.percent) }))
   u.on('update-downloaded', (i) => set({ state: 'ready', version: i.version, progress: 100, notes: notesText(i.releaseNotes) ?? status.notes }))
   u.on('error', (e) => {
     const msg = e?.message ?? ''
     if (status.state === 'ready') return set({ state: 'ready' })
+    // a download that broke part way: the update screen says so and offers a retry
+    if (status.state === 'downloading') return set({ state: 'error', error: 'The download did not finish.' })
     // no release published yet (404) or no internet: nothing to report, you are simply on the newest version we can see
     if (/\b404\b|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ERR_INTERNET|net::/i.test(msg)) return set({ state: 'latest', error: undefined })
-    set({ state: 'error', error: 'Could not check for updates right now.' })
+    set({ state: 'error', error: 'Could not check for updates right now.', version: undefined })
   })
   set({ state: 'idle' })
 
