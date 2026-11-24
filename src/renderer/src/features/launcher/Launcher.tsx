@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CaptureSource, Corner, ProjectSummary, RecorderStatus, WebcamRecordOptions, WebcamShape } from '@shared/types'
+import type { CaptureSource, Corner, ProjectSummary, RecorderStatus, WebcamBg, WebcamRecordOptions, WebcamShape } from '@shared/types'
 import { api, mediaUrl } from '@/lib/api'
 import { webcamConstraints } from '@/lib/mediaCapture'
-import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu, askConfirm, showMessage } from '@/ui'
+import { ColorRow, Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu, askConfirm, showMessage } from '@/ui'
 import { helpMenu, openFeedback } from '@/lib/feedback'
+import LiveCam from '@/features/recording/LiveCam'
+import ScriptModal from './ScriptModal'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { matches, useSettings } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
@@ -11,14 +13,15 @@ import { maybeAutoStart } from '@/features/onboarding/tours'
 import { preloadSample, startPractice } from '@/features/onboarding/practice'
 
 const LS = 'df.recordPrefs'
-interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; keys: boolean; webcam: WebcamRecordOptions }
+interface Prefs { mic: boolean; micDeviceId?: string; noiseSuppression?: boolean; systemAudio: boolean; fps: 30 | 60; countdown: number; keys: boolean; webcam: WebcamRecordOptions }
 const DEF: Prefs = {
   mic: true,
+  noiseSuppression: true,
   systemAudio: true,
   fps: 30,
   countdown: 3,
   keys: true,
-  webcam: { enabled: false, quality: 720, shape: 'circle', size: 0.24, corner: 'br', showBubble: true }
+  webcam: { enabled: false, quality: 720, shape: 'circle', size: 0.24, corner: 'br', showBubble: true, mirror: true }
 }
 function loadPrefs(): Prefs {
   try {
@@ -47,6 +50,7 @@ export default function Launcher() {
   const [busy, setBusy] = useState('')
   const [level, setLevel] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [scriptOpen, setScriptOpen] = useState(false)
   const recBusy = status.state === 'recording' || status.state === 'paused' || status.state === 'countdown' || status.state === 'stopping'
   const cam = prefs.webcam
   // after the welcome tour, point out the home screen once
@@ -159,6 +163,9 @@ export default function Launcher() {
 
   // live webcam preview before recording
   const camVideo = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [camStream, setCamStream] = useState<MediaStream | null>(null)
+  const [camPreviewMode, setCamPreviewMode] = useState<'cam' | 'screen'>('cam')
   const [camError, setCamError] = useState('')
   useEffect(() => {
     if (!cam.enabled || tab !== 'record' || recBusy) return
@@ -170,15 +177,25 @@ export default function Launcher() {
       .then((s) => {
         if (stopped) return s.getTracks().forEach((t) => t.stop())
         stream = s
+        streamRef.current = s
+        setCamStream(s)
         if (camVideo.current) camVideo.current.srcObject = s
         navigator.mediaDevices.enumerateDevices().then((d) => setCams(d.filter((x) => x.kind === 'videoinput')))
       })
       .catch((e) => setCamError(e?.name === 'NotAllowedError' ? 'Camera permission was blocked.' : 'No camera found or it is busy in another app.'))
     return () => {
       stopped = true
+      streamRef.current = null
+      setCamStream(null)
       stream?.getTracks().forEach((t) => t.stop())
     }
   }, [cam.enabled, cam.deviceId, tab, recBusy])
+
+  useEffect(() => {
+    if (camVideo.current && streamRef.current) {
+      camVideo.current.srcObject = streamRef.current
+    }
+  }, [camPreviewMode])
 
   const src = sources.find((s) => s.id === selected)
   const list = sources.filter((s) => s.kind === kind)
@@ -192,6 +209,7 @@ export default function Launcher() {
       fps: prefs.fps,
       mic: prefs.mic,
       micDeviceId: prefs.micDeviceId,
+      noiseSuppression: prefs.noiseSuppression !== false,
       systemAudio: prefs.systemAudio,
       countdown: prefs.countdown,
       keys: prefs.keys,
@@ -322,13 +340,13 @@ export default function Launcher() {
           <div className="home-quick">
             <button onClick={() => doImport()}><Icon name="upload" size={14} /> Import a video</button>
             <button onClick={() => openProjectFromDialog()}><Icon name="folder" size={14} /> Open a project <kbd>Ctrl O</kbd></button>
-            <button data-tour="home-practice" className="accent" onClick={() => startPractice()}><Icon name="sparkles" size={14} /> Practice on a sample</button>
+            <button data-tour="home-practice" className={projects.length === 0 ? "accent" : undefined} onClick={() => startPractice()}><Icon name="sparkles" size={14} /> Practice on a sample</button>
           </div>
           {projects.length > 0 && (
             <div className="home-recent" data-tour="home-recent">
               <div className="section-head">
-                <span className="section-title">Jump back in</span>
-                <button className="link" onClick={() => setTab('projects')}>See all {projects.length} <Icon name="arrowRight" size={12} /></button>
+                <h2 className="home-recent-title">Jump back in</h2>
+                <button className="link" onClick={() => setTab('projects')}>See all {projects.length}</button>
               </div>
               <div className="home-recent-row">
                 {projects.slice(0, 4).map((p, k) => (
@@ -367,11 +385,12 @@ export default function Launcher() {
               <button className="btn sm" onClick={refresh} disabled={loading}>{loading ? <span className="spin" /> : <Icon name="restart" size={14} />} Refresh</button>
               <span className="hint">{kind === 'window' ? 'For a browser tab, pick the browser window and keep that tab open.' : 'Pick the display you want to record.'}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: list.length === 1 ? 'minmax(0,720px)' : 'repeat(auto-fill,minmax(300px,1fr))', justifyContent: list.length === 1 ? 'center' : undefined, gap: 16 }}>
               {list.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => setSelected(s.id)}
+                  aria-pressed={selected === s.id}
                   onDoubleClick={record}
                   className="glass"
                   style={{
@@ -403,6 +422,7 @@ export default function Launcher() {
                     options={[{ v: '', l: 'Default microphone' }, ...mics.map((m) => ({ v: m.deviceId, l: m.label || 'Microphone' }))]}
                     onChange={(v) => setPrefs({ ...prefs, micDeviceId: v || undefined })}
                   />
+                  <Toggle label="Noise suppression" value={prefs.noiseSuppression !== false} onChange={(v) => setPrefs({ ...prefs, noiseSuppression: v })} />
                   <div className="mic-meter" title="Speak to test your microphone">
                     <Icon name="mic" size={14} />
                     <div>{Array.from({ length: 16 }, (_, k) => <i key={k} className={level * 16 > k ? (k > 12 ? 'hot' : 'on') : ''} />)}</div>
@@ -416,32 +436,157 @@ export default function Launcher() {
               <Toggle label="Record webcam" value={cam.enabled} onChange={(v) => setCam({ enabled: v })} />
               {cam.enabled && (
                 <>
-                  {/* preview of where the camera will sit */}
-                  <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: src ? `#000 center/cover url(${src.thumbnail})` : '#000', border: '1px solid var(--line)' }}>
-                    <div
+                  {/* preview of webcam */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '16/9',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      background: '#0a0d14',
+                      border: '1px solid var(--line)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {camPreviewMode === 'cam' ? (
+                      <>
+                        <video
+                          ref={camVideo}
+                          autoPlay
+                          muted
+                          playsInline
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            transform: cam.mirror !== false ? 'scaleX(-1)' : 'none'
+                          }}
+                        />
+                        {cam.bg && cam.bg !== 'none' && (
+                          <div style={{ position: 'absolute', inset: 0, background: cam.bg === 'remove' ? 'repeating-conic-gradient(#2a2d36 0 25%, #20222a 0 50%) 0 0 / 16px 16px' : '#0a0d14' }}>
+                            <LiveCam stream={camStream} live={cam} style={{ transform: cam.mirror !== false ? 'scaleX(-1)' : 'none' }} />
+                          </div>
+                        )}
+                        {/* shape framing guide */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: cam.shape === 'circle' ? 144 : cam.shape === 'square' ? 144 : 200,
+                              height: cam.shape === 'circle' ? 144 : cam.shape === 'square' ? 144 : 116,
+                              borderRadius: camRadius,
+                              border: '2px solid rgba(255,255,255,0.85)',
+                              boxShadow: '0 0 0 9999px rgba(0,0,0,0.38)'
+                            }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            background: src ? `#000 center/cover url(${src.thumbnail})` : '#000'
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            width: `${cam.size * 56.25}%`,
+                            aspectRatio: '1',
+                            borderRadius: camRadius,
+                            overflow: 'hidden',
+                            border: '2px solid #fff',
+                            boxShadow: '0 6px 18px rgba(0,0,0,.5)',
+                            background: '#111',
+                            [cam.corner.endsWith('l') ? 'left' : 'right']: '4%',
+                            [cam.corner.startsWith('t') ? 'top' : 'bottom']: '6%',
+                            transition: 'all .2s var(--ease)'
+                          } as React.CSSProperties}
+                        >
+                          <video
+                            ref={camVideo}
+                            autoPlay
+                            muted
+                            playsInline
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transform: cam.mirror !== false ? 'scaleX(-1)' : 'none'
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Mode switch pill */}
+                    <button
+                      className="btn xs glass"
+                      onClick={() => setCamPreviewMode((m) => (m === 'cam' ? 'screen' : 'cam'))}
                       style={{
                         position: 'absolute',
-                        width: `${cam.size * 56.25}%`,
-                        aspectRatio: '1',
-                        borderRadius: camRadius,
-                        overflow: 'hidden',
-                        border: '2px solid #fff',
-                        boxShadow: '0 6px 18px rgba(0,0,0,.5)',
-                        background: '#111',
-                        [cam.corner.endsWith('l') ? 'left' : 'right']: '4%',
-                        [cam.corner.startsWith('t') ? 'top' : 'bottom']: '6%',
-                        transition: 'all .2s var(--ease)'
-                      } as React.CSSProperties}
+                        top: 8,
+                        right: 8,
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        borderRadius: 8,
+                        background: 'rgba(0,0,0,0.65)',
+                        backdropFilter: 'blur(8px)',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        zIndex: 10
+                      }}
+                      title={camPreviewMode === 'cam' ? 'Switch to screen placement preview' : 'Switch to camera preview'}
                     >
-                      <video ref={camVideo} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
-                    </div>
-                    {camError && <div className="hint" style={{ position: 'absolute', left: 10, top: 8, right: 10, color: '#fff', background: 'rgba(0,0,0,.6)', padding: '4px 8px', borderRadius: 6 }}>{camError}</div>}
+                      <Icon name={camPreviewMode === 'cam' ? 'monitor' : 'camera'} size={12} />
+                      {camPreviewMode === 'cam' ? 'On screen' : 'Camera'}
+                    </button>
+
+                    {camError && (
+                      <div
+                        className="hint"
+                        style={{
+                          position: 'absolute',
+                          left: 10,
+                          top: 8,
+                          right: 10,
+                          color: '#fff',
+                          background: 'rgba(0,0,0,.75)',
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          zIndex: 15
+                        }}
+                      >
+                        {camError}
+                      </div>
+                    )}
                   </div>
                   <Select
                     value={cam.deviceId ?? ''}
                     options={[{ v: '', l: 'Default camera' }, ...cams.map((c) => ({ v: c.deviceId, l: c.label || 'Camera' }))]}
                     onChange={(v) => setCam({ deviceId: v || undefined })}
                   />
+                  <Toggle label="Mirror camera" value={cam.mirror !== false} onChange={(v) => setCam({ mirror: v })} />
+                  <span className="section-title" style={{ marginTop: 8 }}>Background</span>
+                  <Seg options={[{ v: 'none', l: 'Off' }, { v: 'blur', l: 'Blur' }, { v: 'color', l: 'Color' }, { v: 'remove', l: 'Remove' }]} value={cam.bg ?? 'none'} onChange={(v) => setCam({ bg: v as WebcamBg })} />
+                  {cam.bg === 'blur' && <Slider label="Blur" value={cam.bgBlur ?? 0.6} min={0} max={1} step={0.05} def={0.6} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setCam({ bgBlur: v })} />}
+                  {cam.bg === 'color' && <ColorRow label="Color" value={cam.bgColor ?? '#1d2230'} onChange={(v) => setCam({ bgColor: v })} />}
+                  {cam.bg && cam.bg !== 'none' && <span className="hint">Works like a video call: you see it live, and the editor starts with the same look (you can still change it there).</span>}
                   <Seg options={[{ v: 'circle', l: 'Circle' }, { v: 'rounded', l: 'Rounded' }, { v: 'square', l: 'Square' }]} value={cam.shape} onChange={(v) => setCam({ shape: v as WebcamShape })} />
                   <Slider label="Size" value={cam.size} min={0.12} max={0.45} step={0.01} def={0.24} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setCam({ size: v })} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -461,10 +606,16 @@ export default function Launcher() {
               <span className="section-title" style={{ marginTop: 12 }}>Keyboard</span>
               <Toggle label="Show keyboard shortcuts" value={prefs.keys} onChange={(v) => setPrefs({ ...prefs, keys: v })} />
               <span className="hint">Shortcuts like Ctrl+C or Enter can be shown in the video. What you type is never saved.</span>
+              <span className="section-title" style={{ marginTop: 12 }}>Script</span>
+              <button className="btn" style={{ width: '100%' }} onClick={() => setScriptOpen(true)}>Write or edit script…</button>
+              <span className="hint">An on screen script you can read while recording. It never shows in the video.</span>
               <span className="section-title" style={{ marginTop: 12 }}>Countdown</span>
               <Seg options={[{ v: 0, l: 'Off' }, { v: 3, l: '3s' }, { v: 5, l: '5s' }]} value={prefs.countdown} onChange={(v) => setPrefs({ ...prefs, countdown: v as number })} />
             </div>
             <div style={{ padding: 16, borderTop: '1px solid var(--line)' }}>
+              <div className="hint" style={{ textAlign: 'center', marginBottom: 10, lineHeight: 1.5 }}>
+                {src ? src.name : 'Nothing selected'} · {[prefs.mic && 'mic', prefs.systemAudio && 'system audio', cam.enabled && 'webcam'].filter(Boolean).join(' + ') || 'no audio'} · {prefs.fps} fps
+              </div>
               <button className="btn primary" style={{ width: '100%', height: 46, fontSize: 15, borderRadius: 12 }} disabled={!src || recBusy} onClick={record}>
                 <Icon name="record" size={15} /> Start recording
               </button>
@@ -548,6 +699,7 @@ export default function Launcher() {
         </div>
       ) : null}
       {busy && <div className="toast glass"><span className="spin" />{busy}</div>}
+      {scriptOpen && <ScriptModal onClose={() => setScriptOpen(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   )

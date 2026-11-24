@@ -31,6 +31,8 @@ Where we are, and where we're heading. Status as of v0.3.0 (September 2026).
 - Honest export: real frame rate and resolution choices only
 - **Regional blur & redaction:** hide passwords and emails with frosted blur, mosaic pixelate, or solid black bars that automatically track and scale with auto-zoom
 - **Keystroke / shortcut overlay:** display pressed key shortcuts on the video as animated keycaps with granular timeline editing, 6 positions, symbols/words modes, and custom styles
+- **Cinematic cursor smoothing:** Screen Studio-style Bézier spline path reconstruction with Minimum-Jerk S-curve velocity profiling, curvature tension, and keynote click dwell stabilization
+- **Scrim wallpapers:** replaced the Apple wallpapers with 13 of our own (see `tools/make-wallpapers.py`) so the app can be sold.
 
 ## Next up
 
@@ -48,7 +50,7 @@ Where we are, and where we're heading. Status as of v0.3.0 (September 2026).
 ### Ideas backlog
 - Speed ramps with smooth transitions
 - Multiple scenes with transitions between them
-- Share link upload (EAN hosted)
+- Share link upload (hosted)
 - Templates for intros and outros
 - macOS build (needs a ScreenCaptureKit helper)
 

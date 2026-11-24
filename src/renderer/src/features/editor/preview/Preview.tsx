@@ -3,11 +3,15 @@ import type { Asset, EditState } from '@shared/types'
 import { mediaUrl } from '@/lib/api'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
+import { applyCamBg, loadSegmenter } from '../engine/webcamBg'
 import { Renderer, type FrameDrawer, blurRect, computeLayout, measureText, outputSize, overlayRect, webcamRect } from '../engine/compositor'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
+import { onWallpaperLoaded } from '../engine/backgrounds'
 import { clipAt, nextClip, sampleSegmentKeyframes, sortedClips, sourceToOutput, viewport, zoomAt } from '../engine/timeMap'
-import { Icon, openContextMenu } from '@/ui'
+import { Icon, openContextMenu, showMessage } from '@/ui'
+import { addZoomAt } from '../state/actions'
 import { playClick } from './clickPlayer'
+import { useProxy } from '@/lib/useProxy'
 
 type Box = { x: number; y: number; w: number; h: number }
 type Handle = { kind: 'text' | 'overlay' | 'webcam' | 'blur'; id: string; box: Box } // box in CSS px relative to canvas
@@ -26,6 +30,24 @@ export default function Preview() {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  // Long recordings play from a small preview copy (main/proxy.ts). `hiRef` is the original, used only for
+  // the sharp frame shown while paused. Export always reads the original.
+  const hiRef = useRef<HTMLVideoElement>(null)
+  const proxy = useProxy(project)
+  const proxyOn = proxy.status === 'ready' && !!proxy.path
+  // The webcam plays from its seek friendly copy once it exists. The switch waits for a pause, so playback never blinks.
+  const camProxy = useProxy(project, 'cam')
+  const camPath = useRef(project.media.webcam?.path ?? '')
+  if (!project.media.webcam) camPath.current = ''
+  else if (!playing && camProxy.status === 'ready' && camProxy.path) camPath.current = camProxy.path
+  else if (!camPath.current) camPath.current = project.media.webcam.path
+  const camEditsBg = !!project.media.webcam && edit.webcam.bg !== 'none'
+  // Load the cut-out model while idle, not on the first frame after Play (it blocks the page for about a second)
+  useEffect(() => {
+    if (!camEditsBg) return
+    const id = requestIdleCallback(() => void loadSegmenter(), { timeout: 3000 })
+    return () => cancelIdleCallback(id)
+  }, [camEditsBg])
   const pool = useRef(new Map<string, HTMLMediaElement>())
   const images = useRef(new Map<string, HTMLImageElement>())
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
@@ -35,8 +57,14 @@ export default function Preview() {
   const renderer = useMemo(() => new Renderer(), [])
   const { width: srcW, height: srcH, duration } = project.media.screen
 
-  const track = useMemo(() => buildTrack(cursorData, duration, edit.cursor.smoothing), [cursorData, duration, edit.cursor.smoothing])
-  const camera = useMemo(() => buildCameraTrack(cursorData, duration), [cursorData, duration])
+  const track = useMemo(
+    () => buildTrack(cursorData, duration, edit.cursor),
+    [cursorData, duration, edit.cursor.smoothing, edit.cursor.motionMode, edit.cursor.curvature, edit.cursor.clickDwell]
+  )
+  const camera = useMemo(
+    () => buildCameraTrack(cursorData, duration, edit.cursor),
+    [cursorData, duration, edit.cursor.smoothing, edit.cursor.motionMode, edit.cursor.curvature, edit.cursor.clickDwell]
+  )
   const clicks = useMemo(() => cursorData?.clicks ?? [], [cursorData])
   const assets = useMemo(() => new Map(edit.assets.map((a) => [a.id, a])), [edit.assets])
 
@@ -67,6 +95,12 @@ export default function Preview() {
     img.onload = () => setBgImage(img)
     img.src = mediaUrl(edit.background.imagePath)
   }, [edit.background.type, edit.background.imagePath])
+
+  useEffect(() => {
+    return onWallpaperLoaded(() => {
+      requestAnimationFrame(() => draw.current())
+    })
+  }, [])
 
   // brand logo
   const logo = useRef<HTMLImageElement | null>(null)
@@ -182,11 +216,30 @@ export default function Preview() {
   const logical = useRef(time)
   const camCache = useRef<HTMLCanvasElement | null>(null)
   const camHas = useRef(false)
+  /** media time of the newest frame the webcam element presented (-1: unknown, then every draw copies it) */
+  const camFrameT = useRef(-1)
+  const camDrawnT = useRef(-2)
+  useEffect(() => {
+    const cam = pool.current.get('webcam') as HTMLVideoElement | undefined
+    if (!cam || !('requestVideoFrameCallback' in cam)) return
+    let id = 0
+    const onFrame = (_now: number, meta: { mediaTime: number }) => {
+      camFrameT.current = meta.mediaTime
+      id = cam.requestVideoFrameCallback(onFrame)
+    }
+    id = cam.requestVideoFrameCallback(onFrame)
+    return () => cam.cancelVideoFrameCallback(id)
+  }, [project.media.webcam?.path])
   // Last good frame of the recording. While the video element is seeking it has no picture, so
   // scrubbing used to flash dark; we show this copy instead until the new frame arrives.
   const frameCache = useRef<HTMLCanvasElement | null>(null)
   const frameAt = useRef(-1)
   const frameK = useRef(1)
+  /** how much smaller than the original this video element is (1 for the original) */
+  const scaleOf = (el: HTMLVideoElement) => {
+    const r = el.videoWidth && srcW ? el.videoWidth / srcW : 1
+    return Math.abs(r - 1) < 0.01 ? 1 : r
+  }
   const snapshot = () => {
     const v = videoRef.current
     if (!v || v.readyState < 2 || v.seeking || !v.videoWidth) return
@@ -200,7 +253,8 @@ export default function Preview() {
       fc.height = h
     }
     fc.getContext('2d', { alpha: false })!.drawImage(v, 0, 0, w, h)
-    frameK.current = k
+    // maps source pixels to cache pixels (the video may be a smaller preview copy)
+    frameK.current = k * scaleOf(v)
     frameAt.current = v.currentTime
   }
   // Scrubbing sends a new time on every mouse move. Starting a new seek before the last one is
@@ -215,7 +269,25 @@ export default function Preview() {
       if (Math.abs(v.currentTime - vt) > 0.001) v.currentTime = vt
     }
   }
+  // After scrubbing or pausing settles, line the sharp original up with the frame being shown.
+  const hiTimer = useRef(0)
+  const syncHi = () => {
+    window.clearTimeout(hiTimer.current)
+    hiTimer.current = window.setTimeout(() => {
+      const v = videoRef.current
+      const hi = hiRef.current
+      if (!v || !hi || !proxyOn || useEditor.getState().playing) return
+      if (v.seeking) return syncHi()
+      if (Math.abs(hi.currentTime - v.currentTime) > 0.001) hi.currentTime = v.currentTime
+      else draw.current()
+    }, 180)
+  }
+  useEffect(() => {
+    if (!playing && proxyOn) syncHi()
+    return () => window.clearTimeout(hiTimer.current)
+  }, [time, playing, proxyOn])
   const onVideoSeeked = () => {
+    if (proxyOn) syncHi()
     const v = videoRef.current
     const p = pendingSeek.current
     pendingSeek.current = null
@@ -233,10 +305,10 @@ export default function Preview() {
   const frameMs = useRef(8)
   const adapt = (ms: number) => {
     frameMs.current = frameMs.current * 0.9 + ms * 0.1
-    if (frameMs.current > 14 && quality.current > 0.45) {
-      quality.current = Math.max(0.45, quality.current * 0.85)
+    if (frameMs.current > 14 && quality.current > 0.7) {
+      quality.current = Math.max(0.7, quality.current * 0.88)
       frameMs.current = 10
-    } else if (frameMs.current < 6 && quality.current < 1) quality.current = Math.min(1, quality.current * 1.04)
+    } else if (frameMs.current < 6 && quality.current < 1) quality.current = Math.min(1, quality.current * 1.08)
   }
 
   // extra seconds added to the background clock while paused, so live backgrounds keep moving
@@ -281,7 +353,10 @@ export default function Preview() {
     // keep the last good webcam frame, and show it while the element is seeking or buffering
     let camSrc: { src: CanvasImageSource; w: number; h: number } | null = null
     if (cam && camWant >= 0 && L.edit.webcam.show) {
-      if (cam.readyState >= 2 && !cam.seeking && cam.videoWidth) {
+      // The webcam is ~30 fps and the preview draws ~60: while playing, copy only frames the camera hasn't shown yet
+      const camFresh = !isPlaying || camFrameT.current < 0 || camFrameT.current !== camDrawnT.current
+      if (camFresh && cam.readyState >= 2 && !cam.seeking && cam.videoWidth) {
+        camDrawnT.current = camFrameT.current
         const k = Math.min(1, 720 / Math.max(cam.videoWidth, cam.videoHeight))
         const cw = Math.round(cam.videoWidth * k)
         const ch = Math.round(cam.videoHeight * k)
@@ -294,19 +369,33 @@ export default function Preview() {
         camHas.current = true
       }
       if (camHas.current && camCache.current) camSrc = { src: camCache.current, w: camCache.current.width, h: camCache.current.height }
+      // cut the person out and swap what's behind them (redone only when the camera frame or the look changes)
+      if (camSrc && L.edit.webcam.bg !== 'none') camSrc = applyCamBg(camSrc, L.edit.webcam, L.edit.webcam.bgImage ? mediaUrl(L.edit.webcam.bgImage) : undefined, `${(camFrameT.current >= 0 ? camFrameT.current : cam.currentTime).toFixed(3)}|${cam.seeking ? 1 : 0}`, useEditor.getState().playing ? { maxSide: 360, reuseMs: 90 } : {})
     }
     const ready = v.readyState >= 2 && !v.seeking
     if (ready && !isPlaying) snapshot()
+    // paused on a preview copy: show the sharp original frame once it has landed on the same moment
+    const hi = hiRef.current
+    const hiOk = !isPlaying && proxyOn && ready && !!hi && hi.readyState >= 2 && !hi.seeking && hi.videoWidth > 0 && Math.abs(hi.currentTime - v.currentTime) < 0.034
+    const sv = hiOk ? hi! : v
+    const pk = scaleOf(sv)
     const fc = frameCache.current
     const fk = frameK.current
     const drawFrame: FrameDrawer | null = ready
-      ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(v, sx, sy, sw, sh, dx, dy, dw, dh)
+      ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(sv, sx * pk, sy * pk, sw * pk, sh * pk, dx, dy, dw, dh)
       : fc && frameAt.current >= 0
         ? (cx, sx, sy, sw, sh, dx, dy, dw, dh) => cx.drawImage(fc, sx * fk, sy * fk, sw * fk, sh * fk, dx, dy, dw, dh)
         : null
+    // Resting on the very first frame: show the picture itself, not the first instant of the opening transition (a blank or washed out frame)
+    let drawEdit = useEditor.getState().areaMode ? { ...L.edit, zoom: { ...L.edit.zoom, enabled: false } } : L.edit
+    const firstT = [...L.edit.clips].sort((a, b) => a.start - b.start)[0]?.start ?? 0
+    const lead = L.edit.leadIn ?? 0
+    if (!isPlaying && (Math.abs(t - firstT) < 1e-3 || (lead > 0 && Math.abs(t + lead) < 1e-3))) {
+      drawEdit = { ...drawEdit, transitions: { ...drawEdit.transitions, intro: { ...drawEdit.transitions.intro, type: 'none' }, cut: { ...drawEdit.transitions.cut, type: 'none' }, perCut: {} } }
+    }
     const t0 = performance.now()
     renderer.render(ctx, W, H, {
-      edit: L.edit,
+      edit: drawEdit,
       srcW,
       srcH,
       t,
@@ -414,6 +503,20 @@ export default function Preview() {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [playing, bgType])
+
+  // The main video's source: the light preview copy once it is ready, the original until then.
+  // Swapping keeps the current time, and waits for a pause so playback never stutters.
+  const shownSrc = useRef('')
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v || playing) return
+    const want = proxyOn ? proxy.path! : project.media.screen.path
+    if (shownSrc.current === want) return
+    const at = shownSrc.current ? v.currentTime : Math.max(0, useEditor.getState().time)
+    shownSrc.current = want
+    v.addEventListener('loadedmetadata', () => { v.currentTime = at }, { once: true })
+    v.src = mediaUrl(want)
+  }, [proxyOn, proxy.path, playing, project.media.screen.path])
 
   // playback loop
   useEffect(() => {
@@ -658,6 +761,68 @@ export default function Preview() {
     }, 'zoomfocus' + id)
   }
 
+  // ---- zoom to an area: drag a box, the zoom points at it ----
+  const areaMode = useEditor((s) => s.areaMode)
+  const [area, setArea] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+  useEffect(() => {
+    draw.current()
+    if (!areaMode) return setArea(null)
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && useEditor.getState().setAreaMode(false)
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [areaMode])
+  const finishArea = (r: { x0: number; y0: number; x1: number; y1: number }) => {
+    const st = useEditor.getState()
+    const c = canvasRef.current
+    if (!c || !st.project) return
+    const L = computeLayout(st.project.edit, srcW, srcH, c.width, c.height)
+    const fr = (nx: number, ny: number): [number, number] => [(nx * c.width - L.view.x) / L.view.w, (ny * c.height - L.view.y) / L.view.h]
+    const [ax, ay] = fr(Math.min(r.x0, r.x1), Math.min(r.y0, r.y1))
+    const [bx, by] = fr(Math.max(r.x0, r.x1), Math.max(r.y0, r.y1))
+    const x0 = Math.max(0, ax), y0 = Math.max(0, ay), x1 = Math.min(1, bx), y1 = Math.min(1, by)
+    const w = x1 - x0, h = y1 - y0
+    st.setAreaMode(false)
+    if (w < 0.03 || h < 0.03) return
+    const need = Math.min(6, Math.max(1.1, Math.min(1 / w, 1 / h))) // how far in to fit the box
+    const master = st.project.edit.zoom.master || 1
+    const scale = 1 + (need - 1) / master // the master multiplier scales every zoom, so undo it for an exact fit
+    const t = logical.current
+    const segs = st.project.edit.zoom.segments
+    const sel = st.selection?.kind === 'zoom' ? segs.find((s) => s.id === st.selection!.id) : undefined
+    const at = sel ?? segs.find((s) => t >= s.start && t <= s.end)
+    const id = at?.id ?? addZoomAt(t)
+    if (!id) return void showMessage('No room for a zoom here', 'Move the playhead to a spot that is not inside another zoom, then try again.')
+    st.update((e) => {
+      const z = e.zoom.segments.find((s) => s.id === id)
+      if (!z) return
+      z.x = (x0 + x1) / 2
+      z.y = (y0 + y1) / 2
+      z.scale = scale
+      z.follow = false
+      z.auto = false
+      z.keyframes = []
+    })
+    st.select({ kind: 'zoom', id })
+  }
+  const startArea = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const p0 = canvasXY(e)
+    setArea({ x0: p0.nx, y0: p0.ny, x1: p0.nx, y1: p0.ny })
+    const mv = (ev: PointerEvent) => {
+      const p = canvasXY(ev)
+      setArea({ x0: p0.nx, y0: p0.ny, x1: p.nx, y1: p.ny })
+    }
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', mv)
+      window.removeEventListener('pointerup', up)
+      const p = canvasXY(ev)
+      setArea(null)
+      finishArea({ x0: p0.nx, y0: p0.ny, x1: p.nx, y1: p.ny })
+    }
+    window.addEventListener('pointermove', mv)
+    window.addEventListener('pointerup', up)
+  }
+
   const selZoom = selection?.kind === 'zoom' ? edit.zoom.segments.find((s) => s.id === selection.id) : undefined
   const pinMode = !!selZoom && !selZoom.follow
   const onCanvasDown = (e: React.PointerEvent) => {
@@ -690,17 +855,30 @@ export default function Preview() {
   }
 
   const isFull = useFullscreen(wrapRef)
+  // full screen controls: always there while paused; while playing they show when the mouse moves, then tuck away
+  const [barOn, setBarOn] = useState(true)
+  const barTimer = useRef<number>(0)
+  const wake = () => {
+    setBarOn(true)
+    window.clearTimeout(barTimer.current)
+    barTimer.current = window.setTimeout(() => setBarOn(false), 2500)
+  }
+  useEffect(() => {
+    if (!isFull) return
+    wake()
+    return () => window.clearTimeout(barTimer.current)
+  }, [isFull, playing])
   const selId = selection?.id
   const m = project.media
   const assetOf = (id: string): Asset | undefined => assets.get(id)
 
   return (
-    <div ref={wrapRef} className="preview-wrap" data-tour="preview">
+    <div ref={wrapRef} className="preview-wrap" data-tour="preview" onMouseMove={isFull ? wake : undefined}>
       <button className="icon-btn preview-full-btn" title={`${isFull ? 'Exit full screen' : 'Full screen preview'} (F)`} onClick={togglePreviewFullscreen}>
         <Icon name={isFull ? 'x' : 'expand'} size={16} />
       </button>
       {isFull && (
-        <div className="preview-full-bar glass">
+        <div className={`preview-full-bar ${!playing || barOn ? 'on' : ''}`}>
           <button className="play-btn" style={{ width: 36, height: 36 }} onClick={() => useEditor.getState().setPlaying(!playing)}>
             <Icon name={playing ? 'pause' : 'play'} size={16} />
           </button>
@@ -783,15 +961,27 @@ export default function Preview() {
         {pin && (
           <div style={{ position: 'absolute', left: pin.x - 14, top: pin.y - 14, width: 28, height: 28, borderRadius: 14, border: '2px solid #fff', background: 'rgba(10,132,255,.35)', boxShadow: '0 0 0 6px rgba(10,132,255,.2)', pointerEvents: 'none' }} />
         )}
-        {pinMode && <div className="toast glass" style={{ position: 'absolute', bottom: 12, top: 'auto' }}>Click where this zoom should point</div>}
+        {proxy.status === 'building' && (
+          <div className="glass" title="Making a lighter copy of this recording so the player stays smooth. Your original and your export stay full quality." style={{ position: 'absolute', top: 10, right: 10, padding: '5px 10px', borderRadius: 999, fontSize: 12, pointerEvents: 'none', opacity: 0.9 }}>
+            Smoothing playback {Math.round((proxy.pct ?? 0) * 100)}%
+          </div>
+        )}
+        {areaMode && (
+          <div style={{ position: 'absolute', inset: 0, cursor: 'crosshair', zIndex: 6 }} onPointerDown={startArea}>
+            {area && <div style={{ position: 'absolute', left: Math.min(area.x0, area.x1) * box.w, top: Math.min(area.y0, area.y1) * box.h, width: Math.abs(area.x1 - area.x0) * box.w, height: Math.abs(area.y1 - area.y0) * box.h, border: '2px solid #fff', background: 'rgba(10,132,255,.25)', boxShadow: '0 0 0 9999px rgba(0,0,0,.45)', borderRadius: 4 }} />}
+            <div className="toast glass" style={{ position: 'absolute', bottom: 12, top: 'auto' }}>Drag a box around the part to zoom into · Esc to cancel</div>
+          </div>
+        )}
+        {pinMode && !areaMode && <div className="toast glass" style={{ position: 'absolute', bottom: 12, top: 'auto' }}>Click where this zoom should point</div>}
       </div>
 
       {/* media elements stay in the layout (invisible) so Chromium keeps decoding frames in real time */}
       <div className="media-pool" aria-hidden>
-      <video ref={videoRef} src={mediaUrl(m.screen.path)} muted playsInline preload="auto" className="pool-video" onLoadedData={() => draw.current()} onSeeked={onVideoSeeked} />
+      <video ref={videoRef} muted playsInline preload="auto" className="pool-video" onLoadedData={() => draw.current()} onSeeked={onVideoSeeked} />
+      {proxyOn && <video ref={hiRef} src={mediaUrl(m.screen.path)} muted playsInline preload="metadata" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => draw.current()} />}
       {m.mic && <audio ref={reg('mic')} src={mediaUrl(edit.audio.voiceClean && edit.audio.voiceCleanPath ? edit.audio.voiceCleanPath : m.mic.path)} preload="auto" />}
       {m.system && <audio ref={reg('sys')} src={mediaUrl(m.system.path)} preload="auto" />}
-      {m.webcam && <video ref={reg('webcam')} src={mediaUrl(m.webcam.path)} muted playsInline preload="auto" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => draw.current()} />}
+      {m.webcam && <video ref={reg('webcam')} src={mediaUrl(camPath.current)} muted playsInline preload="auto" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => { syncFollowers(useEditor.getState().playing); draw.current() }} />}
       {edit.audio.musicPath && <audio ref={reg('music')} src={mediaUrl(edit.audio.musicPath)} loop preload="auto" />}
       {edit.overlays.map((o) => {
         const a = assetOf(o.assetId)

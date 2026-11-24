@@ -25,9 +25,13 @@ create index if not exists feedback_kind_status on feedback (kind, status);
 
 export function createDb(url = process.env.DATABASE_URL) {
   if (!url) throw new Error('DATABASE_URL is not set')
-  // hosted databases (Render, Neon) need TLS; a local one doesn't
-  const local = /@(localhost|127\.0\.0\.1)(:|\/)/.test(url) || url.includes('host=/')
-  const pool = new pg.Pool({ connectionString: url, ssl: local ? false : { rejectUnauthorized: false }, max: 5 })
+  // TLS with a verified certificate, except for local databases and Render's internal network (a bare
+  // host with no dots, e.g. dpg-xxxx-a), which is private. PGSSL_NO_VERIFY=1 is an escape hatch for a
+  // provider whose certificate chain Node doesn't trust.
+  const host = (() => { try { return new URL(url).hostname } catch { return '' } })()
+  const local = /^(localhost|127\.0\.0\.1|::1|\[::1\])$/.test(host) || url.includes('host=/') || (host && !host.includes('.'))
+  const ssl = local ? false : { rejectUnauthorized: process.env.PGSSL_NO_VERIFY !== '1' }
+  const pool = new pg.Pool({ connectionString: url, ssl, max: 5 })
   return {
     pool,
     migrate: () => pool.query(SCHEMA),

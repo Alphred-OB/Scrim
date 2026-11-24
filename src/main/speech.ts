@@ -5,6 +5,7 @@ import { join } from 'path'
 import { tmpdir } from 'os'
 import { ffmpegPath, probeDuration, runFfmpeg } from './ffmpeg'
 import type { TranscriptWord } from '@shared/types'
+import { isPathAllowed, isDangerousExtension } from './security'
 
 // Speech to text, voice clean up, dead time detection and guide files. The renderer decides what
 // to do; this side does the heavy lifting with ffmpeg and talks to Groq.
@@ -252,6 +253,7 @@ function stepHtml(i: number, s: GuideExport['steps'][number], src: string): stri
  * in memory at once.
  */
 export async function exportGuide(g: GuideExport, onProgress: (done: number, total: number) => void): Promise<string> {
+  if (!isPathAllowed(g.outPath)) throw new Error('Output path not allowed')
   const dir = await fs.mkdtemp(join(tmpdir(), 'scrim-guide-'))
   try {
     const n = g.steps.length
@@ -315,5 +317,9 @@ export function registerSpeechIpc(): void {
   ipcMain.handle('tidy:screen', (_e, path: string) => screenChange(path))
   ipcMain.handle('guide:stills', (_e, path: string, times: number[]) => stills(path, times))
   ipcMain.handle('guide:export', (e, g: GuideExport) => exportGuide(g, (done, total) => e.sender.send('guide:progress', done, total)))
-  ipcMain.handle('file:writeText', (_e, p: string, text: string) => fs.writeFile(p, text, 'utf8'))
+  ipcMain.handle('file:writeText', (_e, p: string, text: string) => {
+    if (isDangerousExtension(p)) throw new Error('Refusing to write executable file')
+    if (!isPathAllowed(p)) throw new Error('Path not allowed')
+    return fs.writeFile(p, text, 'utf8')
+  })
 }

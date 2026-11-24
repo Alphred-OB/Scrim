@@ -134,6 +134,7 @@ export function createWebApi(): Api {
     },
     // ---- things the browser can do a simpler way ----
     peaks: async () => [],
+    proxyEnsure: async (dir) => ({ dir, status: 'none' as const }),
     screenChange: async () => ({ step: 0.25, values: [] }),
     pickSpeech: async () => -1,
     guideStills: async (path, times) => {
@@ -164,6 +165,8 @@ export function createWebApi(): Api {
     crashEnabled: async () => false,
     crashTest: async () => false,
     recorderStatus: async () => ({ state: 'idle' }) as never,
+    prompter: async () => {},
+    importScript: async () => null,
     listSources: async () => [],
     detectEncoder: async () => 'browser',
     notify: async () => {},

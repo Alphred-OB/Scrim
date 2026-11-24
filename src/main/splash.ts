@@ -68,8 +68,15 @@ export function showSplash(iconPath: string): void {
     show: false,
     center: true,
     hasShadow: false,
-    title: 'Scrim'
+    title: 'Scrim',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
   })
+  splash.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  splash.webContents.on('will-navigate', (e) => e.preventDefault())
   splash.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(page(icon)))
   splash.once('ready-to-show', () => {
     shownAt = Date.now()

@@ -4,8 +4,10 @@ import {
 } from 'mediabunny'
 import type { CursorData, ExportSettings, Project } from '@shared/types'
 import { audibleClicks, clickTrackWav } from '@shared/clickSounds'
+import { applyCamBg, loadSegmenter, preloadPicture } from '../engine/webcamBg'
 import { api, mediaUrl, type MuxJobIn } from '@/lib/api'
 import { Renderer, computeLayout, outputSize } from '../engine/compositor'
+import { ensureWallpaperLoaded } from '../engine/backgrounds'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
 import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
 
@@ -53,11 +55,14 @@ export function exportDims(project: Project, s: ExportSettings): { W: number; H:
  * then adds typical decode/encode cost. Good enough to say "about 2 minutes".
  */
 export async function estimateExportSeconds(project: Project, cursorData: CursorData | null, s: ExportSettings): Promise<number> {
+  if (project.edit.background.type === 'wallpaper') {
+    await ensureWallpaperLoaded(project.edit.background.wallpaper)
+  }
   const { W, H, frames } = exportDims(project, s)
   const canvas = new OffscreenCanvas(W, H)
   const ctx = canvas.getContext('2d', { alpha: false })!
   const r = new Renderer()
-  const track = buildTrack(cursorData, project.media.screen.duration, project.edit.cursor.smoothing)
+  const track = buildTrack(cursorData, project.media.screen.duration, project.edit.cursor)
   const src = new OffscreenCanvas(project.media.screen.width, project.media.screen.height)
   const draw = (c: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D, ...a: number[]) => c.drawImage(src, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7])
   r.render(ctx, W, H, { edit: project.edit, srcW: project.media.screen.width, srcH: project.media.screen.height, t: 0, drawFrame: draw, cursor: track, camera: null, clicks: [] })
@@ -158,6 +163,10 @@ export async function exportProject(
     }
     camSink = await openSink(media.webcam.path, list)
     if (camSink) sinks.push(camSink)
+    if (edit.webcam.bg !== 'none') {
+      await loadSegmenter()
+      if (edit.webcam.bg === 'image' && edit.webcam.bgImage) await preloadPicture(mediaUrl(edit.webcam.bgImage))
+    }
   }
 
   const assets = new Map(edit.assets.map((a) => [a.id, a]))
@@ -191,10 +200,12 @@ export async function exportProject(
   let bgImage: ImageBitmap | null = null
   if (edit.background.type === 'image' && edit.background.imagePath) {
     bgImage = await createImageBitmap(await (await fetch(mediaUrl(edit.background.imagePath))).blob())
+  } else if (edit.background.type === 'wallpaper') {
+    await ensureWallpaperLoaded(edit.background.wallpaper)
   }
 
-  const track = buildTrack(cursorData, duration, edit.cursor.smoothing)
-  const camera = buildCameraTrack(cursorData, duration)
+  const track = buildTrack(cursorData, duration, edit.cursor)
+  const camera = buildCameraTrack(cursorData, duration, edit.cursor)
   const clicks = cursorData?.clicks ?? []
 
   // ---- output ----
@@ -219,6 +230,11 @@ export async function exportProject(
     for (let k = 0; k < frames; k++) yield Math.max(0, srcTime(k)) // the lead-in has no recording frames
   }
 
+  const camPic = edit.webcam.bg === 'image' && edit.webcam.bgImage ? mediaUrl(edit.webcam.bgImage) : undefined
+  const camFor = (f: VideoSample) => {
+    const cam = { src: f.toCanvasImageSource() as CanvasImageSource, w: f.displayWidth, h: f.displayHeight }
+    return edit.webcam.bg === 'none' ? cam : applyCamBg(cam, edit.webcam, camPic)
+  }
   let prev: VideoSample | null = null
   let k = 0
   const t0 = performance.now()
@@ -262,7 +278,7 @@ export async function exportProject(
         bgImage,
         bgVideo: bgFrame ? (bgFrame.toCanvasImageSource() as CanvasImageSource) : null,
         bgVideoSize: bgFrame ? [bgFrame.displayWidth, bgFrame.displayHeight] : undefined,
-        webcam: camFrame ? { src: camFrame.toCanvasImageSource() as CanvasImageSource, w: camFrame.displayWidth, h: camFrame.displayHeight } : null,
+        webcam: camFrame ? camFor(camFrame) : null,
         overlays: ovMap,
         watermark: logo ? { src: logo, w: logo.width, h: logo.height } : null
       })

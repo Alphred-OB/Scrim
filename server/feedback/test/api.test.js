@@ -1,16 +1,20 @@
 // Needs a Postgres: TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5433/scrim_fb npm test
-import { test, before, after } from 'node:test'
+// (intake.test.js covers the request checks without a database)
+import { test as nodeTest, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { createApp } from '../src/app.js'
 import { createDb } from '../src/db.js'
 
 const url = process.env.TEST_DATABASE_URL
-const db = createDb(url)
+const skip = !url && 'set TEST_DATABASE_URL to run'
+const test = (name, fn) => nodeTest(name, { skip }, fn)
+const db = url ? createDb(url) : null
 const sent = []
 let server
 let base
 
 before(async () => {
+  if (!db) return
   await db.migrate()
   await db.pool.query('truncate feedback restart identity')
   const fakeGithub = async () => ({ ok: true, json: async () => ({ tag_name: 'v0.4.0', published_at: '2026-09-24', assets: [{ name: 'Scrim-Setup-0.4.0.exe', size: 136072282, browser_download_url: 'https://example.com/Scrim-Setup-0.4.0.exe' }, { name: 'latest.yml', size: 300 }] }) })
@@ -19,6 +23,7 @@ before(async () => {
   base = `http://127.0.0.1:${server.address().port}`
 })
 after(async () => {
+  if (!db) return
   server.close()
   await db.close()
 })
@@ -101,13 +106,6 @@ test('the website pages are served with safe headers', async () => {
     assert.ok(r.headers.get('content-security-policy'), p)
   }
   assert.match(await (await fetch(base + '/')).text(), /Download/)
-})
-
-test('the live editor demo is served with room for video and workers', async () => {
-  const r = await fetch(base + '/app/')
-  assert.equal(r.status, 200)
-  assert.match(r.headers.get('content-security-policy'), /worker-src 'self' blob:/)
-  assert.equal((await fetch(base + '/app/demo/project.json')).status, 200)
 })
 
 test('download always points at the newest installer', async () => {

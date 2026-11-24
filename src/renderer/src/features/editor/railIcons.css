@@ -173,14 +173,16 @@
 .rail { scrollbar-width: none; padding-bottom: 8px; }
 .rail::-webkit-scrollbar { display: none; }
 .rail .rail-btn { height: 46px; gap: 3px; flex-shrink: 0; }
+@media (max-height: 960px) { .rail .rail-btn { height: 42px; } }
 @media (max-height: 820px) {
   .rail .rail-btn { height: 40px; }
   .rail .rail-btn span { font-size: 9.5px; }
 }
 .rail-more-wrap { position: sticky; bottom: -8px; width: 100%; min-height: 8px; display: flex; justify-content: center; pointer-events: none; margin-top: auto; }
-.rail-more-wrap:has(.rail-more) { padding: 4px 0 10px; background: var(--bg-2); box-shadow: 0 -1px 0 var(--line); }
-.rail { scroll-padding-bottom: 40px; }
-.rail-more { pointer-events: auto; width: 40px; height: 22px; border-radius: 11px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); animation: railMore 1.8s ease-in-out infinite; }
+.rail-more-wrap:has(.rail-more) { padding: 18px 0 10px; background: linear-gradient(to bottom, transparent, var(--bg-2) 55%); }
+.rail { scroll-padding-bottom: 40px; scroll-snap-type: y proximity; }
+.rail .rail-btn { scroll-snap-align: start; }
+.rail-more { pointer-events: auto; width: 48px; height: 28px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); animation: railMore 1.8s ease-in-out infinite; }
 .rail-more:hover { color: var(--text); border-color: var(--accent); }
 .rail-more.up { animation: none; }
 .rail-more.up svg { transform: rotate(180deg); }

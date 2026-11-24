@@ -16,11 +16,13 @@ import Waveform from './Waveform'
 import Filmstrip from './Filmstrip'
 import { TRANSITIONS } from '../panels/EffectsPanel'
 import { TransitionPicker } from './TransitionPicker'
+import { useSettings } from '@/lib/settings'
+import { useProxy } from '@/lib/useProxy'
 
 const TRACK_H = 34
 const VIDEO_H = 58
 const RULER_H = 26
-const HEAD_W = 128
+const HEAD_W = 140
 const PAD = 14
 export const ZOOM_MIN = 0.25 // 1 = whole video fits the view
 export const ZOOM_MAX = 60
@@ -30,7 +32,7 @@ let zoomAnchor: { time: number; screenX: number } | null = null
 export const useTimelineView = create<{ zoom: number; height: number; snap: boolean; setZoom(z: number | ((z: number) => number)): void; setHeight(h: number): void; setSnap(v: boolean): void }>((set, get) => ({
   zoom: 1,
   height: Number(localStorage.getItem('df.tlh')) || 300,
-  snap: true,
+  snap: useSettings.getState().settings.timelineMagnet ?? false, // free by default: items stay exactly where you drop them
   setZoom: (z) => set({ zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, typeof z === 'function' ? z(get().zoom) : z)) }),
   setHeight: (h) => {
     const v = Math.min(620, Math.max(170, h))
@@ -41,7 +43,10 @@ export const useTimelineView = create<{ zoom: number; height: number; snap: bool
     }
     set({ height: v })
   },
-  setSnap: (v) => set({ snap: v })
+  setSnap: (v) => {
+    useSettings.getState().save({ timelineMagnet: v })
+    set({ snap: v })
+  }
 }))
 
 type Item = { id: string; start: number; end: number; lane?: number }
@@ -66,6 +71,9 @@ export default function Timeline() {
   const duration = project.media.screen.duration
   const edit = project.edit
   const media = project.media
+  const proxy = useProxy(project)
+  // thumbnails come from the light copy; until we know whether there is one, don't start grabbing from the big original
+  const filmPath = proxy.status === 'ready' && proxy.path ? proxy.path : proxy.status === 'checking' ? '' : media.screen.path
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const playheadRef = useRef<HTMLDivElement>(null)
@@ -87,7 +95,9 @@ export default function Timeline() {
   const outDur = outputDuration(clips, lead)
   const o = (t: number) => sourceToOutput(clips, t, lead) // source -> output
   const src = (T: number) => outputToSource(clips, T, lead) // output -> source
-  const pps = (width / Math.max(0.5, outDur)) * zoom
+  // while the video is being slid, keep the scale fixed (otherwise the view re-fits as the gap grows and the clip seems to shrink/stick)
+  const [frozenPps, setFrozenPps] = useState<number | null>(null)
+  const pps = frozenPps ?? (width / Math.max(0.5, outDur)) * zoom
   const total = outDur * pps
   const tail = Math.max(260, width * 0.5)
   const X = (T: number) => PAD + T * pps
@@ -200,9 +210,10 @@ export default function Timeline() {
     return !a || a.kind === 'image' ? Infinity : a.duration - ov.trimStart
   }
 
-  /** Magnet: an item dropped onto a neighbour on its own layer joins it end to end instead of
+  /** Magnet (only when switched on): an item dropped onto a neighbour on its own layer joins it end to end instead of
    *  jumping to another layer, as long as the nudge is small. */
   const joinNeighbour = (list: Item[], it: Item): boolean => {
+    if (!useTimelineView.getState().snap) return false // magnet off: nothing jumps or sticks, gaps stay gaps
     const lane = it.lane ?? 0
     const Ts = o(it.start)
     const Te = o(it.end)
@@ -344,14 +355,17 @@ export default function Timeline() {
     const lead0 = lead
     const key = `lead-${Date.now()}`
     let moved = false
+    const pps0 = pps
     const mv = (ev: PointerEvent) => {
       if (Math.abs(ev.clientX - x0) > 3) moved = true
       if (!moved) return
-      let next = Math.max(0, lead0 + (ev.clientX - x0) / pps)
-      if (next * pps < 10) next = 0
-      update((ed) => (ed.leadIn = +next.toFixed(3)), key)
+      setFrozenPps(pps0)
+      let next = Math.max(0, lead0 + (ev.clientX - x0) / pps0)
+      if (next * pps0 < 10) next = 0
+      update((ed) => { ed.leadIn = +next.toFixed(3) }, key)
     }
     const up = () => {
+      setFrozenPps(null)
       window.removeEventListener('pointermove', mv)
       window.removeEventListener('pointerup', up)
       if (!moved) seek(timeAt(x0))
@@ -742,7 +756,7 @@ export default function Timeline() {
             {/* the video, one block per clip, with thumbnails */}
             {clips.map((c) =>
               block('clip', c, 'video', COLORS.video, 'film', <>{c.speed !== 1 ? `${c.speed}x · ` : ''}{fmtTime((c.end - c.start) / c.speed, true)}</>,
-                <Filmstrip path={media.screen.path} duration={duration} from={c.start} to={c.end} width={Math.max(6, ((c.end - c.start) / c.speed) * pps)} height={VIDEO_H - 6} />)
+                filmPath && <Filmstrip path={filmPath} duration={duration} from={c.start} to={c.end} width={Math.max(6, ((c.end - c.start) / c.speed) * pps)} height={VIDEO_H - 6} />)
             )}
             {joints}
 
@@ -767,14 +781,16 @@ export default function Timeline() {
             })}
 
             {/* keyboard shortcuts: click to jump there, right click to hide one */}
-            {keyPresses.length > 0 && keyPresses.map((kp) => {
+            {keyPresses.length > 0 && keyPresses.map((kp, ki) => {
+              // never wider than the gap to the next press, so neighbours don't stack into unreadable text
+              const room = ki < keyPresses.length - 1 ? XS(keyPresses[ki + 1].t) - XS(kp.t) - 2 : Infinity
               const id = Math.round(kp.t * 1000)
               const hidden = edit.keys.hidden.includes(id)
               return (
                 <button
                   key={'k' + id}
                   className={`tl-key ${hidden || !edit.keys.show || edit.tracks.keys === false ? 'off' : ''}`}
-                  style={{ left: XS(kp.t), top: top('keys') + 5, height: TRACK_H - 10, minWidth: Math.max(18, edit.keys.hold * pps) }}
+                  style={{ left: XS(kp.t), top: top('keys') + 5, height: TRACK_H - 10, width: Math.max(6, Math.min(room, Math.max(18, edit.keys.hold * pps))) }}
                   title={`${kp.keys.join(' + ')}${hidden ? ' (hidden)' : ''}. Right click to ${hidden ? 'show' : 'hide'} it.`}
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => {
@@ -786,7 +802,7 @@ export default function Timeline() {
                     update((ed) => (ed.keys.hidden = hidden ? ed.keys.hidden.filter((h) => h !== id) : [...ed.keys.hidden, id]))
                   }}
                 >
-                  {kp.keys.map((c, i) => <kbd key={i}>{c}</kbd>)}
+                  {Math.min(room, Math.max(18, edit.keys.hold * pps)) >= 44 && kp.keys.map((c, i) => <kbd key={i}>{c}</kbd>)}
                 </button>
               )
             })}

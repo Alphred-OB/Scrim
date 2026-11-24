@@ -32,7 +32,13 @@ The real cursor is hidden in the video. Scrim logs where it goes and every click
 Eye and speaker icons dim their track when turned off. Items snap to the playhead and to each other's edges. The minus and plus buttons (or Ctrl + scroll) zoom the timeline. Right click anything for more options. Grey hatched areas are cut from the final video.
 
 ## Background
-Wallpapers (24), Live (animated: aurora, orbit, concentric, contour, waves, bokeh, grid, stars in 2D, and terrain, tunnel, spheres, cubes in 3D, with speed and three colors), Image, Video, Color and Gradient. Blur and darken work on all of them.
+- **Scrim wallpapers:** 13 high-resolution wallpapers drawn for Scrim (Dark, Vivid and Light sets) plus procedural gradients and live animated scenes. They are made by `tools/make-wallpapers.py`, so they are ours to ship.
+- **Redesigned Wallpaper Gallery:** Sleek 16:10 widescreen desktop cards with live release tags, instant-load thumbnails, active check badges, and category filtering (`All`, `macOS`, `Landscape`, `Abstract`, `Gradients`).
+- **Gradients & Procedural Wallpapers:** 24 curated smooth gradient backdrops.
+- **Live Backgrounds:** Animated scenes (aurora, orbit, concentric, contour, waves, bokeh, grid, stars in 2D, and terrain, tunnel, spheres, cubes in 3D, with speed and color controls).
+- **Unified Custom Media:** Single upload/drop card combining both images (PNG, JPG, WebP) and looping videos (MP4, WebM, MOV) with automatic file-type detection, live preview player, and replace/remove controls.
+- **Unified Colors & Gradients:** Single panel tab with a clean switch between solid color palette swatches and multi-stop linear/radial gradient styling.
+- **Adjustments:** High-performance blur and darkening sliders applicable across all backgrounds.
 
 ## Zoom
 - **Automatic:** finds your clicks and zooms in on them, following the cursor. Set the depth and click **Find clicks again** to rebuild.
@@ -40,7 +46,12 @@ Wallpapers (24), Live (animated: aurora, orbit, concentric, contour, waves, boke
 - **Master zoom** scales every zoom at once. **Transition speed** sets how fast it eases in and out.
 
 ## Cursor and clicks
-19 cursor styles in five groups: Classic (macOS, Windows, outline), Simple, Pointy (including neon), Touch (dot, touch circle, ring) and Special (hand, crosshair, pen). Style it with fill, outline, outline width, size, shadow and opacity. Motion has smoothing, sway and hide when not moving. The spotlight can glow, dim everything else, or draw a ring. Choose when it shows (always, while moving, on clicks), and set its color, strength, darkness, size and edge softness. Click effects: ripple, ring or pulse, with color and bounce.
+19 cursor styles in five groups: Classic (macOS, Windows, outline), Simple, Pointy (including neon), Touch (dot, touch circle, ring) and Special (hand, crosshair, pen). Style it with fill, outline, outline width, size, shadow and opacity.
+- **Cinematic Motion Engine (Screen Studio style):** Reconstructs erratic, hesitant mouse recordings into fluid, curved Bézier trajectories with Minimum-Jerk motor control easing ($10\tau^3 - 15\tau^4 + 6\tau^5$).
+- **Curvature Control:** Adjust arc tension from Straight (0%) to Sweeping (100%).
+- **Click Dwell Pause:** Stabilizes the pointer with an intentional presentation pause on buttons before and after clicks.
+- **Motion Modes:** Choose between **Cinematic** (curved Bézier splines), **Natural** (critically damped spring physics), and **Direct** (raw capture).
+- **Physics & Effects:** Cursor sway (velocity roll), idle hiding, and customizable spotlight (glow, dim everything else, or ring). Click effects include ripple, ring or pulse, with tactile mouse click audio SFX (Apple, Logitech, Mechanical, Soft, Pop).
 
 ## Keyboard Shortcuts Overlay
 Recorded shortcuts (e.g. `Ctrl+C`, `Ctrl+Shift+P`, `Enter`, arrows) display as beautiful animated keycaps overlaid on the video. Plain typing is never recorded to protect passwords and private text.

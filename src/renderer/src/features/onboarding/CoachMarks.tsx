@@ -1,3 +1,4 @@
+import { Icon } from '@/ui'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { EditState } from '@shared/types'
 import { useEditor } from '@/features/editor/state/store'
@@ -117,7 +118,7 @@ export default function CoachMarks() {
         <p>{step.body}</p>
         {task && (
           <div className={`coach-task ${done ? 'done' : ''}`}>
-            <span className="coach-check">{done ? <svg viewBox="0 0 12 12" width="11" height="11"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}</span>
+            <span className="coach-check">{done ? <Icon name="check" size={13} variant="Bold" /> : null}</span>
             <span>{done ? 'Nice one' : task.todo}</span>
             {!done && task.doIt && <button className="link" onClick={() => task.doIt!()}>Show me</button>}
           </div>

@@ -3,6 +3,7 @@ import type { Asset, AudioClip, BlurItem, EffectClip, EffectLook, OverlayClip, T
 import { defaultEffect, freeLane, newBlur, newText, newZoom, uid } from '@shared/defaults'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { api } from '@/lib/api'
+import { askConfirm } from '@/ui'
 import { flushSave, useEditor } from './store'
 import { timeBus } from './timeBus'
 import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
@@ -82,6 +83,37 @@ export function addAssetAt(asset: Asset, t0: number, lane = 0): void {
     s.update((e) => e.overlays.push(o))
     s.select({ kind: 'overlay', id: o.id })
   }
+}
+
+/**
+ * Adds media from the library. A video becomes its own piece of the project, before or after the recording (whichever
+ * end is nearer), so it never lands on top of the recording. Dropped into the intro space it fills the intro.
+ * Pictures and sound still go where they were dropped. Use addAssetAt for the old "play on top" behaviour.
+ */
+export async function addMediaSmart(asset: Asset, t0: number, lane = 0): Promise<void> {
+  const s = st()
+  const p = s.project
+  if (!p || asset.kind !== 'video') return addAssetAt(asset, t0, lane)
+  // dropped inside existing intro space it always plays as is; otherwise the person picks
+  const asIs = t0 < 0 || (await askConfirm({ title: 'Keep this video as it is?', body: `"${asset.name}" may already have its own background and frame (for example a video you exported from Scrim).\n\nKeep as is: plays full picture, no second background.\nApply my background: joins your recording and gets this project's background and frame.`, ok: 'Keep as is', cancel: 'Apply my background', icon: 'info' }))
+  // as is: play it full picture in new intro space (no re-encode, no second background/frame)
+  if (asIs) {
+    const d = Math.max(0.5, asset.duration)
+    const fromTop = t0 >= 0 // not dropped inside existing intro space: goes in front of everything
+    const newLead = fromTop ? lead() + d : Math.max(lead(), d)
+    const start = fromTop ? -newLead : Math.min(Math.max(t0, -newLead), -d)
+    const o: OverlayClip = {
+      id: uid('ov'), assetId: asset.id, start, end: +(start + d).toFixed(3), lane: freeLane(p.edit.overlays, start, start + d, lane), trimStart: 0, x: 0.5, y: 0.5, w: 1, radius: 0, shadow: false,
+      opacity: 1, volume: 1, muted: !asset.hasAudio, mode: 'full', fit: 'contain'
+    }
+    s.update((e) => {
+      e.leadIn = newLead
+      e.overlays.push(o)
+    })
+    s.select({ kind: 'overlay', id: o.id })
+    return
+  }
+  await joinVideoAt(t0 < dur() / 2 ? 'start' : 'end', asset.path)
 }
 
 export function removeAsset(id: string): void {

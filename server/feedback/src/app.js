@@ -8,7 +8,7 @@ const KINDS = new Set(['bug', 'idea'])
 const CLIENTS = new Set(['scrim-desktop', 'scrim-website'])
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), '..', 'public')
 const STATUSES = ['new', 'seen', 'planned', 'done', 'wontfix']
-const LIMITS = { title: 140, message: 8000, email: 200, logs: 600_000, shot: 4_000_000 }
+const LIMITS = { title: 140, message: 8000, email: 200, logs: 600_000, shot: 4_000_000, meta: 20_000 }
 const PER_HOUR = 12 // reports one address can send in an hour
 
 const emailOk = (s) => /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/.test(s)
@@ -25,7 +25,7 @@ export function createApp(db, opts = {}) {
   const notify = opts.notify ?? webhookNotifier(process.env.NOTIFY_WEBHOOK_URL)
   const app = express()
   app.disable('x-powered-by')
-  app.set('trust proxy', true) // Render and Vercel sit behind a proxy
+  app.set('trust proxy', 1) // exactly one proxy (Render) in front; `true` would trust a client-sent X-Forwarded-For
 
   app.use((_req, res, next) => {
     res.set({
@@ -34,8 +34,6 @@ export function createApp(db, opts = {}) {
       'X-Frame-Options': 'DENY',
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'"
     })
-    // the live editor demo plays and exports video in the page, which needs blob: and workers
-    if (_req.path.startsWith('/app')) res.set('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; worker-src 'self' blob:; connect-src 'self' blob: data:; frame-ancestors 'none'")
     next()
   })
   app.get('/health', (_req, res) => res.json({ ok: true }))
@@ -52,7 +50,7 @@ export function createApp(db, opts = {}) {
     const r = await latest().catch(() => null)
     res.redirect(302, r?.url ?? `https://github.com/${opts.githubRepo ?? process.env.GITHUB_REPO ?? 'Alphred-OB/Scrim'}/releases/latest`)
   })
-  app.use(express.static(PUBLIC, { extensions: ['html'], maxAge: '1h', setHeaders: (res, p) => /\.(webp|mp4|jpg|png)$/.test(p) && res.set('Cache-Control', 'public, max-age=86400') }))
+  app.use(express.static(PUBLIC, { extensions: ['html'], maxAge: '1h', setHeaders: (res, p) => res.set('Cache-Control', /\.(webp|mp4|jpg|png)$/.test(p) ? 'public, max-age=86400' : 'no-cache') }))
 
   // ---------------- from the app ----------------
   app.post('/v1/feedback', express.json({ limit: '7mb' }), async (req, res) => {
@@ -70,7 +68,7 @@ export function createApp(db, opts = {}) {
       if (message.length < 3) return res.status(400).json({ error: 'Please describe it in a few words.' })
       const email = clean(b.email, LIMITS.email)
       if (email && !emailOk(email)) return res.status(400).json({ error: "That email address doesn't look right." })
-      const logs = typeof b.logs === 'string' ? b.logs.slice(-LIMITS.logs) : null
+      const logs = typeof b.logs === 'string' ? b.logs.replace(/\u0000/g, '').slice(-LIMITS.logs) : null
       let screenshot = null
       let screenshotType = null
       if (typeof b.screenshot === 'string' && b.screenshot) {
@@ -82,13 +80,15 @@ export function createApp(db, opts = {}) {
       }
       const ipHash = createHash('sha256').update(salt + (req.ip ?? '')).digest('hex').slice(0, 32)
       if ((await db.recentFrom(ipHash, 60)) >= PER_HOUR) return res.status(429).json({ error: 'Thanks! You have sent a lot of reports this hour. Please try again later.' })
-      const meta = typeof b.meta === 'object' && b.meta && !Array.isArray(b.meta) ? b.meta : {}
+      // Postgres jsonb rejects NUL characters, and cutting JSON text mid-way makes it invalid, so drop oversized meta instead
+      const metaJson = typeof b.meta === 'object' && b.meta && !Array.isArray(b.meta) ? JSON.stringify(b.meta, (_k, v) => (typeof v === 'string' ? v.replace(/\u0000/g, '') : v)) : '{}'
+      const meta = metaJson.length <= LIMITS.meta ? JSON.parse(metaJson) : { truncated: true }
       const row = await db.insert({
         kind, title, message, email: email || null, logs, screenshot, screenshotType, ipHash,
         appVersion: clean(b.appVersion, 40) || null,
         os: clean(b.os, 120) || null,
         crashId: clean(b.crashId, 80) || null,
-        meta: JSON.parse(JSON.stringify(meta).slice(0, 20000) || '{}')
+        meta
       })
       notify({ id: row.id, kind, title, appVersion: b.appVersion }).catch(() => {})
       db.forgetAddresses?.().catch(() => {}) // the spam check only needs an hour of memory
@@ -168,7 +168,7 @@ function latestRelease(repo, fetchFn) {
     if (cache && Date.now() - at < 600_000) return cache
     const headers = { accept: 'application/vnd.github+json', 'user-agent': 'scrim-site' }
     if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`
-    const r = await fetchFn(`https://api.github.com/repos/${repo}/releases/latest`, { headers })
+    const r = await fetchFn(`https://api.github.com/repos/${repo}/releases/latest`, { headers, signal: AbortSignal.timeout(5000) })
     if (!r.ok) throw new Error('GitHub ' + r.status)
     const j = await r.json()
     const exe = (j.assets ?? []).find((a) => /\.exe$/i.test(a.name))

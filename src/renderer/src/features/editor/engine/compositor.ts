@@ -29,7 +29,7 @@ export interface RenderInputs {
   /** clock for animated backgrounds; defaults to t (the preview keeps them moving while paused) */
   bgTime?: number
   bgVideoSize?: [number, number]
-  webcam?: { src: CanvasImageSource; w: number; h: number } | null
+  webcam?: { src: CanvasImageSource; w: number; h: number; cut?: boolean } | null
   overlays?: Map<string, { src: CanvasImageSource; w: number; h: number }>
   /** brand logo image for edit.watermark */
   watermark?: { src: CanvasImageSource; w: number; h: number } | null
@@ -181,11 +181,29 @@ export function blurRect(b: BlurItem, L: Layout, vp: { x: number; y: number; w: 
   }
 }
 
-function drawWebcam(ctx: Ctx, edit: EditState, cam: { src: CanvasImageSource; w: number; h: number }, W: number, H: number, k: number): void {
+function drawWebcam(ctx: Ctx, edit: EditState, cam: { src: CanvasImageSource; w: number; h: number; cut?: boolean }, W: number, H: number, k: number): void {
   const wc = edit.webcam
   const r = webcamRect(edit, W, H)
   const rad = wc.shape === 'circle' ? r.w / 2 : wc.shape === 'rounded' ? r.w * 0.22 : 6 * k
   ctx.save()
+  if (cam.cut) {
+    // background removed: just the person over the screen, no frame, the shadow follows their outline
+    if (wc.shadow) {
+      ctx.shadowColor = 'rgba(0,0,0,.45)'
+      ctx.shadowBlur = 28 * k
+      ctx.shadowOffsetY = 8 * k
+    }
+    const side = Math.min(cam.w, cam.h)
+    const sx = (cam.w - side) / 2
+    const sy = (cam.h - side) / 2
+    if (wc.mirror) {
+      ctx.translate(r.x + r.w, r.y)
+      ctx.scale(-1, 1)
+      ctx.drawImage(cam.src, sx, sy, side, side, 0, 0, r.w, r.h)
+    } else ctx.drawImage(cam.src, sx, sy, side, side, r.x, r.y, r.w, r.h)
+    ctx.restore()
+    return
+  }
   if (wc.shadow) {
     ctx.shadowColor = 'rgba(0,0,0,.45)'
     ctx.shadowBlur = 28 * k

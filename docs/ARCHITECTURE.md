@@ -57,12 +57,20 @@ The export dialog only offers settings that are real. The recorder measures the 
 ## Performance choices
 - GPU capture and GPU encoding while recording
 - The cursor is tracked separately, so 30 fps recordings still get a smooth cursor
+- Timeline thumbnails (`timeline/Filmstrip.tsx`) grab frames one seek at a time, so they pause while the video plays or the playhead is being moved, and wait until the editor knows whether a preview copy exists instead of starting on the full size original
+- The webcam is copied to its frame cache only when it has a new frame (it runs at ~30 fps, the preview draws at ~60)
 - Preview playback drives a tiny event bus instead of React state (the playhead and time label don't re-render the app)
 - Cached background and shadow layers, and blur by downscaling
 - Reduce transparency setting turns off backdrop blur
+- Long or big recordings (over about 2.5 minutes or 400 MB) get a light preview copy, `proxy.mp4`, kept in a local cache folder (`%LOCALAPPDATA%\Scrim\preview-cache\<project>-<hash>`, see `main/previewCache.ts`) so OneDrive never uploads it (up to 1600 wide, x264 veryfast crf 23, keyframe every second, no B frames, no audio, same timestamps). `main/proxy.ts` builds it in the background at low priority and the editor (`lib/useProxy.ts`) switches to it when ready. The player, scrubbing and the timeline thumbnails use the copy. Paused frames come from the original, so what you stop on is sharp. Export never uses the copy.
+- The webcam gets the same treatment (`cam-proxy.mp4`, same size, keyframe every second) when it is a recorder WebM longer than 20 s: MediaRecorder writes a keyframe only every 3 to 8 s, which made each webcam seek take 0.1 to 0.5 s. `useProxy(project, 'cam')` switches the webcam element to it on the next pause. New recordings also ask MediaRecorder for a keyframe every second (`videoKeyFrameIntervalDuration`).
+- Copies made by older versions in the project folder are moved into the cache the next time the project opens. Deleting a project removes its copies, and Settings > Clear temporary cache removes them all (they are made again on the next open).
+- The webcam cut-out model (`engine/webcamBg.ts`) is loaded on idle when the project uses a webcam background, so its one second of setup never lands on Play.
 
 ## Themes
 All colors are CSS variables in `styles/tokens.css`. `data-theme` on `<html>` switches dark and light, and System follows Windows. The main process updates the title bar buttons to match.
 
 ## Testing
 `npx tsx test/make-project.ts a` makes a test project. `SCRIM_TEST_DIR=<project> SCRIM_TEST_OUT=<dir> electron .` then runs `src/main/selftest.ts`. It clicks through the UI with real mouse input and prints PASS or FAIL for: the track eye toggles, dragging media onto the timeline, settings and theme switching, live backgrounds, the export dialog and full screen preview. It saves screenshots and finishes with a real export (`SCRIM_TEST_FORMAT`). `SCRIM_TEST_IMPORT` imports files first, `SCRIM_TEST_RECORD=1` runs a real record, stop and editor cycle instead.
+
+`npm run build` then `npm run perf -- "<project folder>"` (`tools/perf-player.mjs`) opens a real project in the built app, waits for its preview copies, then times playhead jumps and cold playback at a few spots (one inside the webcam). It prints PASS or FAIL against fixed limits (seek 100 ms, 10% dropped frames, 0.95x speed, 300 ms freeze); `--profile` shows where the first Play spends its busiest stretch, `--json` prints the raw numbers. It only seeks and plays, so it never changes the project.

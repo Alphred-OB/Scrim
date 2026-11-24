@@ -31,6 +31,7 @@ function startTrack(kind: Kind, stream: MediaStream, opts: MediaRecorderOptions)
 export interface MediaStartOptions {
   mic: boolean
   micDeviceId?: string
+  noiseSuppression?: boolean
   system: boolean
   webcam: { deviceId?: string; quality: 480 | 720 | 1080 } | null
 }
@@ -52,12 +53,13 @@ export async function startMedia(opts: MediaStartOptions): Promise<Partial<Recor
   if (opts.mic) {
     jobs.push(
       (async () => {
+        const ns = opts.noiseSuppression ?? true
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             deviceId: opts.micDeviceId ? { exact: opts.micDeviceId } : undefined,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+            echoCancellation: ns,
+            noiseSuppression: ns,
+            autoGainControl: ns,
             channelCount: 1
           }
         })
@@ -83,7 +85,9 @@ export async function startMedia(opts: MediaStartOptions): Promise<Partial<Recor
         const stream = await navigator.mediaDevices.getUserMedia({ video: webcamConstraints(cam.deviceId, 1080), audio: false })
         const h = stream.getVideoTracks()[0]?.getSettings().height ?? 720
         const bps = h >= 1000 ? 5_000_000 : h >= 700 ? 2_500_000 : 1_200_000
-        out.webcam = await startTrack('webcam', stream, { videoBitsPerSecond: bps })
+        // a keyframe every second: left to itself the recorder makes one every 3 to 8 s, and then every seek
+        // in the editor decodes seconds of video first (0.1 to 0.5 s per seek, which stalled the player)
+        out.webcam = await startTrack('webcam', stream, { videoBitsPerSecond: bps, videoKeyFrameIntervalDuration: 1000 } as MediaRecorderOptions)
       })().catch((e) => console.warn('webcam failed', e))
     )
   }

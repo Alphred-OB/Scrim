@@ -1,6 +1,7 @@
-import { app, BrowserWindow, screen, dialog, ipcMain, session, shell, desktopCapturer, Menu, globalShortcut, Notification } from 'electron'
-import { basename, dirname, join } from 'path'
+import { app, BrowserWindow, screen, dialog, ipcMain, session, shell, desktopCapturer, Menu, globalShortcut, Notification, Tray, nativeImage } from 'electron'
+import { basename, dirname, join, extname } from 'path'
 import { tmpdir } from 'os'
+import { pathToFileURL } from 'url'
 import { existsSync, promises as fs } from 'fs'
 import type { CursorData, AppSettings, Asset, Preset, Project, RecordOptions, WebcamRecordOptions } from '@shared/types'
 import { registerSchemes, handleMediaProtocol } from './protocol'
@@ -13,14 +14,17 @@ import { getSettings, migrateLegacyUserData, saveSettings } from './settings'
 import { closeWrite, mux, MuxJob, openWrite, writeAt } from './exporter'
 import { initUpdater } from './updater'
 import { registerSpeechIpc } from './speech'
+import { registerProxyIpc } from './proxy'
+import { previewCacheRoot, previewCacheStats } from './previewCache'
 import { registerFeedbackIpc } from './feedback'
 import { initCrashReports, registerCrashIpc } from './crash'
-import { detectEncoder } from './ffmpeg'
+import { detectEncoder, getAvailableEncoders } from './ffmpeg'
 import { runSelfTest, selfTestDir } from './selftest'
 import { closeSplash, showSplash } from './splash'
 import { joinVideo, type JoinWhere } from './join'
 import './rpc'
 import { startLog } from './log'
+import { isSafeExternalUrl, isPathAllowed, isOpenable, grantPath, grantParentOf } from './security'
 
 startLog()
 initCrashReports() // before the app is ready, so crashes in every window are caught (sends nothing unless allowed)
@@ -34,10 +38,158 @@ let mainWindow: BrowserWindow | null = null
 let toolbar: BrowserWindow | null = null
 let bubble: BrowserWindow | null = null
 let border: BrowserWindow | null = null
+let prompter: BrowserWindow | null = null
+let isQuitting = false
+let appTray: Tray | null = null
 // Windows wants a real .ico (with every size) for the taskbar, title bar and tray; elsewhere a png is fine
 const ICON_PNG = join(__dirname, '../../resources/icon.png')
 const ICON = process.platform === 'win32' ? join(__dirname, '../../resources/icon.ico') : ICON_PNG
-const APP_ID = app.isPackaged ? 'com.eruditeafrican.scrim' : 'com.eruditeafrican.scrim.dev'
+const APP_ID = app.isPackaged ? 'com.aob.scrim' : 'com.aob.scrim.dev'
+
+function ensureAppTray(): void {
+  if (appTray) return
+  try {
+    const img = nativeImage.createFromPath(ICON).resize({ width: 16, height: 16 })
+    appTray = new Tray(img)
+    appTray.setToolTip('Scrim')
+    appTray.setContextMenu(
+      Menu.buildFromTemplate([
+        {
+          label: 'Show Scrim',
+          click: () => {
+            mainWindow?.show()
+            mainWindow?.focus()
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Quit Scrim',
+          click: () => {
+            isQuitting = true
+            app.quit()
+          }
+        }
+      ])
+    )
+    appTray.on('click', () => {
+      mainWindow?.show()
+      mainWindow?.focus()
+    })
+  } catch (err) {
+    console.warn('[tray] app tray failed', err)
+  }
+}
+
+async function getCacheStats(): Promise<{ sizeBytes: number; humanSize: string; fileCount: number }> {
+  let sizeBytes = 0
+  let fileCount = 0
+  try {
+    const sesBytes = await session.defaultSession.getCacheSize()
+    sizeBytes += sesBytes
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const tmp = tmpdir()
+    const entries = await fs.readdir(tmp, { withFileTypes: true })
+    for (const e of entries) {
+      if (e.name.toLowerCase().startsWith('scrim-')) {
+        const full = join(tmp, e.name)
+        try {
+          if (e.isDirectory()) {
+            const files = await fs.readdir(full)
+            for (const f of files) {
+              const st = await fs.stat(join(full, f))
+              sizeBytes += st.size
+              fileCount++
+            }
+          } else {
+            const st = await fs.stat(full)
+            sizeBytes += st.size
+            fileCount++
+          }
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // preview copies of long recordings (main/proxy.ts); made again on demand when a project is opened
+  const previews = await previewCacheStats()
+  sizeBytes += previews.bytes
+  fileCount += previews.files
+
+  const humanSize =
+    sizeBytes < 1024 * 1024
+      ? `${Math.round(sizeBytes / 1024)} KB`
+      : sizeBytes < 1024 * 1024 * 1024
+        ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+        : `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+
+  return { sizeBytes, humanSize, fileCount }
+}
+
+async function clearCache(): Promise<{ freedBytes: number; humanFreed: string }> {
+  const before = await getCacheStats()
+  try {
+    await session.defaultSession.clearCache()
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const tmp = tmpdir()
+    const entries = await fs.readdir(tmp, { withFileTypes: true })
+    for (const e of entries) {
+      if (e.name.toLowerCase().startsWith('scrim-')) {
+        const full = join(tmp, e.name)
+        try {
+          await fs.rm(full, { recursive: true, force: true })
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  // a copy the open editor is playing is locked on Windows and simply stays
+  await fs.rm(previewCacheRoot(), { recursive: true, force: true }).catch(() => {})
+
+  // report what really went (files in use stay behind)
+  const after = await getCacheStats()
+  const freed = Math.max(0, before.sizeBytes - after.sizeBytes)
+  return {
+    freedBytes: freed,
+    humanFreed: freed < 1024 * 1024 ? `${Math.round(freed / 1024)} KB` : freed < 1024 ** 3 ? `${(freed / 1024 ** 2).toFixed(1)} MB` : `${(freed / 1024 ** 3).toFixed(2)} GB`
+  }
+}
+
+const RENDERER_URL = pathToFileURL(join(__dirname, '../renderer/index.html')).href
+
+function secureWebContents(wc: Electron.WebContents): void {
+  wc.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  const handleNav = (e: Electron.Event, url: string) => {
+    const isDev = !!process.env['ELECTRON_RENDERER_URL']
+    // only our own page: any other local file would get window.api through the preload
+    const isLocal = isDev
+      ? url.startsWith(process.env['ELECTRON_RENDERER_URL']!)
+      : url.split('#')[0] === RENDERER_URL
+    if (!isLocal) {
+      e.preventDefault()
+      if (isSafeExternalUrl(url)) shell.openExternal(url)
+    }
+  }
+  wc.on('will-navigate', handleNav)
+  wc.on('will-redirect', handleNav)
+}
 
 function loadRoute(win: BrowserWindow, route: string): void {
   if (process.env['ELECTRON_RENDERER_URL']) win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${route}`)
@@ -59,24 +211,37 @@ function createMainWindow(): void {
     titleBarOverlay: process.platform === 'win32' ? { color: '#00000000', symbolColor: '#c9ccd6', height: 44 } : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
       backgroundThrottling: false // audio keeps recording while hidden
     }
   })
+  secureWebContents(mainWindow.webContents)
   // Windows takes the taskbar icon from the app's id. While developing, the running exe is
   // Electron's, so tell Windows our own id and icon for this window or it shows the Electron atom.
   if (process.platform === 'win32') mainWindow.setAppDetails({ appId: APP_ID, appIconPath: ICON, appIconIndex: 0, relaunchDisplayName: 'Scrim' })
   mainWindow.on('ready-to-show', () => closeSplash(() => mainWindow?.show(), selfTestDir() ? 0 : 1700))
+  mainWindow.on('close', (e) => {
+    if (!isQuitting && getSettings()?.minimizeToTray) {
+      e.preventDefault()
+      mainWindow?.hide()
+      ensureAppTray()
+    }
+  })
+  mainWindow.on('show', () => {
+    if (appTray) {
+      appTray.destroy()
+      appTray = null
+    }
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
     toolbar?.destroy()
     bubble?.destroy()
     border?.destroy()
+    prompter?.destroy()
     app.quit()
-  })
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
   })
   loadRoute(mainWindow, '/')
   if (selfTestDir()) runSelfTest(mainWindow, openEditor)
@@ -98,8 +263,9 @@ function showToolbar(displayRect: Rect, protect: boolean): void {
       hasShadow: false,
       show: false,
       title: 'Scrim Toolbar',
-      webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, backgroundThrottling: false }
+      webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
     })
+    secureWebContents(toolbar.webContents)
     toolbar.setAlwaysOnTop(true, 'screen-saver')
     loadRoute(toolbar, '/toolbar')
   }
@@ -138,8 +304,9 @@ function showBorder(rect: Rect, protect: boolean, outside: boolean): void {
       hasShadow: false,
       show: false,
       title: 'Scrim Border',
-      webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, backgroundThrottling: false }
+      webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
     })
+    secureWebContents(border.webContents)
     border.setIgnoreMouseEvents(true)
     border.setAlwaysOnTop(true, 'screen-saver')
     loadRoute(border, '/border')
@@ -153,9 +320,64 @@ function hideBorder(): void {
   border?.hide()
 }
 
+/**
+ * The on screen script. It's marked as excluded from capture (like the record bar), so you can read
+ * it while recording and it never shows in the video. Alt+Shift+Space starts/stops the scroll,
+ * Alt+Shift+Up/Down change the speed.
+ */
+const PROMPTER_KEYS: [string, string][] = [['Alt+Shift+Space', 'toggle'], ['Alt+Shift+Up', 'faster'], ['Alt+Shift+Down', 'slower'], ['Alt+Shift+Home', 'restart']]
+
+function showPrompter(displayRect?: Rect, force = false): void {
+  const p = getSettings().prompter
+  if (!p?.text?.trim() || (!force && !p.show)) return
+  const w = 720
+  const h = 230
+  if (!prompter || prompter.isDestroyed()) {
+    prompter = new BrowserWindow({
+      width: w,
+      height: h,
+      minWidth: 360,
+      minHeight: 120,
+      frame: false,
+      transparent: true,
+      resizable: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: false, // clicking it never takes the keyboard from the app you're demoing
+      hasShadow: false,
+      show: false,
+      title: 'Scrim Script',
+      webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
+    })
+    secureWebContents(prompter.webContents)
+    prompter.setAlwaysOnTop(true, 'screen-saver')
+    loadRoute(prompter, '/prompter')
+  }
+  prompter.setContentProtection(true)
+  const r = displayRect ?? screen.getPrimaryDisplay().bounds // both are in DIPs, like the bar and the bubble
+  const b = { x: Math.round(r.x + r.width / 2 - w / 2), y: Math.round(r.y + 24), width: w, height: h }
+  prompter.setBounds(b)
+  prompter.showInactive()
+  for (const [key, cmd] of PROMPTER_KEYS) {
+    try {
+      globalShortcut.register(key, () => broadcast('prompter:cmd', cmd))
+    } catch {
+      /* key taken by another app */
+    }
+  }
+}
+
+function hidePrompter(): void {
+  for (const [key] of PROMPTER_KEYS) globalShortcut.unregister(key)
+  if (prompter && !prompter.isDestroyed()) {
+    prompter.destroy()
+    prompter = null
+  }
+}
+
 /** Is this physical screen point on the record bar or the webcam bubble? */
 function isOwnUi(p: { x: number; y: number }): boolean {
-  for (const w of [toolbar, bubble]) {
+  for (const w of [toolbar, bubble, prompter]) {
     if (!w || w.isDestroyed() || !w.isVisible()) continue
     const b = process.platform === 'win32' ? screen.dipToScreenRect(null, w.getBounds()) : w.getBounds()
     if (p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height) return true
@@ -181,12 +403,13 @@ function showBubble(displayRect: Rect, cam: WebcamRecordOptions): void {
       hasShadow: false,
       show: false,
       title: 'Scrim Camera',
-      webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, backgroundThrottling: false }
+      webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false }
     })
+    secureWebContents(bubble.webContents)
     bubble.setAlwaysOnTop(true, 'screen-saver')
     bubble.setContentProtection(true)
   }
-  const q = new URLSearchParams({ shape: cam.shape, device: cam.deviceId ?? '' }).toString()
+  const q = new URLSearchParams({ shape: cam.shape, device: cam.deviceId ?? '', bg: cam.bg ?? 'none', blur: String(cam.bgBlur ?? 0.6), color: cam.bgColor ?? '#1d2230' }).toString()
   loadRoute(bubble, `/bubble?${q}`)
   bubble.setBounds({ x: Math.round(x), y: Math.round(y), width: size, height: size })
   bubble.showInactive()
@@ -212,11 +435,27 @@ function registerIpc(): void {
   ipcMain.handle('recorder:pause', () => recorder.pause())
   ipcMain.handle('recorder:resume', () => recorder.resume())
   ipcMain.handle('recorder:status', () => recorder.getStatus())
+  ipcMain.handle('script:import', async () => {
+    const r = await dialog.showOpenDialog(mainWindow!, { title: 'Import a script', properties: ['openFile'], filters: [{ name: 'Text', extensions: ['txt', 'md'] }] })
+    const f = r.canceled ? null : r.filePaths[0]
+    if (!f) return null
+    if ((await fs.stat(f)).size > 2_000_000) throw new Error('That file is too big for a script.')
+    return (await fs.readFile(f, 'utf8')).replace(/^﻿/, '')
+  })
+  ipcMain.handle('prompter:toggle', (_e, open: boolean) => (open ? showPrompter(undefined, true) : hidePrompter()))
   ipcMain.handle('encoder:detect', () => detectEncoder())
+  ipcMain.handle('encoder:list', () => getAvailableEncoders())
 
   ipcMain.handle('projects:list', () => listProjects())
-  ipcMain.handle('projects:load', (_e, dir: string) => loadProject(dir))
-  ipcMain.handle('projects:save', (_e, p: Project) => saveProject(p))
+  ipcMain.handle('projects:load', async (_e, dir: string) => {
+    const p = await loadProject(dir) // throws unless the folder holds a readable project.json
+    grantPath(dir) // a project opened from elsewhere (recent list, Ctrl+O) may be saved back to its own folder
+    return p
+  })
+  ipcMain.handle('projects:save', (_e, p: Project) => {
+    if (!isPathAllowed(p?.dir)) throw new Error('Path not allowed')
+    return saveProject(p)
+  })
   ipcMain.handle('projects:delete', (_e, dir: string) => deleteProject(dir))
   ipcMain.handle('projects:root', () => projectsRoot())
   ipcMain.handle('projects:import', async (_e, file?: string) => {
@@ -245,7 +484,10 @@ function registerIpc(): void {
     const file = r.canceled ? null : r.filePaths[0]
     if (!file) return null
     const dir = dirname(file)
-    if (existsSync(join(dir, 'project.json')) && (basename(file) === 'project.json' || /^screen(-\d+)?\.mp4$/.test(basename(file)))) return dir
+    if (existsSync(join(dir, 'project.json')) && (basename(file) === 'project.json' || /^screen(-\d+)?\.mp4$/.test(basename(file)))) {
+      grantPath(dir)
+      return dir
+    }
     if (file.toLowerCase().endsWith('.json')) throw new Error('That file is not a Scrim project.')
     return (await importVideo(file)).dir
   })
@@ -254,30 +496,79 @@ function registerIpc(): void {
     const r = await dialog.showOpenDialog(mainWindow!, { title: opts.title, properties: ['openFile'], filters: opts.filters })
     return r.canceled ? null : r.filePaths[0] ?? null
   })
-  ipcMain.handle('dialog:save', async (_e, opts: { defaultName: string; ext: string }) => {
-    const r = await dialog.showSaveDialog(mainWindow!, {
-      defaultPath: join(app.getPath('videos'), opts.defaultName),
-      filters: [{ name: opts.ext.toUpperCase(), extensions: [opts.ext] }]
+  ipcMain.handle('dialog:chooseFolder', async (_e, title?: string) => {
+    const r = await dialog.showOpenDialog(mainWindow!, {
+      title: title || 'Choose folder',
+      properties: ['openDirectory', 'createDirectory']
     })
-    return r.canceled ? null : r.filePath ?? null
+    const dir = r.canceled ? null : r.filePaths[0] ?? null
+    grantPath(dir)
+    return dir
   })
+  // one Save window at a time: a second request while it's open gets the same answer instead of stacking another window
+  let savePending: Promise<string | null> | null = null
+  ipcMain.handle('dialog:save', (_e, opts: { defaultName: string; ext: string; defaultDir?: string }) => {
+    if (process.env.SCRIM_TEST_SAVE_DIR) return Promise.resolve(grantParentOf(join(process.env.SCRIM_TEST_SAVE_DIR, opts.defaultName))) // automated checks: no window
+    if (savePending) {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus()
+      return savePending
+    }
+    const baseDir = opts.defaultDir || getSettings().exportDir || app.getPath('videos')
+    // bring Scrim forward first so the window never opens behind it
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    savePending = dialog
+      .showSaveDialog(mainWindow!, {
+        defaultPath: join(baseDir, opts.defaultName),
+        filters: [{ name: opts.ext.toUpperCase(), extensions: [opts.ext] }]
+      })
+      .then((r) => (r.canceled ? null : grantParentOf(r.filePath) ?? null))
+      .finally(() => {
+        savePending = null
+      })
+    return savePending
+  })
+  ipcMain.handle('cache:stats', () => getCacheStats())
+  ipcMain.handle('cache:clear', () => clearCache())
   ipcMain.handle('asset:copy', (_e, dir: string, file: string) => copyAsset(dir, file))
   ipcMain.handle('presets:load', () => loadPresets())
   ipcMain.handle('presets:save', (_e, list: Preset[]) => savePresets(list))
   ipcMain.handle('shell:show', (_e, p: string) => shell.showItemInFolder(p))
-  ipcMain.handle('shell:open', (_e, p: string) => shell.openPath(p))
+  ipcMain.handle('shell:open', (_e, p: string) => {
+    if (!isOpenable(p)) throw new Error('Refusing to open that file')
+    return shell.openPath(p)
+  })
   ipcMain.handle('app:tmp', () => tmpdir())
 
   ipcMain.handle('sample:getDir', (_e, reset?: boolean) => getSampleDir(!!reset))
   ipcMain.handle('sample:begin', () => sampleBegin())
   ipcMain.handle('sample:finish', (_e, dir: string, cursor: CursorData, duration: number) => sampleFinish(dir, cursor, duration))
-  ipcMain.handle('file:open', (_e, p: string) => openWrite(p))
-  ipcMain.handle('file:write', (_e, p: string, data: Uint8Array, pos: number) => writeAt(p, data, pos))
+  ipcMain.handle('file:open', (_e, p: string) => {
+    if (!isPathAllowed(p)) throw new Error('Path not allowed')
+    return openWrite(p)
+  })
+  ipcMain.handle('file:write', (_e, p: string, data: Uint8Array, pos: number) => {
+    if (!isPathAllowed(p)) throw new Error('Path not allowed')
+    return writeAt(p, data, pos)
+  })
   ipcMain.handle('file:close', (_e, p: string) => closeWrite(p))
-  ipcMain.handle('file:remove', (_e, p: string) => fs.rm(p, { force: true }))
-  ipcMain.handle('file:readJson', async (_e, p: string) => JSON.parse(await fs.readFile(p, 'utf8')))
+  ipcMain.handle('file:remove', (_e, p: string) => {
+    if (!isPathAllowed(p)) throw new Error('Path not allowed')
+    return fs.rm(p, { force: true })
+  })
+  ipcMain.handle('file:readJson', async (_e, p: string) => {
+    const ext = extname(p).toLowerCase()
+    if (ext !== '.json') throw new Error('Only JSON files may be read')
+    if (!isPathAllowed(p)) throw new Error('Path not allowed')
+    return JSON.parse(await fs.readFile(p, 'utf8'))
+  })
   ipcMain.handle('audio:save', async (_e, dir: string, kind: string, data: Uint8Array) => {
-    const p = join(dir, `${kind}.raw.webm`)
+    const safeKind = kind.replace(/[^a-zA-Z0-9_-]/g, '')
+    const p = join(dir, `${safeKind}.raw.webm`)
+    if (!isPathAllowed(p)) throw new Error('Path not allowed')
     await fs.writeFile(p, data)
     return p
   })
@@ -291,7 +582,11 @@ function registerIpc(): void {
     if (process.platform === 'win32') mainWindow.setTitleBarOverlay({ color: '#00000000', symbolColor: light ? '#3a3d46' : '#c9ccd6', height: 44 })
   })
   ipcMain.handle('settings:get', () => getSettings())
-  ipcMain.handle('settings:save', (_e, s: AppSettings) => saveSettings(s))
+  ipcMain.handle('settings:save', async (_e, s: AppSettings) => {
+    const r = await saveSettings(s)
+    broadcast('settings:changed', null) // the script window follows changes made in the editor
+    return r
+  })
   ipcMain.handle('assets:import', async (_e, dir: string, paths?: string[]) => {
     let files = paths
     if (!files?.length) {
@@ -345,6 +640,16 @@ function openEditor(dir: string): void {
   mainWindow.focus()
 }
 
+// One Scrim at a time: a second launch (double click, shortcut, taskbar) brings the open window forward.
+// Two instances would record, autosave and build preview copies over each other.
+if (!app.requestSingleInstanceLock()) app.exit(0)
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+})
+
 app.whenReady().then(() => {
   migrateLegacyUserData()
   Menu.setApplicationMenu(null)
@@ -355,21 +660,31 @@ app.whenReady().then(() => {
   handleMediaProtocol()
 
   const ses = session.defaultSession
-  ses.setPermissionRequestHandler((_wc, permission, cb) => cb(['media', 'display-capture', 'clipboard-read', 'fullscreen'].includes(permission)))
-  ses.setPermissionCheckHandler(() => true)
+  const PERMS = ['media', 'display-capture', 'clipboard-read', 'clipboard-sanitized-write', 'fullscreen']
+  ses.setPermissionRequestHandler((_wc, permission, cb) => cb(PERMS.includes(permission)))
+  ses.setPermissionCheckHandler((_wc, permission) => PERMS.includes(permission))
   // getDisplayMedia is only used to grab system audio (Windows loopback)
   ses.setDisplayMediaRequestHandler(async (_req, cb) => {
     const [first] = await desktopCapturer.getSources({ types: ['screen'] })
     cb({ video: first, audio: 'loopback' })
   })
 
-  recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showBubble, hideBubble, showBorder, hideBorder, isOwnUi, iconPath: ICON, openEditor, broadcast })
+  recorder.init({ mainWindow: () => mainWindow, showToolbar, hideToolbar, showPrompter: (r) => showPrompter(r), hidePrompter, showBubble, hideBubble, showBorder, hideBorder, isOwnUi, iconPath: ICON, openEditor, broadcast })
   registerIpc()
   initUpdater(broadcast)
   registerSpeechIpc()
+  registerProxyIpc()
   registerFeedbackIpc()
   registerCrashIpc()
   if (!selfTestDir()) showSplash(ICON_PNG)
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    try {
+      app.setLoginItemSettings({ openAtLogin: !!getSettings().openAtLogin })
+    } catch {
+      /* ignore */
+    }
+  }
+
   createMainWindow()
   // warm up encoder detection in the background so the first recording starts fast
   setTimeout(() => {
@@ -377,6 +692,14 @@ app.whenReady().then(() => {
       .then(() => probeDdaOutputs())
       .catch(() => {})
   }, 1500)
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
+  if (appTray) {
+    appTray.destroy()
+    appTray = null
+  }
 })
 
 app.on('will-quit', () => {

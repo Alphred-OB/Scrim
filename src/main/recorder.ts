@@ -15,6 +15,8 @@ export interface RecorderHooks {
   mainWindow: () => BrowserWindow | null
   showToolbar: (displayRect: Rect, protect: boolean) => void
   hideToolbar: () => void
+  showPrompter: (displayRect: Rect) => void
+  hidePrompter: () => void
   showBubble: (displayRect: Rect, cam: WebcamRecordOptions) => void
   hideBubble: () => void
   showBorder: (rect: Rect, protect: boolean, outside: boolean) => void
@@ -376,6 +378,7 @@ class Recorder {
       const protect = this.engine.kind === 'dda'
       this.hooks.mainWindow()?.hide()
       this.hooks.showToolbar(displayRect, true)
+      this.hooks.showPrompter(displayRect)
       if (opts.webcam?.enabled && opts.webcam.showBubble && protect) this.hooks.showBubble(displayRect, opts.webcam)
       this.updateBorder()
       for (let c = opts.countdown; c > 0; c--) {
@@ -396,6 +399,7 @@ class Recorder {
           this.media = await callRenderer<{ mic?: number; system?: number; webcam?: number }>(win.webContents, 'media:start', {
             mic: opts.mic,
             micDeviceId: opts.micDeviceId,
+            noiseSuppression: opts.noiseSuppression,
             system: opts.systemAudio,
             webcam: opts.webcam?.enabled ? { deviceId: opts.webcam.deviceId, quality: opts.webcam.quality } : null
           })
@@ -644,6 +648,7 @@ class Recorder {
     this.tracker = null
     if (this.dir && !existsSync(join(this.dir, 'project.json'))) await fs.rm(this.dir, { recursive: true, force: true }).catch(() => {})
     this.hooks.hideToolbar()
+    this.hooks.hidePrompter()
     this.hooks.hideBubble()
     this.hooks.hideBorder()
     const win = this.hooks.mainWindow()
@@ -675,6 +680,7 @@ class Recorder {
     const win = this.hooks.mainWindow()
     if (win) await callRenderer(win.webContents, 'media:cancel').catch(() => {})
     this.hooks.hideToolbar()
+    this.hooks.hidePrompter()
     this.hooks.hideBubble()
     this.hooks.hideBorder()
     if (this.dir) await fs.rm(this.dir, { recursive: true, force: true }).catch(() => {})
@@ -716,6 +722,7 @@ class Recorder {
     }
     await ending
     this.hooks.hideToolbar()
+    this.hooks.hidePrompter()
 
     try {
       const project = await this.finalize(opts, videoStart, cursor, files)
@@ -769,7 +776,8 @@ class Recorder {
       } else media[kind] = { path, offset }
     }
 
-    const edit = defaultEdit(info.duration)
+    const defAspect = getSettings()?.defaultAspect || '16:9'
+    const edit = defaultEdit(info.duration, defAspect)
     if (cursor) {
       const cursorPath = join(dir, 'cursor.json')
       await fs.writeFile(cursorPath, JSON.stringify(cursor))
@@ -781,6 +789,10 @@ class Recorder {
       const cam = opts.webcam
       edit.webcam.shape = cam.shape
       edit.webcam.size = cam.size
+      if (cam.mirror !== undefined) edit.webcam.mirror = cam.mirror
+      if (cam.bg) edit.webcam.bg = cam.bg
+      if (cam.bgBlur !== undefined) edit.webcam.bgBlur = cam.bgBlur
+      if (cam.bgColor) edit.webcam.bgColor = cam.bgColor
       const mx = 0.06 + cam.size / 2 / 1.78
       const my = 0.08 + cam.size / 2
       edit.webcam.x = cam.corner.endsWith('l') ? mx : 1 - mx

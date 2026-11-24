@@ -8,14 +8,14 @@ import { TEXT_LOOPS, TEXT_MOTIONS, drawAnimatedText } from '../engine/textAnim'
 
 /** Ready made looks. Each comes with an animation that suits it. */
 const STYLE_PRESETS: { name: string; sample: string; p: Partial<TextItem> }[] = [
-  { name: 'Caption', sample: 'Caption', p: { font: 'Inter', size: 54, bold: true, color: '#ffffff', bg: '#0b0d12', bgOpacity: 0.75, radius: 14, padding: 18, shadow: false, letterSpacing: 0, animIn: 'pop', animOut: 'fade', loop: 'none' } },
-  { name: 'Title', sample: 'Title', p: { font: 'Poppins', size: 96, bold: true, color: '#ffffff', bg: '', shadow: true, letterSpacing: -1, animIn: 'words', animOut: 'fade', inDur: 0.7, loop: 'none' } },
-  { name: 'Label', sample: 'Label', p: { font: 'Inter', size: 40, bold: true, color: '#0b0c0f', bg: '#ffffff', bgOpacity: 1, radius: 99, padding: 16, shadow: false, letterSpacing: 0, animIn: 'slide-up', animOut: 'slide-down', loop: 'none' } },
-  { name: 'Accent', sample: 'Accent', p: { font: 'Montserrat', size: 60, bold: true, color: '#ffffff', bg: '#2f6bff', bgOpacity: 1, radius: 12, padding: 20, shadow: false, letterSpacing: 0, animIn: 'wipe', animOut: 'wipe', loop: 'none' } },
+  { name: 'Caption', sample: 'Hello there', p: { font: 'Inter', size: 54, bold: true, color: '#ffffff', bg: '#0b0d12', bgOpacity: 0.75, radius: 14, padding: 18, shadow: false, letterSpacing: 0, animIn: 'pop', animOut: 'fade', loop: 'none' } },
+  { name: 'Title', sample: 'Big idea', p: { font: 'Poppins', size: 96, bold: true, color: '#ffffff', bg: '', shadow: true, letterSpacing: -1, animIn: 'words', animOut: 'fade', inDur: 0.7, loop: 'none' } },
+  { name: 'Label', sample: 'Tip', p: { font: 'Inter', size: 40, bold: true, color: '#0b0c0f', bg: '#ffffff', bgOpacity: 1, radius: 99, padding: 16, shadow: false, letterSpacing: 0, animIn: 'slide-up', animOut: 'slide-down', loop: 'none' } },
+  { name: 'Accent', sample: 'Step 1', p: { font: 'Montserrat', size: 60, bold: true, color: '#ffffff', bg: '#2f6bff', bgOpacity: 1, radius: 12, padding: 20, shadow: false, letterSpacing: 0, animIn: 'wipe', animOut: 'wipe', loop: 'none' } },
   { name: 'Poster', sample: 'POSTER', p: { font: 'Bebas Neue', size: 130, bold: false, color: '#ffffff', bg: '', shadow: true, letterSpacing: 2, animIn: 'letters', animOut: 'blur', inDur: 0.8, loop: 'none' } },
   { name: 'Code', sample: 'npm i', p: { font: 'JetBrains Mono', size: 44, bold: false, color: '#a7f3d0', bg: '#0b0c0f', bgOpacity: 0.9, radius: 10, padding: 16, shadow: false, letterSpacing: 0, animIn: 'typewriter', animOut: 'fade', inDur: 0.9, loop: 'none' } },
   { name: 'Callout', sample: 'New!', p: { font: 'Poppins', size: 64, bold: true, color: '#0b0c0f', bg: '#ffd60a', bgOpacity: 1, radius: 16, padding: 18, shadow: false, letterSpacing: 0, animIn: 'drop', animOut: 'pop', loop: 'wiggle' } },
-  { name: 'Neon', sample: 'Neon', p: { font: 'Montserrat', size: 80, bold: true, color: '#5ef0ff', bg: '', shadow: false, letterSpacing: 1, animIn: 'blur', animOut: 'fade', loop: 'glow' } },
+  { name: 'Neon', sample: 'Glow', p: { font: 'Montserrat', size: 80, bold: true, color: '#5ef0ff', bg: '', shadow: false, letterSpacing: 1, animIn: 'blur', animOut: 'fade', loop: 'glow' } },
   { name: 'Lower third', sample: 'Sam Lee', p: { font: 'Inter', size: 46, bold: true, color: '#ffffff', bg: '#ff3b30', bgOpacity: 1, radius: 6, padding: 16, shadow: false, letterSpacing: 0, align: 'left', x: 0.22, y: 0.82, animIn: 'slide-right', animOut: 'slide-left', loop: 'none' } }
 ]
 

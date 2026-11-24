@@ -7,3 +7,6 @@ dist
 .DS_Store
 Thumbs.db
 logs/
+
+# local scratch output (brag-output holds a Chrome profile with cookies)
+brag-output/

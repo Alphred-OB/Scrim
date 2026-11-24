@@ -23,6 +23,11 @@ export interface WebcamRecordOptions {
   size: number // 0.1..0.45 of the output short side
   corner: Corner
   showBubble: boolean // floating preview bubble while recording
+  mirror?: boolean // mirror camera feed horizontally
+  /** live background change, shown in the preview and the bubble; the editor starts with the same look */
+  bg?: WebcamBg
+  bgBlur?: number
+  bgColor?: string
 }
 
 export interface RecordOptions {
@@ -32,6 +37,7 @@ export interface RecordOptions {
   fps: 30 | 60
   mic: boolean
   micDeviceId?: string
+  noiseSuppression?: boolean
   systemAudio: boolean
   countdown: number // seconds, 0 = none
   webcam?: WebcamRecordOptions
@@ -129,6 +135,7 @@ export type ClickEffect = 'none' | 'ripple' | 'ring' | 'pulse'
 export type SpotlightMode = 'glow' | 'dim' | 'ring'
 /** always, only while the cursor moves, or only around clicks */
 export type SpotlightWhen = 'always' | 'moving' | 'clicks'
+export type CursorMotionMode = 'cinematic' | 'natural' | 'raw'
 export interface CursorSettings {
   show: boolean
   style: CursorStyle
@@ -139,6 +146,9 @@ export interface CursorSettings {
   opacity: number // 0..1
   size: number // multiplier
   smoothing: number // 0..1
+  motionMode?: CursorMotionMode // 'cinematic' (Bézier spline + minimum jerk), 'natural' (spring physics), or 'raw'
+  curvature?: number // 0..1 tension / arc smoothness of Bézier spline
+  clickDwell?: number // seconds to pause / stabilize on target around clicks
   clickEffect: ClickEffect
   clickColor: string
   clickBounce: number // 1 = none
@@ -342,6 +352,23 @@ export interface WebcamSettings {
   borderColor: string
   shadow: boolean
   mirror: boolean
+  /** what replaces the room behind you: nothing, a blur, a color or a picture */
+  bg: WebcamBg
+  bgBlur: number // 0..1 strength of the blur
+  bgColor: string
+  bgImage?: string // path of a picture in the project's assets
+}
+
+export type WebcamBg = 'none' | 'remove' | 'blur' | 'color' | 'image'
+
+/** The on screen script (teleprompter) shown while recording. It is kept out of the video. */
+export interface PrompterSettings {
+  text: string // lines starting with # are section titles
+  show: boolean // open it automatically when a recording starts
+  auto?: boolean // scroll by itself while recording (default on)
+  size: number // font px
+  speed: number // 1..10
+  opacity: number // 0.3..1
 }
 
 export interface AudioSettings {
@@ -462,6 +489,22 @@ export interface AppSettings {
   exportProgress: ExportProgressStyle
   exportCelebrate: boolean // confetti when an export finishes
   captureEngine: 'auto' | 'dda' | 'gdi'
+  /** preferred hardware or software video encoder */
+  videoEncoder?: 'auto' | 'nvenc' | 'qsv' | 'amf' | 'cpu'
+  /** default directory for saved video exports */
+  exportDir?: string
+  /** custom directory where recordings and project folders are stored */
+  projectsDir?: string
+  /** whether magnetic snapping is enabled by default on the timeline */
+  timelineSnapping?: boolean // old name, no longer used
+  /** magnetic snapping and joining on the timeline (off by default: items move freely) */
+  timelineMagnet?: boolean
+  /** default aspect ratio for new projects */
+  defaultAspect?: Aspect
+  /** whether Scrim automatically starts when logging into Windows */
+  openAtLogin?: boolean
+  /** whether closing the Scrim window minimizes it to the system tray */
+  minimizeToTray?: boolean
   /** seconds the arrow keys move the playhead (0 = one frame); Shift moves 5x */
   arrowStep: number
   /** animated line around the area being recorded */
@@ -476,6 +519,7 @@ export interface AppSettings {
   /** size of the offline speech model */
   localModel?: 'tiny' | 'base' | 'small'
   brandKits?: BrandKit[]
+  prompter?: PrompterSettings
 }
 
 /** Where the app's self update is at (updates come from GitHub Releases). */

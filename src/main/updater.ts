@@ -43,7 +43,13 @@ export function initUpdater(broadcast: (channel: string, payload: unknown) => vo
   u.on('update-not-available', () => set({ state: 'latest' }))
   u.on('download-progress', (p) => set({ state: 'downloading', progress: Math.round(p.percent) }))
   u.on('update-downloaded', (i) => set({ state: 'ready', version: i.version, progress: 100, notes: notesText(i.releaseNotes) ?? status.notes }))
-  u.on('error', (e) => set({ state: status.state === 'ready' ? 'ready' : 'error', error: e?.message?.split('\n')[0] }))
+  u.on('error', (e) => {
+    const msg = e?.message ?? ''
+    if (status.state === 'ready') return set({ state: 'ready' })
+    // no release published yet (404) or no internet: nothing to report, you are simply on the newest version we can see
+    if (/\b404\b|ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ERR_INTERNET|net::/i.test(msg)) return set({ state: 'latest', error: undefined })
+    set({ state: 'error', error: 'Could not check for updates right now.' })
+  })
   set({ state: 'idle' })
 
   // first look a little after start up, then every 4 hours while the app stays open
@@ -58,7 +64,8 @@ async function check(manual: boolean): Promise<UpdateStatus> {
     await autoUpdater.checkForUpdates()
   } catch (e) {
     // a quiet background check that fails (offline, rate limited) is not worth a message
-    set({ state: manual ? 'error' : 'idle', error: e instanceof Error ? e.message.split('\n')[0] : String(e) })
+    console.warn('[update] check failed', e instanceof Error ? e.message.split('\n')[0] : String(e))
+    set({ state: manual ? 'error' : 'idle', error: manual ? 'Could not check for updates right now.' : undefined })
   }
   return status
 }

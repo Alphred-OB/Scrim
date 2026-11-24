@@ -12,7 +12,8 @@
     "start": "node src/index.js",
     "css": "tailwindcss -i styles/site.css -o public/site.css --minify",
     "css:watch": "tailwindcss -i styles/site.css -o public/site.css --watch",
-    "build": "npm run css",
+    "pages": "node build-site.mjs",
+    "build": "node build-site.mjs && npm run css",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

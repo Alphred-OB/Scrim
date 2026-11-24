@@ -1,10 +1,10 @@
-import type { AppSettings, EditState, KeyframeEase, Project, TextItem, TextMotion, ZoomKeyframe, ZoomSegment, EffectSettings } from './types'
+import type { AppSettings, Aspect, EditState, KeyframeEase, Project, TextItem, TextMotion, ZoomKeyframe, ZoomSegment, EffectSettings } from './types'
 
 export const uid = (p = ''): string => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
 
-export function defaultEdit(duration: number): EditState {
+export function defaultEdit(duration: number, aspect: Aspect = '16:9'): EditState {
   return {
-    aspect: '16:9',
+    aspect,
     background: {
       type: 'wallpaper',
       wallpaper: 'aurora',
@@ -34,6 +34,9 @@ export function defaultEdit(duration: number): EditState {
       opacity: 1,
       size: 2,
       smoothing: 0.55,
+      motionMode: 'cinematic',
+      curvature: 0.5,
+      clickDwell: 0.12,
       clickEffect: 'ripple',
       clickColor: '#3b82f6',
       clickBounce: 1.6,
@@ -61,7 +64,7 @@ export function defaultEdit(duration: number): EditState {
     assets: [],
     overlays: [],
     audioClips: [],
-    webcam: { show: true, shape: 'circle', size: 0.24, x: 0.86, y: 0.8, border: 4, borderColor: '#ffffff', shadow: true, mirror: true },
+    webcam: { show: true, shape: 'circle', size: 0.24, x: 0.86, y: 0.8, border: 4, borderColor: '#ffffff', shadow: true, mirror: true, bg: 'none', bgBlur: 0.6, bgColor: '#1d2230' },
     audio: { micMuted: false, micVolume: 1, systemMuted: false, systemVolume: 0.8, webcamMuted: true, musicVolume: 0.25, musicMuted: false, syncOffset: 0 },
     export: { resolution: 0, fps: 30, quality: 'high', format: 'mp4' }, // 0 = original: every recorded pixel is kept
     transitions: {
@@ -252,6 +255,11 @@ export function defaultSettings(): AppSettings {
     reduceTransparency: false,
     theme: 'dark',
     captureEngine: 'auto',
+    videoEncoder: 'auto',
+    timelineMagnet: false,
+    defaultAspect: '16:9',
+    openAtLogin: false,
+    minimizeToTray: false,
     arrowStep: 0.5,
     recordBorder: true,
     onboarded: false,

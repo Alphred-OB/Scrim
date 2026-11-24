@@ -1,4 +1,4 @@
-appId: com.eruditeafrican.scrim
+appId: com.aob.scrim
 productName: Scrim
 directories:
   buildResources: build
@@ -23,12 +23,12 @@ win:
   # Once you sign, uncomment publisherName with the exact name on the certificate, so the
   # auto updater only installs updates signed by you.
   # signtoolOptions:
-  #   publisherName: "Erudite African Network"
+  #   publisherName: "AOB"
   #
   # Option B, Azure Trusted Signing (no USB token, works in CI): fill these in and set
   # AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET in the environment.
   # azureSignOptions:
-  #   publisherName: "Erudite African Network"
+  #   publisherName: "AOB"
   #   endpoint: "https://eus.codesigning.azure.net"
   #   codeSigningAccountName: "your-account"
   #   certificateProfileName: "your-profile"

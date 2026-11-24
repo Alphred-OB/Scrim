@@ -12,45 +12,62 @@
   const fine = matchMedia('(hover: hover) and (pointer: fine)').matches
   const desktop = () => innerWidth >= 1024
 
-  // ---------- theme ----------
-  const isDark = () => (root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches)
+  // ---------- theme: light by default, switched with a little film-style moment ----------
+  const isDark = () => root.dataset.theme === 'dark'
   const paintTheme = () => {
-    const pick = root.dataset.theme || 'system'
-    $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === pick)))
     const d = isDark()
+    const pick = d ? 'dark' : 'light'
+    $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === pick)))
+    $('[data-theme-toggle]')?.setAttribute('aria-checked', String(d))
     const sun = $('[data-icon-sun]')
     const moon = $('[data-icon-moon]')
     if (sun && moon) {
-      sun.style.transform = d ? 'translateY(-150%) rotate(-90deg)' : 'none'
-      moon.style.transform = d ? 'none' : 'translateY(150%) rotate(90deg)'
+      sun.style.transform = d ? 'translateY(-170%) rotate(-120deg)' : 'none'
+      moon.style.transform = d ? 'none' : 'translateY(170%) rotate(120deg)'
     }
-    $('meta[name=theme-color]')?.setAttribute('content', d ? '#0a0a0a' : '#fafaf9')
+    $('meta[name=theme-color]')?.setAttribute('content', d ? '#0b0c0f' : '#f4f5f7')
   }
   const setTheme = (t) => {
+    if (t === (isDark() ? 'dark' : 'light')) return
     const apply = () => {
       root.classList.add('theme-switching')
-      if (t === 'system') delete root.dataset.theme
-      else root.dataset.theme = t
+      root.dataset.theme = t
       try {
-        t === 'system' ? localStorage.removeItem('scrim-theme') : localStorage.setItem('scrim-theme', t)
+        localStorage.setItem('scrim-theme', t)
       } catch {}
       paintTheme()
       requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')))
     }
-    // a circle grows from the switch (Chrome and Edge), otherwise a plain swap
     const btn = $('[data-theme-toggle]')
     if (!document.startViewTransition || calm || !btn) return apply()
+    // 1) letterbox bars close in like a film frame  2) the new theme opens as a circle from the switch  3) bars open again
+    const bars = document.createElement('div')
+    bars.className = 'wow-bars'
+    bars.innerHTML = '<i></i><i></i>'
+    document.body.append(bars)
+    btn.classList.remove('flip')
+    void btn.offsetWidth
+    btn.classList.add('flip')
+    requestAnimationFrame(() => bars.classList.add('in'))
     const r = btn.getBoundingClientRect()
     const x = r.left + r.width / 2
     const y = r.top + r.height / 2
     const end = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y))
-    document.startViewTransition(apply).ready.then(() => {
-      root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${end}px at ${x}px ${y}px)`] }, { duration: 700, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', pseudoElement: '::view-transition-new(root)' })
-    })
+    setTimeout(() => {
+      root.classList.add('theme-vt')
+      const vt = document.startViewTransition(apply)
+      vt.ready.then(() => {
+        root.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${end}px at ${x}px ${y}px)`] }, { duration: 1000, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', pseudoElement: '::view-transition-new(root)' })
+      })
+      vt.finished.finally(() => {
+        root.classList.remove('theme-vt')
+        bars.classList.remove('in')
+        setTimeout(() => bars.remove(), 600)
+      })
+    }, 380)
   }
   $('[data-theme-toggle]')?.addEventListener('click', () => setTheme(isDark() ? 'light' : 'dark'))
   $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themeSet)))
-  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', paintTheme)
   paintTheme()
 
   // ---------- first visit intro, then the hero comes in ----------
@@ -439,7 +456,7 @@
     arrow.classList.toggle('hidden', st === 'dot' || st === 'ring')
     pDot.classList.toggle('hidden', st !== 'dot')
     arrow.style.width = st === 'big' ? '34px' : '22px'
-    arrow.style.setProperty('--p-fill', st === 'big' ? '#ff3d2e' : 'var(--c-ink)')
+    arrow.style.setProperty('--p-fill', st === 'big' ? 'var(--c-accent)' : 'var(--c-ink)')
     ring.style.opacity = st === 'ring' || st === 'dot' || st === 'arrow' || st === 'big' ? '' : '0'
     ring.dataset.base = st === 'ring' ? '34' : st === 'dot' ? '28' : '36'
     ring.style.width = ring.style.height = ring.dataset.base + 'px'
@@ -796,10 +813,18 @@
 
   // ---------- year and version ----------
   $$('[data-year]').forEach((el) => (el.textContent = new Date().getFullYear()))
+  // the newest installer comes straight from GitHub Releases, so a new release shows up here by itself
+  const REPO = 'Alphred-OB/Scrim'
   if (location.protocol !== 'file:') {
-    fetch('/v1/latest')
+    fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })
       .then((r) => (r.ok ? r.json() : null))
-      .then((v) => v?.version && $$('[data-meta]').forEach((el) => (el.textContent = `Version ${v.version} · Windows 10 and 11 · Free${v.size ? ` · ${Math.round(v.size / 1e6)} MB` : ''}`)))
+      .then((rel) => {
+        const exe = rel?.assets?.find((a) => /\.exe$/i.test(a.name))
+        if (!exe) return
+        $$('[data-download]').forEach((a) => (a.href = exe.browser_download_url))
+        const v = String(rel.tag_name || '').replace(/^v/i, '')
+        $$('[data-meta]').forEach((el) => (el.textContent = `Version ${v} · Windows 10 and 11 · Free · ${Math.round(exe.size / 1e6)} MB`))
+      })
       .catch(() => {})
   }
 

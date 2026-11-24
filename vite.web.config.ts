@@ -18,6 +18,7 @@ export default defineConfig({
   base: './',
   resolve: { alias: { '@shared': resolve('src/shared'), '@': resolve('src/renderer/src') } },
   plugins: [react(), noSpeechEngine],
+  assetsInclude: ['**/*.tflite'],
   worker: { format: 'es', plugins: () => [noSpeechEngine] },
   optimizeDeps: { exclude: ['@huggingface/transformers', 'onnxruntime-web'] },
   build: {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Aspect, ExportFormat, ExportSettings, Project } from '@shared/types'
+import { friendlyError } from '@/lib/errors'
 import { api } from '@/lib/api'
 import { playDoneSound } from '@/lib/settings'
 import { DoneBurst, Icon, ProgressViz, Select, Seg, fmtTime, type Option } from '@/ui'
@@ -99,9 +100,11 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
   const [state, setState] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [prog, setProg] = useState<ExportProgress>({ phase: 'prepare', progress: 0 })
   const [err, setErr] = useState('')
+  const [errDetail, setErrDetail] = useState('')
   const [outPath, setOutPath] = useState('')
   const [estimate, setEstimate] = useState<number | null>(null)
   const [took, setTook] = useState(0)
+  const [choosing, setChoosing] = useState(false) // the Save window is open: block a second click so windows don't stack up
   const abort = useRef<AbortController | null>(null)
 
   const set = (patch: Partial<ExportSettings>) => update((e) => Object.assign(e.export, patch))
@@ -132,7 +135,15 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
   const start = async () => {
     const ext = s.format
     const safe = project.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'demo'
-    const p = await api.saveFile(`${safe}.${ext}`, ext)
+    const exportDir = useSettings.getState().settings.exportDir
+    if (choosing) return
+    setChoosing(true)
+    let p: string | null = null
+    try {
+      p = await api.saveFile(`${safe}.${ext}`, ext, exportDir)
+    } finally {
+      setChoosing(false)
+    }
     if (!p) return
     await flushSave()
     setOutPath(p)
@@ -149,7 +160,9 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
     } catch (e) {
       if ((e as Error).name === 'AbortError') return setState('idle')
       console.error(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      const f = friendlyError(e)
+      setErr(f.message)
+      setErrDetail(f.detail)
       setState('error')
     }
   }
@@ -215,7 +228,9 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button className="btn" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-              <button className="btn primary" style={{ flex: 2 }} onClick={start}><Icon name="download" size={15} /> Export {fmt.l}</button>
+              <button className="btn primary" style={{ flex: 2 }} disabled={choosing} onClick={start}>
+                {choosing ? <><span className="spin" /> Choose where to save…</> : <><Icon name="download" size={15} /> Export {fmt.l}</>}
+              </button>
             </div>
           </div>
         )}
@@ -258,7 +273,13 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'error' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ color: 'var(--danger)', whiteSpace: 'pre-wrap', fontSize: 12.5, maxHeight: 200, overflow: 'auto', userSelect: 'text' }}>{err}</div>
+            <div style={{ color: 'var(--danger)', fontSize: 13.5, lineHeight: 1.5 }}>{err}</div>
+            {errDetail && (
+              <details className="hint">
+                <summary style={{ cursor: 'pointer' }}>Technical details</summary>
+                <div style={{ whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', userSelect: 'text', marginTop: 6 }}>{errDetail}</div>
+              </details>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" style={{ flex: 1 }} onClick={onClose}>Close</button>
               <button className="btn primary" style={{ flex: 1 }} onClick={() => setState('idle')}>Try again</button>

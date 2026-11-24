@@ -13,6 +13,19 @@ export interface MuxJobIn {
   format?: 'mp4' | 'webm' | 'mov' | 'gif'
 }
 
+export interface EncoderInfo {
+  id: 'auto' | 'nvenc' | 'qsv' | 'amf' | 'cpu'
+  name: string
+  available: boolean
+  active?: boolean
+}
+
+export interface CacheStats {
+  sizeBytes: number
+  humanSize: string
+  fileCount: number
+}
+
 export interface Api {
   setZoom(factor: number): void
   pauseRecording(): Promise<void>
@@ -26,7 +39,10 @@ export interface Api {
   cancelRecording(): Promise<void>
   restartRecording(): Promise<void>
   recorderStatus(): Promise<RecorderStatus>
+  prompter(open: boolean): Promise<void>
+  importScript(): Promise<string | null>
   detectEncoder(): Promise<string>
+  listEncoders(): Promise<EncoderInfo[]>
   listProjects(): Promise<ProjectSummary[]>
   loadProject(dir: string): Promise<Project>
   saveProject(p: Project): Promise<void>
@@ -34,7 +50,10 @@ export interface Api {
   importVideo(file?: string): Promise<Project | null>
   projectsRoot(): Promise<string>
   openFile(title: string, filters: { name: string; extensions: string[] }[]): Promise<string | null>
-  saveFile(defaultName: string, ext: string): Promise<string | null>
+  chooseFolder(title?: string): Promise<string | null>
+  saveFile(defaultName: string, ext: string, defaultDir?: string): Promise<string | null>
+  getCacheStats(): Promise<CacheStats>
+  clearCache(): Promise<{ freedBytes: number; humanFreed: string }>
   copyAsset(dir: string, file: string): Promise<string>
   loadPresets(): Promise<Preset[]>
   savePresets(l: Preset[]): Promise<void>
@@ -60,6 +79,8 @@ export interface Api {
   /** Joins a video before or after the main video. No file = ask with a dialog. Null if cancelled. */
   joinVideo(dir: string, where: 'start' | 'end', file?: string): Promise<{ project: Project; cursor: CursorData | null } | null>
   peaks(path: string): Promise<number[]>
+  /** light preview copy for long recordings; progress comes on 'proxy:update' */
+  proxyEnsure(dir: string, src: string, duration: number, w: number, h: number, kind?: 'screen' | 'cam'): Promise<{ dir: string; kind?: 'screen' | 'cam'; status: 'none' | 'building' | 'ready' | 'failed'; pct?: number; path?: string; width?: number; height?: number }>
   notify(title: string, body: string): Promise<void>
   engines(): Promise<{ dda: boolean; platform: string }>
   updateStatus(): Promise<UpdateStatus>

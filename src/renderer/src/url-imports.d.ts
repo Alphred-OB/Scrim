@@ -6,3 +6,8 @@ declare module '*?url' {
 declare module 'onnxruntime-web' {
   export * from 'onnxruntime-common'
 }
+
+declare module '*?inline' {
+  const dataUrl: string
+  export default dataUrl
+}

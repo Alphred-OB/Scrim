@@ -14,6 +14,7 @@ const api = {
   resumeRecording: () => invoke('recorder:resume'),
   recorderStatus: () => invoke('recorder:status'),
   detectEncoder: () => invoke('encoder:detect'),
+  listEncoders: () => invoke('encoder:list'),
 
   listProjects: () => invoke('projects:list'),
   loadProject: (dir: string) => invoke('projects:load', dir),
@@ -24,7 +25,10 @@ const api = {
   projectsRoot: () => invoke('projects:root'),
 
   openFile: (title: string, filters: { name: string; extensions: string[] }[]) => invoke('dialog:open', { title, filters }),
-  saveFile: (defaultName: string, ext: string) => invoke('dialog:save', { defaultName, ext }),
+  chooseFolder: (title?: string) => invoke('dialog:chooseFolder', title),
+  saveFile: (defaultName: string, ext: string, defaultDir?: string) => invoke('dialog:save', { defaultName, ext, defaultDir }),
+  getCacheStats: () => invoke('cache:stats'),
+  clearCache: () => invoke('cache:clear'),
   copyAsset: (dir: string, file: string) => invoke('asset:copy', dir, file),
   loadPresets: () => invoke('presets:load'),
   savePresets: (l: unknown) => invoke('presets:save', l),
@@ -48,6 +52,7 @@ const api = {
   importAssets: (dir: string, paths?: string[]) => invoke('assets:import', dir, paths),
   joinVideo: (dir: string, where: 'start' | 'end', file?: string) => invoke('project:join', dir, where, file),
   peaks: (p: string) => invoke('media:peaks', p),
+  proxyEnsure: (dir: string, src: string, duration: number, w: number, h: number, kind?: 'screen' | 'cam') => invoke('proxy:ensure', dir, src, duration, w, h, kind),
   notify: (title: string, body: string) => invoke('app:notify', title, body),
   engines: () => invoke('app:engines'),
   updateStatus: () => invoke('update:status'),
@@ -69,9 +74,13 @@ const api = {
   setTheme: (t: 'dark' | 'light') => invoke('app:theme', t),
   setZoom: (f: number) => webFrame.setZoomFactor(Math.max(0.7, Math.min(1.5, f))),
 
+  importScript: () => invoke('script:import'),
+  prompter: (open: boolean) => invoke('prompter:toggle', open),
   openEditor: (dir: string) => ipcRenderer.send('nav:editor', dir),
 
   on: (channel: string, cb: (...a: unknown[]) => void) => {
+    const ALLOWED_CHANNELS = new Set(['nav', 'export:progress', 'speech:progress', 'join:progress', 'recorder:status', 'update:status', 'guide:progress', 'proxy:update', 'prompter:cmd', 'settings:changed'])
+    if (!ALLOWED_CHANNELS.has(channel)) throw new Error(`Disallowed IPC channel: ${channel}`)
     const fn = (_e: unknown, ...a: unknown[]) => cb(...a)
     ipcRenderer.on(channel, fn)
     return () => ipcRenderer.removeListener(channel, fn)

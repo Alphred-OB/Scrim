@@ -1,6 +1,6 @@
 import { protocol } from 'electron'
 import { createReadStream, promises as fs } from 'fs'
-import { extname } from 'path'
+import { extname, resolve, basename } from 'path'
 
 const MIME: Record<string, string> = {
   '.mp4': 'video/mp4',
@@ -16,8 +16,7 @@ const MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.json': 'application/json'
+  '.gif': 'image/gif'
 }
 
 export function registerSchemes(): void {
@@ -71,9 +70,25 @@ export function handleMediaProtocol(): void {
   protocol.handle('media', async (req) => {
     try {
       const url = new URL(req.url)
-      const path = decodeURIComponent(url.pathname.slice(1))
-      const stat = await fs.stat(path)
-      const type = MIME[extname(path).toLowerCase()] ?? 'application/octet-stream'
+      const rawPath = decodeURIComponent(url.pathname.slice(1))
+      const target = resolve(rawPath)
+      const ext = extname(target).toLowerCase()
+      const type = MIME[ext]
+      if (!type) {
+        return new Response('Forbidden file type', { status: 403 })
+      }
+      const lower = target.toLowerCase()
+      const fileName = basename(target)
+      if (
+        lower.includes('\\.ssh\\') || lower.includes('/.ssh/') ||
+        lower.includes('\\.aws\\') || lower.includes('/.aws/') ||
+        lower.includes('\\.git\\') || lower.includes('/.git/') ||
+        lower.includes('\\windows\\system32') || lower.includes('/etc/') ||
+        fileName.startsWith('.') || fileName.endsWith('.env')
+      ) {
+        return new Response('Access denied', { status: 403 })
+      }
+      const stat = await fs.stat(target)
       const range = req.headers.get('range')
       const headers: Record<string, string> = {
         'Content-Type': type,
@@ -94,12 +109,12 @@ export function handleMediaProtocol(): void {
         if (start > end || start >= stat.size) {
           return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${stat.size}` } })
         }
-        return new Response(fileStream(path, start, end), {
+        return new Response(fileStream(target, start, end), {
           status: 206,
           headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Content-Length': String(end - start + 1) }
         })
       }
-      return new Response(fileStream(path, 0, stat.size - 1), {
+      return new Response(fileStream(target, 0, stat.size - 1), {
         status: 200,
         headers: { ...headers, 'Content-Length': String(stat.size) }
       })

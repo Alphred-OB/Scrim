@@ -1,50 +1,183 @@
-// Built in backgrounds: still wallpapers and animated "live" scenes (2D and 3D), all drawn in code
-// so the app ships no image files and export is frame exact (every scene is a pure function of time).
+// Built in backgrounds: our own still wallpapers, procedural gradients, and animated "live" scenes (2D and 3D).
+
+import wp_midnight_aurora from '@/assets/wallpapers/wp-midnight-aurora.jpg'
+import wpt_midnight_aurora from '@/assets/wallpapers/thumb-wp-midnight-aurora.jpg'
+import wp_obsidian_flow from '@/assets/wallpapers/wp-obsidian-flow.jpg'
+import wpt_obsidian_flow from '@/assets/wallpapers/thumb-wp-obsidian-flow.jpg'
+import wp_nebula from '@/assets/wallpapers/wp-nebula.jpg'
+import wpt_nebula from '@/assets/wallpapers/thumb-wp-nebula.jpg'
+import wp_deep_ocean from '@/assets/wallpapers/wp-deep-ocean.jpg'
+import wpt_deep_ocean from '@/assets/wallpapers/thumb-wp-deep-ocean.jpg'
+import wp_emerald_night from '@/assets/wallpapers/wp-emerald-night.jpg'
+import wpt_emerald_night from '@/assets/wallpapers/thumb-wp-emerald-night.jpg'
+import wp_graphite from '@/assets/wallpapers/wp-graphite.jpg'
+import wpt_graphite from '@/assets/wallpapers/thumb-wp-graphite.jpg'
+import wp_sunset_waves from '@/assets/wallpapers/wp-sunset-waves.jpg'
+import wpt_sunset_waves from '@/assets/wallpapers/thumb-wp-sunset-waves.jpg'
+import wp_electric_blue from '@/assets/wallpapers/wp-electric-blue.jpg'
+import wpt_electric_blue from '@/assets/wallpapers/thumb-wp-electric-blue.jpg'
+import wp_ultraviolet from '@/assets/wallpapers/wp-ultraviolet.jpg'
+import wpt_ultraviolet from '@/assets/wallpapers/thumb-wp-ultraviolet.jpg'
+import wp_cloud_pastel from '@/assets/wallpapers/wp-cloud-pastel.jpg'
+import wpt_cloud_pastel from '@/assets/wallpapers/thumb-wp-cloud-pastel.jpg'
+import wp_morning_mist from '@/assets/wallpapers/wp-morning-mist.jpg'
+import wpt_morning_mist from '@/assets/wallpapers/thumb-wp-morning-mist.jpg'
+import wp_peach_glow from '@/assets/wallpapers/wp-peach-glow.jpg'
+import wpt_peach_glow from '@/assets/wallpapers/thumb-wp-peach-glow.jpg'
+import wp_mint_fresh from '@/assets/wallpapers/wp-mint-fresh.jpg'
+import wpt_mint_fresh from '@/assets/wallpapers/thumb-wp-mint-fresh.jpg'
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
+export type WallpaperCategory = 'Dark' | 'Vivid' | 'Light' | 'Gradients'
+
 // ---------------- still wallpapers ----------------
-export interface Wallpaper { id: string; name: string; base: string; blobs: [number, number, number, string][] }
+export interface Wallpaper {
+  id: string
+  name: string
+  category: WallpaperCategory
+  tag?: string
+  image?: string
+  thumb?: string
+  base: string
+  blobs?: [number, number, number, string][]
+}
 
 export const WALLPAPERS: Wallpaper[] = [
-  { id: 'aurora', name: 'Aurora', base: '#0b1026', blobs: [[0.15, 0.2, 0.6, '#2f6bff'], [0.85, 0.3, 0.55, '#7c3aed'], [0.5, 0.95, 0.6, '#06b6d4'], [0.9, 0.9, 0.4, '#1e3a8a']] },
-  { id: 'sunset', name: 'Sunset', base: '#2a0a1f', blobs: [[0.1, 0.1, 0.6, '#ff7a45'], [0.9, 0.2, 0.55, '#ff3d77'], [0.4, 0.9, 0.7, '#7c3aed'], [0.95, 0.95, 0.4, '#f59e0b']] },
-  { id: 'ocean', name: 'Ocean', base: '#03141f', blobs: [[0.2, 0.8, 0.7, '#0ea5e9'], [0.8, 0.15, 0.6, '#14b8a6'], [0.6, 0.6, 0.4, '#1d4ed8']] },
-  { id: 'mint', name: 'Mint', base: '#06201a', blobs: [[0.2, 0.2, 0.6, '#34d399'], [0.85, 0.7, 0.6, '#0f766e'], [0.5, 1, 0.5, '#a3e635']] },
-  { id: 'candy', name: 'Candy', base: '#2b0a3d', blobs: [[0.15, 0.85, 0.6, '#f472b6'], [0.85, 0.15, 0.6, '#60a5fa'], [0.6, 0.5, 0.45, '#c084fc']] },
-  { id: 'peach', name: 'Peach', base: '#fbe3d0', blobs: [[0.1, 0.1, 0.6, '#fdba74'], [0.9, 0.3, 0.55, '#fda4af'], [0.4, 0.95, 0.6, '#fde68a']] },
-  { id: 'dusk', name: 'Dusk', base: '#0f0a1f', blobs: [[0.8, 0.8, 0.7, '#e11d48'], [0.2, 0.3, 0.6, '#4338ca'], [0.6, 0.1, 0.4, '#9333ea']] },
-  { id: 'forest', name: 'Forest', base: '#0a1a10', blobs: [[0.3, 0.9, 0.7, '#166534'], [0.8, 0.2, 0.55, '#65a30d'], [0.1, 0.2, 0.4, '#0f766e']] },
-  { id: 'ice', name: 'Ice', base: '#dbeafe', blobs: [[0.2, 0.2, 0.6, '#ffffff'], [0.8, 0.8, 0.6, '#93c5fd'], [0.7, 0.2, 0.4, '#c7d2fe']] },
-  { id: 'lava', name: 'Lava', base: '#1a0500', blobs: [[0.3, 0.7, 0.65, '#ea580c'], [0.8, 0.3, 0.55, '#dc2626'], [0.6, 0.95, 0.4, '#facc15']] },
-  { id: 'graphite', name: 'Graphite', base: '#0d0e11', blobs: [[0.2, 0.1, 0.7, '#2a2d35'], [0.9, 0.9, 0.7, '#1b1d23'], [0.7, 0.3, 0.3, '#3b3f4a']] },
-  { id: 'lilac', name: 'Lilac', base: '#ede9fe', blobs: [[0.1, 0.9, 0.6, '#c4b5fd'], [0.9, 0.1, 0.6, '#f0abfc'], [0.5, 0.5, 0.35, '#ffffff']] },
-  { id: 'neon', name: 'Neon', base: '#050510', blobs: [[0.15, 0.5, 0.5, '#22d3ee'], [0.85, 0.5, 0.5, '#e879f9'], [0.5, 0.05, 0.35, '#4f46e5']] },
-  { id: 'sand', name: 'Sand', base: '#e7dcc8', blobs: [[0.2, 0.3, 0.6, '#f5ecd9'], [0.85, 0.8, 0.6, '#d6b98c'], [0.6, 0.1, 0.3, '#fff7e6']] },
-  { id: 'berry', name: 'Berry', base: '#1c0418', blobs: [[0.2, 0.8, 0.6, '#be185d'], [0.8, 0.2, 0.6, '#6d28d9'], [0.9, 0.9, 0.35, '#f43f5e']] },
-  { id: 'sky', name: 'Sky', base: '#0c4a6e', blobs: [[0.1, 0.1, 0.7, '#38bdf8'], [0.9, 0.9, 0.6, '#1e40af'], [0.7, 0.2, 0.4, '#bae6fd']] },
-  { id: 'cotton', name: 'Cotton', base: '#fdf2f8', blobs: [[0.15, 0.2, 0.6, '#bae6fd'], [0.85, 0.75, 0.6, '#fbcfe8'], [0.5, 0.5, 0.4, '#e9d5ff']] },
-  { id: 'citrus', name: 'Citrus', base: '#1a1300', blobs: [[0.2, 0.2, 0.6, '#fde047'], [0.8, 0.8, 0.6, '#f97316'], [0.8, 0.1, 0.35, '#84cc16']] },
-  { id: 'deep', name: 'Deep sea', base: '#020617', blobs: [[0.5, 1.1, 0.8, '#0e7490'], [0.1, 0.1, 0.5, '#1e1b4b'], [0.9, 0.3, 0.4, '#155e75']] },
-  { id: 'rose', name: 'Rose gold', base: '#2a1614', blobs: [[0.2, 0.8, 0.6, '#fda4af'], [0.8, 0.2, 0.6, '#b45309'], [0.5, 0.5, 0.3, '#fecdd3']] },
-  { id: 'emerald', name: 'Emerald', base: '#022c22', blobs: [[0.8, 0.8, 0.7, '#10b981'], [0.2, 0.2, 0.5, '#064e3b'], [0.5, 0, 0.35, '#6ee7b7']] },
-  { id: 'violet', name: 'Violet', base: '#12002b', blobs: [[0.3, 0.3, 0.7, '#7c3aed'], [0.9, 0.8, 0.5, '#c026d3'], [0.1, 0.9, 0.4, '#312e81']] },
-  { id: 'paper', name: 'Paper', base: '#eee7db', blobs: [[0.2, 0.2, 0.6, '#f7f1e6'], [0.8, 0.8, 0.6, '#e3d7c3']] },
-  { id: 'midnight', name: 'Midnight', base: '#05060a', blobs: [[0.8, 0.1, 0.6, '#1e293b'], [0.1, 0.9, 0.5, '#0f172a']] }
+  // --- Scrim's own wallpapers (drawn by tools/make-wallpapers.py, so they are ours to ship) ---
+  { id: 'midnight-aurora', name: 'Midnight Aurora', category: 'Dark', tag: 'Scrim', image: wp_midnight_aurora, thumb: wpt_midnight_aurora, base: '#060a1c' },
+  { id: 'obsidian-flow', name: 'Obsidian Flow', category: 'Dark', tag: 'Scrim', image: wp_obsidian_flow, thumb: wpt_obsidian_flow, base: '#05050b' },
+  { id: 'nebula', name: 'Nebula', category: 'Dark', tag: 'Scrim', image: wp_nebula, thumb: wpt_nebula, base: '#070312' },
+  { id: 'deep-ocean', name: 'Deep Ocean', category: 'Dark', tag: 'Scrim', image: wp_deep_ocean, thumb: wpt_deep_ocean, base: '#03121f' },
+  { id: 'emerald-night', name: 'Emerald Night', category: 'Dark', tag: 'Scrim', image: wp_emerald_night, thumb: wpt_emerald_night, base: '#03120e' },
+  { id: 'graphite', name: 'Graphite', category: 'Dark', tag: 'Scrim', image: wp_graphite, thumb: wpt_graphite, base: '#0b0c10' },
+  { id: 'sunset-waves', name: 'Sunset Waves', category: 'Vivid', tag: 'Scrim', image: wp_sunset_waves, thumb: wpt_sunset_waves, base: '#2a0a2e' },
+  { id: 'electric-blue', name: 'Electric Blue', category: 'Vivid', tag: 'Scrim', image: wp_electric_blue, thumb: wpt_electric_blue, base: '#0b1470' },
+  { id: 'ultraviolet', name: 'Ultraviolet', category: 'Vivid', tag: 'Scrim', image: wp_ultraviolet, thumb: wpt_ultraviolet, base: '#1a0536' },
+  { id: 'cloud-pastel', name: 'Cloud Pastel', category: 'Light', tag: 'Scrim', image: wp_cloud_pastel, thumb: wpt_cloud_pastel, base: '#f7f0ff' },
+  { id: 'morning-mist', name: 'Morning Mist', category: 'Light', tag: 'Scrim', image: wp_morning_mist, thumb: wpt_morning_mist, base: '#f1f7ff' },
+  { id: 'peach-glow', name: 'Peach Glow', category: 'Light', tag: 'Scrim', image: wp_peach_glow, thumb: wpt_peach_glow, base: '#fff3e8' },
+  { id: 'mint-fresh', name: 'Mint Fresh', category: 'Light', tag: 'Scrim', image: wp_mint_fresh, thumb: wpt_mint_fresh, base: '#effcf6' },
+
+  // --- Procedural Gradient Wallpapers ---
+  { id: 'aurora', name: 'Aurora', category: 'Gradients', tag: 'Gradient', base: '#0b1026', blobs: [[0.15, 0.2, 0.6, '#2f6bff'], [0.85, 0.3, 0.55, '#7c3aed'], [0.5, 0.95, 0.6, '#06b6d4'], [0.9, 0.9, 0.4, '#1e3a8a']] },
+  { id: 'sunset', name: 'Sunset', category: 'Gradients', tag: 'Gradient', base: '#2a0a1f', blobs: [[0.1, 0.1, 0.6, '#ff7a45'], [0.9, 0.2, 0.55, '#ff3d77'], [0.4, 0.9, 0.7, '#7c3aed'], [0.95, 0.95, 0.4, '#f59e0b']] },
+  { id: 'ocean', name: 'Ocean', category: 'Gradients', tag: 'Gradient', base: '#03141f', blobs: [[0.2, 0.8, 0.7, '#0ea5e9'], [0.8, 0.15, 0.6, '#14b8a6'], [0.6, 0.6, 0.4, '#1d4ed8']] },
+  { id: 'mint', name: 'Mint', category: 'Gradients', tag: 'Gradient', base: '#06201a', blobs: [[0.2, 0.2, 0.6, '#34d399'], [0.85, 0.7, 0.6, '#0f766e'], [0.5, 1, 0.5, '#a3e635']] },
+  { id: 'candy', name: 'Candy', category: 'Gradients', tag: 'Gradient', base: '#2b0a3d', blobs: [[0.15, 0.85, 0.6, '#f472b6'], [0.85, 0.15, 0.6, '#60a5fa'], [0.6, 0.5, 0.45, '#c084fc']] },
+  { id: 'peach', name: 'Peach', category: 'Gradients', tag: 'Gradient', base: '#fbe3d0', blobs: [[0.1, 0.1, 0.6, '#fdba74'], [0.9, 0.3, 0.55, '#fda4af'], [0.4, 0.95, 0.6, '#fde68a']] },
+  { id: 'dusk', name: 'Dusk', category: 'Gradients', tag: 'Gradient', base: '#0f0a1f', blobs: [[0.8, 0.8, 0.7, '#e11d48'], [0.2, 0.3, 0.6, '#4338ca'], [0.6, 0.1, 0.4, '#9333ea']] },
+  { id: 'forest', name: 'Forest', category: 'Gradients', tag: 'Gradient', base: '#0a1a10', blobs: [[0.3, 0.9, 0.7, '#166534'], [0.8, 0.2, 0.55, '#65a30d'], [0.1, 0.2, 0.4, '#0f766e']] },
+  { id: 'ice', name: 'Ice', category: 'Gradients', tag: 'Gradient', base: '#dbeafe', blobs: [[0.2, 0.2, 0.6, '#ffffff'], [0.8, 0.8, 0.6, '#93c5fd'], [0.7, 0.2, 0.4, '#c7d2fe']] },
+  { id: 'lava', name: 'Lava', category: 'Gradients', tag: 'Gradient', base: '#1a0500', blobs: [[0.3, 0.7, 0.65, '#ea580c'], [0.8, 0.3, 0.55, '#dc2626'], [0.6, 0.95, 0.4, '#facc15']] },
+  { id: 'graphite', name: 'Graphite', category: 'Gradients', tag: 'Gradient', base: '#0d0e11', blobs: [[0.2, 0.1, 0.7, '#2a2d35'], [0.9, 0.9, 0.7, '#1b1d23'], [0.7, 0.3, 0.3, '#3b3f4a']] },
+  { id: 'lilac', name: 'Lilac', category: 'Gradients', tag: 'Gradient', base: '#ede9fe', blobs: [[0.1, 0.9, 0.6, '#c4b5fd'], [0.9, 0.1, 0.6, '#f0abfc'], [0.5, 0.5, 0.35, '#ffffff']] },
+  { id: 'neon', name: 'Neon', category: 'Gradients', tag: 'Gradient', base: '#050510', blobs: [[0.15, 0.5, 0.5, '#22d3ee'], [0.85, 0.5, 0.5, '#e879f9'], [0.5, 0.05, 0.35, '#4f46e5']] },
+  { id: 'sand', name: 'Sand', category: 'Gradients', tag: 'Gradient', base: '#e7dcc8', blobs: [[0.2, 0.3, 0.6, '#f5ecd9'], [0.85, 0.8, 0.6, '#d6b98c'], [0.6, 0.1, 0.3, '#fff7e6']] },
+  { id: 'berry', name: 'Berry', category: 'Gradients', tag: 'Gradient', base: '#1c0418', blobs: [[0.2, 0.8, 0.6, '#be185d'], [0.8, 0.2, 0.6, '#6d28d9'], [0.9, 0.9, 0.35, '#f43f5e']] },
+  { id: 'sky', name: 'Sky', category: 'Gradients', tag: 'Gradient', base: '#0c4a6e', blobs: [[0.1, 0.1, 0.7, '#38bdf8'], [0.9, 0.9, 0.6, '#1e40af'], [0.7, 0.2, 0.4, '#bae6fd']] },
+  { id: 'cotton', name: 'Cotton', category: 'Gradients', tag: 'Gradient', base: '#fdf2f8', blobs: [[0.15, 0.2, 0.6, '#bae6fd'], [0.85, 0.75, 0.6, '#fbcfe8'], [0.5, 0.5, 0.4, '#e9d5ff']] },
+  { id: 'citrus', name: 'Citrus', category: 'Gradients', tag: 'Gradient', base: '#1a1300', blobs: [[0.2, 0.2, 0.6, '#fde047'], [0.8, 0.8, 0.6, '#f97316'], [0.8, 0.1, 0.35, '#84cc16']] },
+  { id: 'deep', name: 'Deep sea', category: 'Gradients', tag: 'Gradient', base: '#020617', blobs: [[0.5, 1.1, 0.8, '#0e7490'], [0.1, 0.1, 0.5, '#1e1b4b'], [0.9, 0.3, 0.4, '#155e75']] },
+  { id: 'rose', name: 'Rose gold', category: 'Gradients', tag: 'Gradient', base: '#2a1614', blobs: [[0.2, 0.8, 0.6, '#fda4af'], [0.8, 0.2, 0.6, '#b45309'], [0.5, 0.5, 0.3, '#fecdd3']] },
+  { id: 'emerald', name: 'Emerald', category: 'Gradients', tag: 'Gradient', base: '#022c22', blobs: [[0.8, 0.8, 0.7, '#10b981'], [0.2, 0.2, 0.5, '#064e3b'], [0.5, 0, 0.35, '#6ee7b7']] },
+  { id: 'violet', name: 'Violet', category: 'Gradients', tag: 'Gradient', base: '#12002b', blobs: [[0.3, 0.3, 0.7, '#7c3aed'], [0.9, 0.8, 0.5, '#c026d3'], [0.1, 0.9, 0.4, '#312e81']] },
+  { id: 'paper', name: 'Paper', category: 'Gradients', tag: 'Gradient', base: '#eee7db', blobs: [[0.2, 0.2, 0.6, '#f7f1e6'], [0.8, 0.8, 0.6, '#e3d7c3']] },
+  { id: 'midnight', name: 'Midnight', category: 'Gradients', tag: 'Gradient', base: '#05060a', blobs: [[0.8, 0.1, 0.6, '#1e293b'], [0.1, 0.9, 0.5, '#0f172a']] }
 ]
 
+function drawCover(ctx: Ctx, img: CanvasImageSource, iw: number, ih: number, w: number, h: number): void {
+  const s = Math.max(w / iw, h / ih)
+  const dw = iw * s
+  const dh = ih * s
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh)
+}
+
+const imgCache = new Map<string, HTMLImageElement>()
+const loadListeners = new Set<() => void>()
+
+export function onWallpaperLoaded(cb: () => void): () => void {
+  loadListeners.add(cb)
+  return () => {
+    loadListeners.delete(cb)
+  }
+}
+
+export function preloadWallpaperImage(src: string): Promise<HTMLImageElement> {
+  if (typeof Image === 'undefined') return Promise.resolve({} as HTMLImageElement)
+  const existing = imgCache.get(src)
+  if (existing && existing.complete && existing.naturalWidth > 0) {
+    return Promise.resolve(existing)
+  }
+  return new Promise((resolve, reject) => {
+    let img = existing
+    if (!img) {
+      img = new Image()
+      imgCache.set(src, img)
+    }
+    img.onload = () => {
+      loadListeners.forEach((l) => l())
+      resolve(img!)
+    }
+    img.onerror = (e) => reject(e)
+    if (!img.src) img.src = src
+    else if (img.complete && img.naturalWidth > 0) resolve(img)
+  })
+}
+
+/** Projects made with the old Apple wallpapers keep a similar look: their ids point at the nearest of our own. */
+const LEGACY_WALLPAPERS: Record<string, string> = {
+  sequoia: 'midnight-aurora', 'sonoma-light': 'morning-mist', 'sonoma-dark': 'deep-ocean', 'ventura-light': 'peach-glow', 'ventura-dark': 'nebula',
+  monterey: 'ultraviolet', 'big-sur': 'electric-blue', catalina: 'deep-ocean', mojave: 'sunset-waves', 'apple-cyan': 'deep-ocean', 'apple-purple': 'ultraviolet'
+}
+export const findWallpaper = (id: string): Wallpaper | undefined => WALLPAPERS.find((x) => x.id === (LEGACY_WALLPAPERS[id] ?? id))
+
+export async function ensureWallpaperLoaded(id: string): Promise<void> {
+  const wp = findWallpaper(id)
+  if (!wp || !wp.image) return
+  await preloadWallpaperImage(wp.image)
+}
+
 export function drawWallpaper(ctx: Ctx, w: number, h: number, id: string): void {
-  const wp = WALLPAPERS.find((x) => x.id === id) ?? WALLPAPERS[0]
+  const wp = findWallpaper(id) ?? WALLPAPERS[0]
+  if (wp.image && typeof Image !== 'undefined') {
+    let img = imgCache.get(wp.image)
+    if (!img) {
+      img = new Image()
+      img.src = wp.image
+      img.onload = () => loadListeners.forEach((l) => l())
+      imgCache.set(wp.image, img)
+    }
+    if (img.complete && img.naturalWidth > 0) {
+      drawCover(ctx, img, img.naturalWidth, img.naturalHeight, w, h)
+      return
+    }
+  }
+
   ctx.fillStyle = wp.base
   ctx.fillRect(0, 0, w, h)
-  const m = Math.max(w, h)
-  for (const [x, y, r, c] of wp.blobs) {
-    const g = ctx.createRadialGradient(x * w, y * h, 0, x * w, y * h, r * m)
-    g.addColorStop(0, c)
-    g.addColorStop(1, c + '00')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, w, h)
+  if (wp.blobs) {
+    const m = Math.max(w, h)
+    for (const [x, y, r, c] of wp.blobs) {
+      const g = ctx.createRadialGradient(x * w, y * h, 0, x * w, y * h, r * m)
+      g.addColorStop(0, c)
+      g.addColorStop(1, c + '00')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+    }
   }
+}
+
+// Background preload of official wallpapers in browser/electron environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  WALLPAPERS.forEach((wp) => {
+    if (wp.image) {
+      const img = new Image()
+      img.src = wp.image
+      img.onload = () => loadListeners.forEach((l) => l())
+      imgCache.set(wp.image, img)
+    }
+  })
 }
 
 // ---------------- live (animated) backgrounds ----------------

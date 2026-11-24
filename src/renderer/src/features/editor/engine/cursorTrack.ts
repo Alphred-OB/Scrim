@@ -1,4 +1,5 @@
-import type { CursorData } from '@shared/types'
+import type { CursorData, CursorSettings } from '@shared/types'
+import { buildCinematicTrack } from './cinematicSpline'
 
 export const TRACK_HZ = 60
 
@@ -96,18 +97,35 @@ function smooth(arr: Float32Array, amount: number): Float32Array {
   return run(run(arr, false), true)
 }
 
-export function buildTrack(data: CursorData | null, duration: number, smoothing: number): Track | null {
+export function buildTrack(data: CursorData | null, duration: number, opts: CursorSettings | number): Track | null {
   if (!data) return null
+  const settings: CursorSettings =
+    typeof opts === 'number'
+      ? ({ smoothing: opts, motionMode: 'cinematic', curvature: 0.5, clickDwell: 0.12 } as unknown as CursorSettings)
+      : opts
+
+  const mode = settings.motionMode ?? 'cinematic'
+  if (mode === 'cinematic') {
+    const track = buildCinematicTrack(data, duration, settings)
+    if (track) return track
+  }
+
   const r = resample(data, duration)
-  return { hz: TRACK_HZ, xs: smooth(r.xs, smoothing), ys: smooth(r.ys, smoothing), moving: r.moving, hidden: data.hidden }
+  if (mode === 'raw') {
+    return { hz: TRACK_HZ, xs: r.xs, ys: r.ys, moving: r.moving, hidden: data.hidden }
+  }
+
+  const s = settings.smoothing ?? 0.55
+  return { hz: TRACK_HZ, xs: smooth(r.xs, s), ys: smooth(r.ys, s), moving: r.moving, hidden: data.hidden }
 }
 
-/** Slow camera path used by "follow cursor" zooms. */
-export function buildCameraTrack(data: CursorData | null, duration: number): Track | null {
+/** Slow camera path used by "follow cursor" zooms. Employs the cinematic track for fluid Steadicam motion. */
+export function buildCameraTrack(data: CursorData | null, duration: number, opts?: CursorSettings | number): Track | null {
   if (!data) return null
-  const r = resample(data, duration)
-  const s = (a: Float32Array) => smooth(smooth(a, 1), 1)
-  return { hz: TRACK_HZ, xs: s(r.xs), ys: s(r.ys), moving: r.moving }
+  const base = buildTrack(data, duration, opts ?? 0.55)
+  if (!base) return null
+  const s = (a: Float32Array) => smooth(smooth(a, 0.8), 0.8)
+  return { hz: TRACK_HZ, xs: s(base.xs), ys: s(base.ys), moving: base.moving }
 }
 
 export function sampleTrack(tr: Track, t: number): { x: number; y: number; vx: number; idle: number } {

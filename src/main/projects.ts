@@ -1,19 +1,35 @@
 import { app } from 'electron'
 import { promises as fs, existsSync } from 'fs'
-import { join, extname, basename } from 'path'
+import { join, extname, basename, resolve, relative, isAbsolute } from 'path'
 import type { Asset, CursorData, Preset, Project, ProjectSummary } from '@shared/types'
 import { autoZoomFromClicks } from '@shared/autozoom'
 import { defaultEdit, migrateProject, uid } from '@shared/defaults'
 import { spawn } from 'child_process'
 import { ffmpegPath, probeVideo, runFfmpeg } from './ffmpeg'
+import { getSettings } from './settings'
+import { removePreviewCache } from './previewCache'
 
 export function projectsRoot(): string {
+  try {
+    const custom = getSettings()?.projectsDir
+    if (custom && custom.trim()) return custom.trim()
+  } catch {
+    /* fallback to default */
+  }
   return join(app.getPath('documents'), 'Scrim')
 }
 
 /** Projects made before the rename to Scrim still live here. We keep showing them. */
 const legacyRoot = (): string => join(app.getPath('documents'), 'Demo Frame')
-const roots = (): string[] => [projectsRoot(), ...(existsSync(legacyRoot()) ? [legacyRoot()] : [])]
+export const projectRoots = (): string[] => roots()
+const roots = (): string[] => {
+  const current = projectsRoot()
+  const docRoot = join(app.getPath('documents'), 'Scrim')
+  const list = [current]
+  if (current !== docRoot && existsSync(docRoot)) list.push(docRoot)
+  if (existsSync(legacyRoot()) && !list.includes(legacyRoot())) list.push(legacyRoot())
+  return list
+}
 
 export async function ensureRoot(): Promise<string> {
   const root = projectsRoot()
@@ -124,7 +140,7 @@ export async function importVideo(file: string): Promise<Project> {
     updatedAt: Date.now(),
     dir,
     media: { screen: { path: target, ...info }, system },
-    edit: defaultEdit(info.duration)
+    edit: defaultEdit(info.duration, getSettings()?.defaultAspect || '16:9')
   }
   p.edit.cursor.show = false
   await saveProject(p)
@@ -155,8 +171,14 @@ export async function copyAsset(dir: string, file: string): Promise<string> {
 }
 
 export async function deleteProject(dir: string): Promise<void> {
-  if (!roots().some((r) => dir.startsWith(r))) throw new Error('Refusing to delete outside projects folder')
-  await fs.rm(dir, { recursive: true, force: true })
+  const target = resolve(dir)
+  const isSafe = roots().some((r) => {
+    const rel = relative(resolve(r), target)
+    return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+  })
+  if (!isSafe) throw new Error('Refusing to delete outside projects folder')
+  await fs.rm(target, { recursive: true, force: true })
+  await removePreviewCache(target)
 }
 
 // ---------- presets ----------
@@ -320,7 +342,7 @@ export async function sampleFinish(dir: string, cursor: CursorData, duration: nu
   await fs.writeFile(join(dir, 'cursor.json'), JSON.stringify(cursor))
   await makeThumb(target, dir).catch(() => {})
   const dur = info.duration || duration
-  const edit = defaultEdit(dur)
+  const edit = defaultEdit(dur, getSettings()?.defaultAspect || '16:9')
   edit.zoom.segments = autoZoomFromClicks(cursor, dur)
 
   // Split into 2 clips to showcase cut transitions

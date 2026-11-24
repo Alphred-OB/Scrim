@@ -6,6 +6,7 @@ import { useSettings, matches } from '@/lib/settings'
 import { openProjectFromDialog } from '@/lib/openProject'
 import { maybeAutoStart, startTour, takeQueuedTour, useTour } from '@/features/onboarding/tours'
 import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
+import { friendlyError } from '@/lib/errors'
 import { helpMenu } from '@/lib/feedback'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { useEditor, flushSave, Panel } from './state/store'
@@ -17,6 +18,7 @@ import { outputDuration, sourceToOutput } from './engine/timeMap'
 import ExportDialog from './export/ExportDialog'
 import { exportProject, estimateExportSeconds } from './export/exporter'
 import BackgroundPanel from './panels/BackgroundPanel'
+import FramePanel from './panels/FramePanel'
 import CursorPanel from './panels/CursorPanel'
 import ZoomPanel from './panels/ZoomPanel'
 import TextPanel from './panels/TextPanel'
@@ -39,6 +41,7 @@ import { sortedClips } from './engine/timeMap'
 
 const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boolean }[] = [
   { id: 'background', icon: 'sparkles', title: 'Background & frame', label: 'Style' },
+  { id: 'frame', icon: 'frame', title: 'Frame: padding, shadow, corners and border', label: 'Frame' },
   { id: 'cursor', icon: 'cursor', title: 'Cursor & clicks', label: 'Cursor' },
   { id: 'zoom', icon: 'zoom', title: 'Zoom' },
   { id: 'text', icon: 'text', title: 'Text' },
@@ -86,7 +89,22 @@ export default function Editor({ dir }: { dir: string }) {
     }
   }, [dir])
 
-  if (error) return <div style={{ padding: 40 }}>Could not open project: {error}</div>
+  if (error) {
+    const f = friendlyError(error)
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+        <div style={{ maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>This project could not be opened</h3>
+          <span className="hint">{f.message}</span>
+          <button className="btn primary" onClick={() => (location.hash = '/')}>Back to home</button>
+          <details className="hint" style={{ maxWidth: '100%' }}>
+            <summary style={{ cursor: 'pointer' }}>Technical details</summary>
+            <div style={{ whiteSpace: 'pre-wrap', userSelect: 'text', marginTop: 6 }}>{f.detail}</div>
+          </details>
+        </div>
+      </div>
+    )
+  }
   if (!project || project.dir !== dir) return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spin" /></div>
   return <EditorView />
 }
@@ -96,9 +114,6 @@ function EditorView() {
   const panel = useEditor((s) => s.panel)
   const setPanel = useEditor((s) => s.setPanel)
   const playing = useEditor((s) => s.playing)
-  const saving = useEditor((s) => s.saving)
-  const past = useEditor((s) => s.past.length)
-  const future = useEditor((s) => s.future.length)
   const update = useEditor((s) => s.update)
   const shortcuts = useSettings((s) => s.settings.shortcuts)
   const [exporting, setExporting] = useState(false)
@@ -106,10 +121,30 @@ function EditorView() {
   const [presets, setPresets] = useState<Preset[]>([])
   const [presetName, setPresetName] = useState('')
   const [presetsOpen, setPresetsOpen] = useState(false)
+  const presetsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!presetsOpen) return
+    const onDown = (e: PointerEvent | MouseEvent) => {
+      if (presetsRef.current && e.target instanceof Node && presetsRef.current.contains(e.target)) return
+      if ((e.target as HTMLElement).closest?.('.context-menu, .cmenu')) return
+      setPresetsOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPresetsOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [presetsOpen])
   const [name, setName] = useState(project.name)
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
   const [clickedRail, setClickedRail] = useState<Panel | null>(null)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
   // every tool opens at the top of its page, not wherever the last one was scrolled to
   const panelRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -285,6 +320,7 @@ function EditorView() {
 
   return (
     <div
+      className="fade-in"
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) {
@@ -299,11 +335,7 @@ function EditorView() {
       <header className="drag surface win-head" style={{ height: 48, display: 'flex', alignItems: 'center', gap: 4, padding: '0 150px 0 10px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <button className="icon-btn" title="Back to home" onClick={async () => { await flushSave(); location.hash = '/' }}><Icon name="back" /></button>
         <button className="icon-btn" title="Show project folder" onClick={() => api.showItem(project.media.screen.path)}><Icon name="folder" /></button>
-        <div style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 6px' }} />
-        <button className="icon-btn" title={`Undo (${kb('undo')})`} disabled={!past} onClick={() => useEditor.getState().undo()}><Icon name="undo" /></button>
-        <button className="icon-btn" title={`Redo (${kb('redo')})`} disabled={!future} onClick={() => useEditor.getState().redo()}><Icon name="redo" /></button>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 4, background: saving ? 'var(--warn)' : 'var(--ok)', transition: 'background .3s' }} title={saving ? 'Saving…' : 'All changes saved'} />
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -312,10 +344,10 @@ function EditorView() {
             style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontWeight: 650, fontSize: 13.5, textAlign: 'center', width: 300, outline: 'none' }}
           />
         </div>
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={presetsRef}>
           <button data-tour="presets" className="btn ghost sm" onClick={() => setPresetsOpen((o) => !o)}><Icon name="bookmark" size={15} /> Presets <Icon name="chevron" size={13} /></button>
           {presetsOpen && (
-            <div className="menu glass pop-in" style={{ position: 'absolute', right: 0, top: 38, width: 270, zIndex: 50 }} onMouseLeave={() => setPresetsOpen(false)}>
+            <div className="menu glass pop-in" style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', width: 270, zIndex: 50 }}>
               {presets.length === 0 && <div className="hint" style={{ padding: 8 }}>Save your favourite look (background, frame, cursor, webcam) to reuse it on every recording.</div>}
               {presets.map((p) => (
                 <button
@@ -371,25 +403,78 @@ function EditorView() {
           ))}
           <RailMore />
         </nav>
-        <aside ref={panelRef} data-tour="panel" className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
-          <div className="fade-in" key={panel}>
-            {panel === 'background' && <BackgroundPanel />}
-            {panel === 'cursor' && <CursorPanel />}
-            {panel === 'zoom' && <ZoomPanel />}
-            {panel === 'text' && <TextPanel />}
-            {panel === 'blur' && <BlurPanel />}
-            {panel === 'media' && <MediaPanel />}
-            {panel === 'webcam' && <WebcamPanel />}
-            {panel === 'audio' && <AudioPanel />}
-            {panel === 'keys' && <KeysPanel />}
-            {panel === 'settings' && <ClipPanel />}
-            {panel === 'effects' && <EffectsPanel />}
-            {panel === 'ai' && <CaptionsPanel />}
-            {panel === 'tidy' && <TidyPanel />}
-            {panel === 'guide' && <GuidePanel />}
-            {panel === 'brand' && <BrandPanel />}
-          </div>
-        </aside>
+        <div
+          style={{
+            width: panelCollapsed ? 0 : 360,
+            flexShrink: 0,
+            transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
+            overflow: 'hidden',
+          }}
+        >
+          <aside
+            ref={panelRef}
+            data-tour="panel"
+            className="surface"
+            style={{
+              width: 360,
+              height: '100%',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              padding: '18px 16px 30px',
+              borderRight: '1px solid var(--line)',
+            }}
+          >
+            <div className="fade-in" key={panel}>
+              {panel === 'background' && <BackgroundPanel />}
+              {panel === 'frame' && <FramePanel />}
+              {panel === 'cursor' && <CursorPanel />}
+              {panel === 'zoom' && <ZoomPanel />}
+              {panel === 'text' && <TextPanel />}
+              {panel === 'blur' && <BlurPanel />}
+              {panel === 'media' && <MediaPanel />}
+              {panel === 'webcam' && <WebcamPanel />}
+              {panel === 'audio' && <AudioPanel />}
+              {panel === 'keys' && <KeysPanel />}
+              {panel === 'settings' && <ClipPanel />}
+              {panel === 'effects' && <EffectsPanel />}
+              {panel === 'ai' && <CaptionsPanel />}
+              {panel === 'tidy' && <TidyPanel />}
+              {panel === 'guide' && <GuidePanel />}
+              {panel === 'brand' && <BrandPanel />}
+            </div>
+          </aside>
+        </div>
+        {/* Collapse/expand toggle — lives OUTSIDE overflow:hidden so it's always visible */}
+        <button
+          onClick={() => setPanelCollapsed((c) => !c)}
+          title={panelCollapsed ? 'Expand panel' : 'Collapse panel'}
+          style={{
+            flexShrink: 0,
+            alignSelf: 'center',
+            width: 22,
+            height: 48,
+            border: 'none',
+            borderRadius: '0 8px 8px 0',
+            background: 'var(--panel)',
+            borderTop: '1px solid var(--line)',
+            borderRight: '1px solid var(--line)',
+            borderBottom: '1px solid var(--line)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--dim)',
+            padding: 0,
+            marginRight: 4,
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--hover)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--panel)')}
+        >
+          <span style={{ display: 'flex', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', transform: panelCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+            <Icon name="back" size={14} />
+          </span>
+        </button>
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 22px 10px', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 110 }}>

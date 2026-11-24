@@ -14,6 +14,7 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { promises as fs } from 'fs'
 import { recorder, listSources } from './recorder'
+import { grantPath } from './security'
 
 export const selfTestDir = (): string | undefined => process.env.SCRIM_TEST_DIR
 
@@ -660,6 +661,7 @@ export function runSelfTest(win: BrowserWindow, openEditor: (dir: string) => voi
         }
         return false
       }
+      grantPath(out) // stands in for the Save dialog, which is what normally allows writing there
       await js(`window.__scrim.saveTo(${JSON.stringify(out)})`)
       await step('offline speech engine loads and runs', async () => {
         const model = await fs.readFile(env.SCRIM_TEST_ONNX || '/tmp/dftest/double.onnx').catch(() => null)

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { CursorData, EditState, Project } from '@shared/types'
 import { api } from '@/lib/api'
 
-export type Panel = 'background' | 'cursor' | 'zoom' | 'text' | 'media' | 'effects' | 'blur' | 'webcam' | 'audio' | 'keys' | 'settings' | 'ai' | 'tidy' | 'guide' | 'brand'
+export type Panel = 'background' | 'frame' | 'cursor' | 'zoom' | 'text' | 'media' | 'effects' | 'blur' | 'webcam' | 'audio' | 'keys' | 'settings' | 'ai' | 'tidy' | 'guide' | 'brand'
 export type Selection = { kind: 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition' | 'blur'; id: string } | null
 
 interface EditorStore {
@@ -19,8 +19,11 @@ interface EditorStore {
   saving: boolean
   /** message for long jobs like joining videos; empty when idle */
   busy: string
+  /** drawing a box on the preview to zoom into (the preview shows the whole screen meanwhile) */
+  areaMode: boolean
 
   setBusy(msg: string): void
+  setAreaMode(on: boolean): void
   load(p: Project, cursor: CursorData | null): void
   update(fn: (e: EditState) => void, key?: string): void
   undo(): void
@@ -47,13 +50,18 @@ export const useEditor = create<EditorStore>((set, get) => ({
   lastAt: 0,
   saving: false,
   busy: '',
+  areaMode: false,
 
   setBusy(msg) {
     set({ busy: msg })
   },
 
+  setAreaMode(on) {
+    set(on ? { areaMode: true, playing: false } : { areaMode: false })
+  },
+
   load(p, cursor) {
-    set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false })
+    set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false, areaMode: false })
   },
 
   update(fn, key = '') {

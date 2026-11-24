@@ -3,7 +3,7 @@ import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { Icon, Section, Seg, Slider, Toggle, fmtTime, openContextMenu, askConfirm } from '@/ui'
 import { api, mediaUrl } from '@/lib/api'
-import { addAssetAt, joinVideoAt, removeAsset } from '../state/actions'
+import { addAssetAt, addMediaSmart, joinVideoAt, removeAsset } from '../state/actions'
 import { dragAsset } from '../state/dragAsset'
 import type { Asset, OverlayMode } from '@shared/types'
 
@@ -15,7 +15,7 @@ export async function importMedia(dir: string, paths?: string[], at?: number): P
     if (at !== undefined) {
       let t = at
       for (const a of assets) {
-        addAssetAt(a, t)
+        await addMediaSmart(a, t)
         t = Math.min(useEditor.getState().project!.media.screen.duration - 0.5, t + 0.5)
       }
     }
@@ -41,7 +41,7 @@ function AssetTile({ a }: { a: Asset }) {
         dragAsset.set(a)
       }}
       onDragEnd={() => dragAsset.set(null)}
-      onDoubleClick={() => addAssetAt(a, timeBus.get())}
+      onDoubleClick={() => addMediaSmart(a, timeBus.get())}
       onContextMenu={(e) =>
         openContextMenu(e, [
           { label: a.kind === 'video' ? 'Add as overlay at playhead' : 'Add at playhead', onClick: () => addAssetAt(a, timeBus.get()) },

@@ -1,8 +1,9 @@
 // Where Scrim sends things. Fill these in once the services exist (see server/feedback/README.md).
 // An empty value switches that feature off quietly.
 
-/** The feedback service (server/feedback), e.g. 'https://feedback.eruditeafricannetwork.com' */
+/** The feedback service (server/feedback), e.g. 'https://feedback.example.com' */
 export const FEEDBACK_URL = ''
+
 
 /** Sentry project key ("DSN") for crash reports. It's safe to ship in the app. */
 export const SENTRY_DSN = ''

@@ -118,6 +118,8 @@ export default function ZoomPanel() {
       </Section>
 
       <Section title="Manual">
+        <button className="btn primary" onClick={() => useEditor.getState().setAreaMode(true)}><Icon name="crop" size={15} /> Zoom to an area</button>
+        <span className="hint">Drag a box around any part of the screen. The zoom fits that box and stays there instead of following the mouse. With a zoom selected it changes that one; otherwise it adds one at the playhead.</span>
         <button className="btn" onClick={() => addZoomAt(timeBus.get())}><Icon name="plus" size={15} /> Add zoom at playhead</button>
         <span className="hint">Or click anywhere on the Zoom track. Pick a zoom, then click the preview to pin exactly where it points.</span>
         {manual.length > 0 && (
@@ -134,7 +136,7 @@ export default function ZoomPanel() {
       {sel && (
         <>
           <Section title={sel.auto ? 'Selected zoom (automatic)' : 'Selected zoom'} action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((e) => (e.zoom.segments = e.zoom.segments.filter((s) => s.id !== sel.id))); select(null) }}>Delete</button>}>
-            <Slider label="Base zoom depth" value={sel.scale} min={1.1} max={4} step={0.05} def={1.6} format={(v) => `${v.toFixed(2)}x`} onChange={(v) => setSel((s) => { s.scale = v; s.auto = false }, 'zscale' + sel.id)} />
+            <Slider label="Base zoom depth" value={sel.scale} min={1.1} max={6} step={0.05} def={1.6} format={(v) => `${v.toFixed(2)}x`} onChange={(v) => setSel((s) => { s.scale = v; s.auto = false }, 'zscale' + sel.id)} />
             <div className="seg">
               <button className={sel.follow ? 'on' : ''} onClick={() => setSel((s) => { s.follow = true; s.auto = false })}><Icon name="cursor" size={14} /> Follow cursor</button>
               <button className={!sel.follow ? 'on' : ''} onClick={() => setSel((s) => { s.follow = false; s.auto = false })}><Icon name="pin" size={14} /> Pin a spot</button>

@@ -48,9 +48,28 @@ export async function probeVideo(file: string): Promise<{ width: number; height:
   }
 }
 
+import { getSettings } from './settings'
+
 let encoderCache: string[] | null = null
+
+export interface EncoderInfo {
+  id: 'auto' | 'nvenc' | 'qsv' | 'amf' | 'cpu'
+  name: string
+  available: boolean
+  active?: boolean
+}
+
 /** Picks the fastest working H.264 encoder on this machine (GPU first, CPU fallback). */
-export async function detectEncoder(): Promise<string> {
+export async function detectEncoder(pref?: string): Promise<string> {
+  let chosenPref = pref
+  if (!chosenPref) {
+    try {
+      chosenPref = getSettings()?.videoEncoder ?? 'auto'
+    } catch {
+      chosenPref = 'auto'
+    }
+  }
+
   if (!encoderCache) {
     encoderCache = []
     for (const enc of ['h264_nvenc', 'h264_qsv', 'h264_amf']) {
@@ -61,7 +80,35 @@ export async function detectEncoder(): Promise<string> {
     }
     encoderCache.push('libx264')
   }
+
+  if (chosenPref === 'nvenc' && encoderCache.includes('h264_nvenc')) return 'h264_nvenc'
+  if (chosenPref === 'qsv' && encoderCache.includes('h264_qsv')) return 'h264_qsv'
+  if (chosenPref === 'amf' && encoderCache.includes('h264_amf')) return 'h264_amf'
+  if (chosenPref === 'cpu') return 'libx264'
   return encoderCache[0]
+}
+
+export async function getAvailableEncoders(): Promise<EncoderInfo[]> {
+  await detectEncoder()
+  const list = encoderCache || ['libx264']
+  const hasNvenc = list.includes('h264_nvenc')
+  const hasQsv = list.includes('h264_qsv')
+  const hasAmf = list.includes('h264_amf')
+  let pref = 'auto'
+  try {
+    pref = getSettings()?.videoEncoder ?? 'auto'
+  } catch {
+    /* ignore */
+  }
+  const activeEnc = await detectEncoder(pref)
+
+  return [
+    { id: 'auto', name: `Automatic (${list[0] === 'libx264' ? 'Software CPU' : list[0].replace('h264_', '').toUpperCase() + ' GPU'})`, available: true, active: pref === 'auto' },
+    { id: 'nvenc', name: 'NVIDIA NVENC (GPU)', available: hasNvenc, active: activeEnc === 'h264_nvenc' },
+    { id: 'qsv', name: 'Intel Quick Sync (GPU)', available: hasQsv, active: activeEnc === 'h264_qsv' },
+    { id: 'amf', name: 'AMD AMF (GPU)', available: hasAmf, active: activeEnc === 'h264_amf' },
+    { id: 'cpu', name: 'Software libx264 (CPU)', available: true, active: activeEnc === 'libx264' }
+  ]
 }
 
 /** Pixel format each encoder takes in. */
