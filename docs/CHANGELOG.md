@@ -1,5 +1,73 @@
 # Changelog
 
+## Unreleased
+- Design pass, part 2: the editor tool rail fits one more tool on typical screens and fades out at the bottom instead of cutting a label in half, and it snaps to whole buttons when you scroll. On the launcher home, "Practice on a sample" is only the highlighted button before you have any projects (Record and Edit stay the main choices after that), and "Jump back in" is a plain heading without the arrow. On the record screen a single screen or window preview is centered and larger instead of sitting in the top left, and the chosen source is announced to screen readers.
+- Design pass: hint, section and rail text now meets contrast (it was 4.25:1, now above 4.5:1) in both built in themes and every custom theme. Timeline Keys chips no longer pile into unreadable text: each fits its gap, and tiny ones show as plain markers (hover for the keys). The track label column is wider so "Camera" is no longer cut to "Came…". Track eye and mute buttons, the "More tools" handle and the panel collapse tab are bigger targets, the project card menu shows on keyboard focus, text style tiles no longer repeat their name, and Settings shows the real version instead of "0.3".
+- Preview copies of long recordings and webcams now live in a local cache folder (%LOCALAPPDATA%\Scrim\preview-cache) instead of the project folder, so OneDrive no longer uploads hundreds of MB of throwaway video per project. Existing copies move over the next time a project opens, with no rebuild. Deleting a project removes its copies, and Clear temporary cache now includes them and reports what it actually freed.
+- Fixed: the player crawling or freezing on projects with a webcam. The browser's recorder puts a keyframe in webcam.webm only every 3 to 8 seconds, so every scrub, play, cut or resync spent 0.1 to 0.5 s decoding before the webcam could move, and the whole preview stalled with it. Webcams longer than 20 seconds now get a seek friendly copy (cam-proxy.mp4) made in the background, and new recordings put a keyframe in every second. On a 22 minute project, webcam seeks went from 125-533 ms to 15-21 ms, a cold play runs at full speed from the first frame (it used to crawl at 0.4x for about 3.5 s), and dropped frames went from 45% to about 6%. The webcam cut-out model now loads while the editor is idle instead of freezing the first Play for about a second. Export still reads the original webcam.
+- Long recordings play smoothly. Recordings over about 2.5 minutes (or 400 MB) get a lighter preview copy made in the background (a small pill shows the progress). The player, scrubbing and timeline thumbnails use it, and paused frames still come from the original, so they stay sharp. The thumbnails are denser on long videos, and the preview no longer drops its quality as far when a frame is slow. Export is untouched and always uses the original.
+- Sharper recordings: encoder settings tuned for screen content (GPU encoders on their high quality setting instead of low latency, CPU fallback on superfast instead of ultrafast, lower quantizer), exact BT.709 color conversion with full chroma, and color tags so nothing looks washed out.
+- Sharper exports: higher bitrates for every quality level, new projects export at Original size (every recorded pixel kept), and the recording is scaled with the highest quality filter.
+- New: click sounds. Pick one of 8 (Mouse, Soft tick, Trackpad, Mechanical, Pop, Wood tap, Digital, Shutter), set the volume, or turn them off. You hear them in the preview and they go into the export. Clicks cut out of the video stay silent.
+- Transitions: drop one anywhere on the video and it lands on the nearest cut, start or end (the round buttons light up to show where). Drop it on the Transitions line for a transition in the middle of a shot. The line only shows when it's in use.
+- New timeline. It shows the video the way it will export: cut parts disappear and everything after slides left, faster clips are shorter. Pull a clip's edge to trim, pull it back out to restore.
+- The video track comes first and shows thumbnails; voice and PC sound show waveforms per clip.
+- Only tracks with something on them are shown. Drag media, text, transitions or effects anywhere on the timeline and the right track appears.
+- A toolbar above the tracks: undo, redo, split, delete, duplicate, quick add for text, zoom, media and effects, snapping on or off, zoom and Fit.
+- Transitions sit right on the video: a round button at the start, the end and every cut. Click it to pick one.
+- Yellow guide line when something snaps, red playhead, double click an empty spot on the Text or Zoom track to add one.
+- Practice always starts from a clean copy of the sample.
+- New: text animations. Pick how text comes in and goes out (16 each: fade, pop, rise, slide, zoom, drop, blur, wipe, spin, flip, typewriter, letter by letter, word by word) and a loop while it's on screen (pulse, float, wiggle, shake, blink, wave, glow), with speed control. Tiles play a preview on hover. Ramps on the Text track show the in and out.
+- New: 9 text styles to start from (Caption, Title, Label, Accent, Poster, Code, Callout, Neon, Lower third), each with its own animation.
+- New: no gradients anywhere in the interface. New solid red logo and app icon, new animated splash screen, bolder home screen with a changing headline word.
+- Improved: the tool rail shows names under the icons. Empty spare layers only appear while you drag something onto a track. New text no longer lands on top of other text. Cursor styles show as a grid. The mic meter says whether it can hear you. The timeline resize handle is visible.
+- New: home and projects screens redesigned. Animated cards, a live glow, R and E shortcuts, quick actions, sorting, relative dates and hover previews.
+- New: Practice on a sample. Scrim makes a short sample recording and walks you through a real edit with small hands on tasks (play, zooms, background, title, cut, transition, intro). Every step has a Show me button.
+- Fixed: the webcam flickered in the preview. Small drift is now corrected smoothly instead of seeking, and the last good frame is kept while it buffers.
+- Fixed: the Export button covered the window buttons on Windows.
+- Fixed: the playhead was drawn in the wrong place after adding intro space.
+- New: drag the whole video right to make empty space before it, like CapCut. Fill it with text, pictures or a video for an intro over the background. Drag it back to the start to remove the space.
+- New: transitions, effects, media and audio all get layers. Things at the same time stack on their own layer, and you can drag them between layers.
+- New: guided tour of the editor and home screen that points at each part of the interface. Runs the first time, and again from the ? button.
+- New: splash screen while Scrim starts
+- New: welcome tour on first run (7 short steps, skippable). Take it again from the ? button on the home screen or Settings, General.
+- New: home screen asks what you want to do: Record, or Edit (recent projects, search, import a video, open a project, drop a video to import)
+- New: transitions have a speed (slow, normal, fast or custom length), a feel (smooth, snappy, gentle, even) and a direction for fades, wipes and whip pans
+- Fixed: full screen preview lag. The preview now lowers its render size while playing if the PC can't keep up (the export is always full quality), and the hidden media players no longer cover the whole screen.
+- Removed: the Clicks track (click effects are set in the Cursor panel) and the Background music section (add music from the Media library)
+- Fixed: pausing jumped the playhead back to where playback started
+- New: Transitions and Effects tracks on the timeline. Drag a transition onto a cut or anywhere on its track (drag its edges for the length); drag a look onto the Effects track to use it on just part of the video. Start, end and cut transitions show as pills you can click.
+- New: Transitions and Effects are separate tabs, with animated previews of each transition (hover) and look swatches made from your own video
+- New: 17 transitions (fade, fade white, flash, morph, blur, zoom in, zoom out, spin, whip pan, slide left/right/up/down, iris, wipe, pixelate, glitch)
+- New: 16 looks (adds cinematic, cyberpunk, dreamy, faded, bright, moody, invert) and new effects: glow, blur, pixelate, scan lines. Blur and pixelate on part of the video are handy for hiding private info.
+- New: layers for Text, Media and Audio. Items that play at the same time sit on their own layer instead of stacking. Drag an item up or down to change its layer; higher layers draw on top. Text always has an empty layer ready.
+- New: eye button on Media and Text, speaker button on Audio, to hide or mute a whole track
+- Changed: the recording outline shows during the countdown, the first few seconds and while paused, then fades away
+- Removed: the webcam 480p/720p/1080p choice, which didn't change anything. Scrim now asks the camera for its best quality.
+- New: transitions for the start, the end and every cut (fade through black or white, blur, zoom, whip pan, flash), with a dot on each cut in the Video track to set its own
+- New: effects panel with 10 looks (vivid, punchy, warm, cool, matte, vintage, sepia, black & white, noir) plus brightness, contrast, saturation, vignette and film grain
+- New: media placement: play a video inside your recording's frame (default for videos), on top as picture in picture, or full screen, with fit or fill
+- Fixed: clicks on the record bar and webcam bubble no longer show up as clicks in the video, and the cursor hides while you drag them. The click that pauses or stops (tray, taskbar) is dropped too.
+- Fixed: custom theme "Dark base" now switches to dark colors
+- Fixed: the timeline zoom slider dot sits on its track
+- Changed: removed the Add button and the zoom, text and split buttons under the preview (use the timeline, right click menus or Z, T, S)
+- New: a moving blue border around what's being recorded (amber while paused). It never shows up in the video. Turn it off in Settings, General.
+- New: redesigned floating record bar: timer, status, pause/resume and stop
+- New: media library tabs for Videos, Audio and Pictures
+- New: the timeline has open space after the end, can zoom out past the video length, and zooming keeps the playhead (or the point under the mouse) in place
+- Fixed: clicking the timeline put the playhead about 150 pixels away from the mouse
+- Fixed: live and video backgrounds stood still while the editor was paused. Live tiles now play when hovered or selected, and unplayable background videos (mov, hevc) are converted.
+- Fixed: the webcam preview on the record screen was squashed to nothing
+- New: arrow keys move the playhead 0.5 seconds by default (pick one frame up to 5 seconds in Settings, General). Shift moves 5 times further, comma and period step one frame, Home and End jump to the start and end. The timeline scrolls to follow.
+- New: 12 themes (including Black & white and White & black) plus a fully custom theme (accent, background, panels, text, dark or light base), a choice of interface font, and interface size
+- New: animated export progress with 6 styles (wavy ring like the Play Store, clean ring, liquid fill, orbit, dots, wavy bar), a check mark that draws itself when done, and optional confetti
+- New: spotlight modes (glow, dim the rest, ring), when to show it (always, while moving, on clicks), strength, darkness, shade color, edge softness and ring thickness
+- New: pause and resume while recording (floating bar, tray, or Alt+Shift+P). Paused time is left out of the video, audio, webcam and cursor.
+- New: Ctrl+S saves the project, Ctrl+O opens a project or any video
+- Changed: the floating bar no longer has Discard or Restart, so a recording can't be deleted by a stray click. Both are still in the tray menu and ask before deleting.
+- New: join videos. Drop a video from the library on the Video track (left half puts it before, right half after), or use Add > Join a video before/after, or right click the Video track. Another Scrim recording brings its cursor, clicks, zooms, mic and system audio along. Other videos get their audio on the Audio track and the cursor is hidden over them.
+- Fixed: editor preview froze while the cursor and zoom kept moving, then sped up at the end
+
 ## 0.3.0
 - Renamed to **Scrim**. Settings, presets and old projects carry over automatically.
 - New: light theme, dark theme, or follow Windows (Settings, Appearance)

@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import { startMedia, stopMedia, cancelMedia } from '@/lib/mediaCapture'
+import { startMedia, stopMedia, cancelMedia, pauseMedia, resumeMedia } from '@/lib/mediaCapture'
 import { useSettings } from '@/lib/settings'
+import { applyTheme } from '@/lib/theme'
 import Launcher from '@/features/launcher/Launcher'
 import Toolbar from '@/features/recording/Toolbar'
+import Prompter from '@/features/recording/Prompter'
 import Bubble from '@/features/recording/Bubble'
+import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
-import { ContextMenuHost } from '@/ui'
+import { ContextMenuHost, DialogHost } from '@/ui'
+import { UpdateBanner } from '@/lib/update'
+import { CrashConsent, FeedbackHost } from '@/lib/feedback'
+import Onboarding from '@/features/onboarding/Onboarding'
+import { PracticeLoader } from '@/features/onboarding/practice'
+import CoachMarks from '@/features/onboarding/CoachMarks'
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(() => location.hash.slice(1) || '/')
@@ -30,6 +38,8 @@ function registerRpc(): void {
     if (method === 'media:start') return startMedia(arg)
     if (method === 'media:stop') return stopMedia(arg.dir)
     if (method === 'media:cancel') return cancelMedia()
+    if (method === 'media:pause') return pauseMedia()
+    if (method === 'media:resume') return resumeMedia()
     throw new Error('Unknown method ' + method)
   })
 }
@@ -37,7 +47,8 @@ function registerRpc(): void {
 export default function App() {
   const route = useHashRoute()
   const reduce = useSettings((s) => s.settings.reduceTransparency)
-  const theme = useSettings((s) => s.settings.theme)
+  const settings = useSettings((s) => s.settings)
+  const settingsLoaded = useSettings((s) => s.loaded)
   useEffect(() => {
     useSettings.getState().load()
   }, [])
@@ -46,17 +57,16 @@ export default function App() {
   }, [reduce])
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const apply = () => {
-      const t = theme === 'system' ? (mq.matches ? 'light' : 'dark') : theme
-      document.documentElement.dataset.theme = t
-      if (!location.hash.includes('toolbar') && !location.hash.includes('bubble')) api.setTheme(t).catch(() => {})
-    }
+    const main = !/toolbar|bubble|border|prompter/.test(location.hash)
+    const apply = () => applyTheme(settings, mq.matches, main)
     apply()
     mq.addEventListener('change', apply)
     return () => mq.removeEventListener('change', apply)
-  }, [theme])
+  }, [settings.theme, settings.customTheme, settings.uiFont, settings.uiScale])
 
   if (route.startsWith('/toolbar')) return <Toolbar />
+  if (route.startsWith('/prompter')) return <Prompter />
+  if (route.startsWith('/border')) return <RecordBorder />
   if (route.startsWith('/bubble')) return <Bubble query={route.split('?')[1] ?? ''} />
   registerRpc()
   return (
@@ -67,6 +77,13 @@ export default function App() {
         <Launcher />
       )}
       <ContextMenuHost />
+      <DialogHost />
+      <UpdateBanner />
+      <FeedbackHost />
+      {!route.startsWith('/editor') && <CrashConsent />}
+      {settingsLoaded && !settings.onboarded && <Onboarding />}
+      <CoachMarks />
+      <PracticeLoader />
     </>
   )
 }

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
-import { Icon, Section, Slider, Toggle, fmtTime, openContextMenu } from '@/ui'
+import { Icon, Section, Seg, Slider, Toggle, fmtTime, openContextMenu, askConfirm } from '@/ui'
 import { api, mediaUrl } from '@/lib/api'
-import { addAssetAt, removeAsset } from '../state/actions'
+import { addAssetAt, addMediaSmart, joinVideoAt, removeAsset } from '../state/actions'
 import { dragAsset } from '../state/dragAsset'
-import type { Asset } from '@shared/types'
+import type { Asset, OverlayMode } from '@shared/types'
 
 /** Imports files into the project. Pass `at` (seconds) to also place them on the timeline. */
 export async function importMedia(dir: string, paths?: string[], at?: number): Promise<string[]> {
@@ -15,7 +15,7 @@ export async function importMedia(dir: string, paths?: string[], at?: number): P
     if (at !== undefined) {
       let t = at
       for (const a of assets) {
-        addAssetAt(a, t)
+        await addMediaSmart(a, t)
         t = Math.min(useEditor.getState().project!.media.screen.duration - 0.5, t + 0.5)
       }
     }
@@ -23,12 +23,11 @@ export async function importMedia(dir: string, paths?: string[], at?: number): P
   return errors
 }
 
-type Filter = 'all' | Asset['kind']
-const KINDS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'video', label: 'Videos' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'image', label: 'Images' }
+type Filter = Asset['kind']
+const KINDS: { id: Filter; label: string; icon: string; empty: string }[] = [
+  { id: 'video', label: 'Videos', icon: 'film', empty: 'No videos yet. Import one, or drag it in from File Explorer.' },
+  { id: 'audio', label: 'Audio', icon: 'music', empty: 'No audio yet. Music and sound effects land here.' },
+  { id: 'image', label: 'Pictures', icon: 'image', empty: 'No pictures yet. Logos and screenshots land here.' }
 ]
 
 function AssetTile({ a }: { a: Asset }) {
@@ -42,13 +41,19 @@ function AssetTile({ a }: { a: Asset }) {
         dragAsset.set(a)
       }}
       onDragEnd={() => dragAsset.set(null)}
-      onDoubleClick={() => addAssetAt(a, timeBus.get())}
+      onDoubleClick={() => addMediaSmart(a, timeBus.get())}
       onContextMenu={(e) =>
         openContextMenu(e, [
-          { label: 'Add at playhead', onClick: () => addAssetAt(a, timeBus.get()) },
+          { label: a.kind === 'video' ? 'Add as overlay at playhead' : 'Add at playhead', onClick: () => addAssetAt(a, timeBus.get()) },
+          ...(a.kind === 'video'
+            ? [
+                { label: 'Join before the main video', onClick: () => joinVideoAt('start', a.path) },
+                { label: 'Join after the main video', onClick: () => joinVideoAt('end', a.path) }
+              ]
+            : []),
           { label: 'Show file', onClick: () => api.showItem(a.path) },
           { sep: true },
-          { label: 'Remove from project', danger: true, onClick: () => confirm(`Remove "${a.name}" and its clips?`) && removeAsset(a.id) }
+          { label: 'Remove from project', danger: true, onClick: async () => (await askConfirm({ title: `Remove "${a.name}"?`, body: 'Its clips on the timeline go too. You can undo this.', ok: 'Remove', danger: true })) && removeAsset(a.id) }
         ])
       }
       className="glass"
@@ -76,7 +81,7 @@ export default function MediaPanel() {
   const select = useEditor((s) => s.select)
   const [busy, setBusy] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>('video')
   const e = project.edit
   const ov = selection?.kind === 'overlay' ? e.overlays.find((o) => o.id === selection.id) : undefined
   const ac = selection?.kind === 'audioClip' ? e.audioClips.find((o) => o.id === selection.id) : undefined
@@ -94,39 +99,52 @@ export default function MediaPanel() {
     <div>
       <Section title="Media library">
         <button className="btn primary" onClick={doImport} disabled={busy}>{busy ? <span className="spin" /> : <Icon name="upload" size={15} />} Import video, audio or image</button>
-        <span className="hint">You can also drag files from File Explorer straight onto the editor. Drag items onto the timeline. Audio lands on the Audio track, videos and images on the Media track.</span>
+        <span className="hint">Drag files in from File Explorer, then drag them onto the timeline. Drop a video on the Video track to join it to your recording.</span>
         {errors.map((er) => <div key={er} className="hint" style={{ color: 'var(--danger)' }}>{er}</div>)}
-        {e.assets.length > 0 && (
-          <div className="tab-chips">
-            {KINDS.map((k) => {
-              const n = k.id === 'all' ? e.assets.length : e.assets.filter((a) => a.kind === k.id).length
-              return (
-                <button key={k.id} className={`tab-chip ${filter === k.id ? 'on' : ''}`} onClick={() => setFilter(k.id)}>
-                  {k.label} <span style={{ opacity: 0.6 }}>{n}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
       </Section>
 
-      {KINDS.filter((k) => k.id !== 'all' && (filter === 'all' || filter === k.id)).map((k) => {
-        const list = e.assets.filter((a) => a.kind === k.id)
-        if (!list.length) return filter === k.id ? <span key={k.id} className="hint">No {k.label.toLowerCase()} yet.</span> : null
+      <div className="media-tabs" role="tablist">
+        {KINDS.map((k) => {
+          const n = e.assets.filter((a) => a.kind === k.id).length
+          return (
+            <button key={k.id} role="tab" aria-selected={filter === k.id} className={filter === k.id ? 'on' : ''} onClick={() => setFilter(k.id)}>
+              <Icon name={k.icon} size={14} /> {k.label}
+              <span className="count">{n}</span>
+            </button>
+          )
+        })}
+      </div>
+      {(() => {
+        const k = KINDS.find((x) => x.id === filter)!
+        const list = e.assets.filter((a) => a.kind === filter)
+        if (!list.length) return <div className="media-empty hint">{k.empty}</div>
         return (
-          <Section key={k.id} title={`${k.label} · ${list.length}`}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {list.map((a) => <AssetTile key={a.id} a={a} />)}
-            </div>
-          </Section>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+            {list.map((a) => <AssetTile key={a.id} a={a} />)}
+          </div>
         )
-      })}
+      })()}
 
       {ov && asset && (
         <Section title="Selected media" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => { update((ed) => (ed.overlays = ed.overlays.filter((x) => x.id !== ov.id))); select(null) }}>Delete</button>}>
           <div className="chip" style={{ maxWidth: '100%' }}>{asset.name}</div>
-          <Toggle label="Full screen (b-roll)" value={ov.fullscreen} onChange={(v) => setOv((o) => (o.fullscreen = v))} />
-          {!ov.fullscreen && (
+          <span className="section-title" style={{ marginTop: 4 }}>Placement</span>
+          <Seg
+            options={[{ v: 'frame', l: 'In the video' }, { v: 'pip', l: 'On top' }, { v: 'full', l: 'Full screen' }]}
+            value={ov.mode}
+            onChange={(v) => setOv((o) => (o.mode = v as OverlayMode))}
+          />
+          <span className="hint">
+            {ov.mode === 'frame'
+              ? 'Plays inside your recording\'s frame, with the same background, corners and shadow. Your recording is hidden while it plays.'
+              : ov.mode === 'full'
+                ? 'Covers the whole video, background included.'
+                : 'Floats on top of your recording, like picture in picture. Drag it on the preview.'}
+          </span>
+          {ov.mode !== 'pip' && (
+            <Seg options={[{ v: 'contain', l: 'Fit whole' }, { v: 'cover', l: 'Fill and crop' }]} value={ov.fit} onChange={(v) => setOv((o) => (o.fit = v as 'contain' | 'cover'))} />
+          )}
+          {ov.mode === 'pip' && (
             <>
               <Slider label="Size" value={ov.w} min={0.08} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setOv((o) => (o.w = v), 'ovw')} />
               <Slider label="Corner radius" value={ov.radius} min={0} max={80} step={1} format={(v) => `${v}px`} onChange={(v) => setOv((o) => (o.radius = v), 'ovr')} />

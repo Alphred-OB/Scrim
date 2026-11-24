@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ExportFormat, ExportSettings, Project } from '@shared/types'
+import type { Aspect, ExportFormat, ExportSettings, Project } from '@shared/types'
+import { friendlyError } from '@/lib/errors'
 import { api } from '@/lib/api'
 import { playDoneSound } from '@/lib/settings'
-import { Icon, Select, Seg, fmtTime, type Option } from '@/ui'
+import { DoneBurst, Icon, ProgressViz, Select, Seg, fmtTime, type Option } from '@/ui'
+import { useSettings } from '@/lib/settings'
 import { useEditor, flushSave } from '../state/store'
 import { outputSize } from '../engine/compositor'
 import { GIF_MAX_FPS, GIF_MAX_RES, canEncode, estimateExportSeconds, exportDims, exportProject, originalRes, sourceFps, type ExportProgress } from './exporter'
@@ -12,6 +14,14 @@ const FORMATS: { v: ExportFormat; l: string; hint: string }[] = [
   { v: 'webm', l: 'WebM', hint: 'Smaller files for websites. VP9 video with Opus audio.' },
   { v: 'mov', l: 'MOV', hint: 'For Final Cut, Premiere and other editors.' },
   { v: 'gif', l: 'GIF', hint: 'Silent loop for docs and READMEs. Up to 720p and 25 fps to keep files small.' }
+]
+
+/** One click setups for where the video is going. */
+const PRESETS: { id: string; l: string; sub: string; aspect: Aspect; reframe: 'fit' | 'follow'; exp: Partial<ExportSettings> }[] = [
+  { id: 'youtube', l: 'YouTube', sub: '16:9 · 1080p', aspect: '16:9', reframe: 'fit', exp: { format: 'mp4', resolution: 1080, fps: 30 } },
+  { id: 'vertical', l: 'TikTok, Reels, Shorts', sub: '9:16 · follows cursor', aspect: '9:16', reframe: 'follow', exp: { format: 'mp4', resolution: 1080, fps: 30 } },
+  { id: 'linkedin', l: 'LinkedIn, X', sub: '1:1 · follows cursor', aspect: '1:1', reframe: 'follow', exp: { format: 'mp4', resolution: 1080, fps: 30 } },
+  { id: 'gif', l: 'GIF for docs', sub: 'small loop · 15 fps', aspect: '16:9', reframe: 'fit', exp: { format: 'gif', resolution: 480, fps: 15 } }
 ]
 
 const RES_STEPS = [480, 720, 1080, 1440, 2160]
@@ -90,13 +100,17 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
   const [state, setState] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [prog, setProg] = useState<ExportProgress>({ phase: 'prepare', progress: 0 })
   const [err, setErr] = useState('')
+  const [errDetail, setErrDetail] = useState('')
   const [outPath, setOutPath] = useState('')
   const [estimate, setEstimate] = useState<number | null>(null)
   const [took, setTook] = useState(0)
+  const [choosing, setChoosing] = useState(false) // the Save window is open: block a second click so windows don't stack up
   const abort = useRef<AbortController | null>(null)
 
   const set = (patch: Partial<ExportSettings>) => update((e) => Object.assign(e.export, patch))
   const choices = useExportChoices(project, s)
+  const progressStyle = useSettings((x) => x.settings.exportProgress ?? 'wavy')
+  const celebrate = useSettings((x) => x.settings.exportCelebrate ?? true)
   const { W, H, duration } = exportDims(project, s)
 
   // if the current choice isn't possible (e.g. 60 fps on a 27 fps recording), switch to the nearest real one
@@ -121,7 +135,15 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
   const start = async () => {
     const ext = s.format
     const safe = project.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'demo'
-    const p = await api.saveFile(`${safe}.${ext}`, ext)
+    const exportDir = useSettings.getState().settings.exportDir
+    if (choosing) return
+    setChoosing(true)
+    let p: string | null = null
+    try {
+      p = await api.saveFile(`${safe}.${ext}`, ext, exportDir)
+    } finally {
+      setChoosing(false)
+    }
     if (!p) return
     await flushSave()
     setOutPath(p)
@@ -138,7 +160,9 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
     } catch (e) {
       if ((e as Error).name === 'AbortError') return setState('idle')
       console.error(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      const f = friendlyError(e)
+      setErr(f.message)
+      setErrDetail(f.detail)
       setState('error')
     }
   }
@@ -157,6 +181,30 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'idle' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span className="section-title">Made for</span>
+            <div className="exp-presets">
+              {PRESETS.map((p) => {
+                const on = project.edit.aspect === p.aspect && (project.edit.reframe ?? 'fit') === p.reframe && s.format === p.exp.format && s.resolution === p.exp.resolution && s.fps === p.exp.fps
+                return (
+                  <button
+                    key={p.id}
+                    data-preset={p.id}
+                    className={`exp-preset ${on ? 'on' : ''}`}
+                    onClick={() =>
+                      update((e) => {
+                        e.aspect = p.aspect
+                        e.reframe = p.reframe
+                        Object.assign(e.export, p.exp)
+                      })
+                    }
+                  >
+                    <span className={`exp-shape a${p.aspect.replace(':', 'x')}`} />
+                    <b>{p.l}</b>
+                    <span>{p.sub}</span>
+                  </button>
+                )
+              })}
+            </div>
             <span className="section-title">Format</span>
             <Seg options={FORMATS.map((f) => ({ v: f.v, l: f.l }))} value={s.format} onChange={(v) => set({ format: v as ExportFormat })} />
             <span className="hint">{fmt.hint}</span>
@@ -173,12 +221,6 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
             <span className="hint">
               Recorded at {project.media.screen.width} x {project.media.screen.height}, {choices.realFps} real frames per second. Options your video can't really reach are turned off.
             </span>
-            {s.format !== 'gif' && (
-              <>
-                <span className="section-title" style={{ marginTop: 6 }}>Quality</span>
-                <Seg options={[{ v: 'low', l: 'Small' }, { v: 'medium', l: 'Good' }, { v: 'high', l: 'High' }, { v: 'max', l: 'Max' }]} value={s.quality} onChange={(v) => set({ quality: v as ExportSettings['quality'] })} />
-              </>
-            )}
             <div className="glass" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, boxShadow: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
               <Icon name="restart" size={16} />
               <span style={{ flex: 1 }}>Estimated time</span>
@@ -186,14 +228,18 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               <button className="btn" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-              <button className="btn primary" style={{ flex: 2 }} onClick={start}><Icon name="download" size={15} /> Export {fmt.l}</button>
+              <button className="btn primary" style={{ flex: 2 }} disabled={choosing} onClick={start}>
+                {choosing ? <><span className="spin" /> Choose where to save…</> : <><Icon name="download" size={15} /> Export {fmt.l}</>}
+              </button>
             </div>
           </div>
         )}
 
         {state === 'running' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="progress"><div style={{ width: `${pct}%` }} /></div>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+              <ProgressViz kind={progressStyle} value={prog.phase === 'prepare' ? null : pct / 100} size={170} />
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }} className="hint">
               <span>
                 {prog.phase === 'prepare'
@@ -211,10 +257,10 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'done' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 28, height: 28, borderRadius: 14, background: 'var(--ok)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800 }}>✓</span>
-              <b>Your video is ready</b>
-              <span className="hint">in {fmtTime(took)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+              <DoneBurst confetti={celebrate} size={96} />
+              <b style={{ fontSize: 16 }}>Your video is ready</b>
+              <span className="hint">Exported in {fmtTime(took)}</span>
             </div>
             <div className="chip" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{outPath}</div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -227,7 +273,13 @@ export default function ExportDialog({ onClose }: { onClose: () => void }) {
 
         {state === 'error' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ color: 'var(--danger)', whiteSpace: 'pre-wrap', fontSize: 12.5, maxHeight: 200, overflow: 'auto', userSelect: 'text' }}>{err}</div>
+            <div style={{ color: 'var(--danger)', fontSize: 13.5, lineHeight: 1.5 }}>{err}</div>
+            {errDetail && (
+              <details className="hint">
+                <summary style={{ cursor: 'pointer' }}>Technical details</summary>
+                <div style={{ whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto', userSelect: 'text', marginTop: 6 }}>{errDetail}</div>
+              </details>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" style={{ flex: 1 }} onClick={onClose}>Close</button>
               <button className="btn primary" style={{ flex: 1 }} onClick={() => setState('idle')}>Try again</button>

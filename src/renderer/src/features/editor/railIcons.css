@@ -1,0 +1,190 @@
+/* ================= Editor rail icons =================
+   One motion language for every tool:
+   - hover: a short one shot that shows what the tool does
+   - click: a quick squash and spring back
+   - open tool: accent colored details, and a small "sign of life" every few seconds
+   Timing: springs for things that pop, smooth ease for things that travel. */
+
+.rx {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --acc: currentColor;
+  display: block;
+  overflow: visible;
+  transition: transform 0.28s var(--spring);
+}
+.rx * { transform-box: fill-box; transform-origin: center; }
+.rx .acc { color: var(--acc); transition: color 0.2s ease; }
+.rail-btn:hover .rx { --acc: var(--accent-2); transform: translateY(-0.5px); }
+.rx.is-active { --acc: var(--accent-2); }
+.rx.is-clicked { animation: rxPop 0.42s var(--spring); }
+@keyframes rxPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.8, 0.86); }
+  65% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* the open tool: its accent detail moves briefly every 5 seconds */
+@keyframes rxIdleNudge { 0%, 88%, 100% { transform: none; } 92% { transform: scale(1.25); } 96% { transform: scale(0.95); } }
+
+/* ---- Style: sparkles ---- */
+.rail-btn:hover .rx-background .p-big { animation: rxSpin 0.7s var(--spring); }
+.rail-btn:hover .rx-background .p-small { animation: rxTwinkle 0.6s var(--spring) 0.1s both; }
+.rail-btn:hover .rx-background .p-dot { animation: rxTwinkle 0.5s var(--spring) 0.22s both; }
+.rx-background.is-active .p-small { animation: rxIdleNudge 5s ease-in-out infinite; }
+@keyframes rxSpin { 0% { transform: rotate(0) scale(1); } 45% { transform: rotate(60deg) scale(0.82); } 100% { transform: rotate(90deg) scale(1); } }
+@keyframes rxTwinkle { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); } }
+
+/* ---- Cursor: the arrow moves in and clicks ---- */
+.rail-btn:hover .rx-cursor .p-arrow { animation: rxClick 0.7s var(--smooth); }
+.rx-cursor .p-rays { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.rail-btn:hover .rx-cursor .p-rays { animation: rxRays 0.7s var(--smooth); }
+.rx-cursor.is-active .p-rays { animation: rxRaysIdle 5s ease-out infinite; }
+@keyframes rxClick {
+  0% { transform: translate(0, 0); }
+  35% { transform: translate(-1.6px, -1.6px); }
+  50% { transform: translate(-1.6px, -1.6px) scale(0.84); }
+  68% { transform: translate(-1.2px, -1.2px) scale(1.04); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes rxRays { 0%, 45% { stroke-dashoffset: 1; opacity: 0; transform: scale(0.6); } 60% { opacity: 1; } 80% { stroke-dashoffset: 0; transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes rxRaysIdle { 0%, 86% { opacity: 1; transform: scale(1); } 90% { opacity: 0.2; transform: scale(0.6); } 96% { opacity: 1; transform: scale(1.2); } 100% { transform: scale(1); } }
+
+/* ---- Zoom: the lens pushes in, the plus turns ---- */
+.rail-btn:hover .rx-zoom .p-lens { animation: rxPush 0.65s var(--spring); }
+.rail-btn:hover .rx-zoom .p-plus { animation: rxTurn 0.65s var(--smooth); }
+.rx-zoom.is-active .p-plus { animation: rxIdleNudge 5s ease-in-out infinite; }
+@keyframes rxPush { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes rxTurn { to { transform: rotate(90deg); } }
+
+/* ---- Text: the T is typed, the caret blinks ---- */
+.rx-text .p-t { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.rail-btn:hover .rx-text .p-t { animation: rxDraw 0.65s var(--smooth); }
+.rail-btn:hover .rx-text .p-caret { animation: rxBlink 0.9s steps(1) 0.1s; }
+.rx-text.is-active .p-caret { animation: rxBlink 1.2s steps(1) infinite; }
+@keyframes rxDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes rxBlink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+/* ---- Blur: the eye squints and gets crossed out ---- */
+.rx-blur .p-slash { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.rail-btn:hover .rx-blur .p-eye { animation: rxSquint 0.6s var(--smooth); }
+.rail-btn:hover .rx-blur .p-slash { animation: rxDraw 0.5s var(--smooth) 0.12s both; }
+.rx-blur.is-active .p-eye { animation: rxSquintIdle 5s ease-in-out infinite; }
+@keyframes rxSquint { 40% { transform: scaleY(0.55); } 100% { transform: scaleY(1); } }
+@keyframes rxSquintIdle { 0%, 90%, 100% { transform: none; } 94% { transform: scaleY(0.2); } }
+
+/* ---- Media: the sun rises over the hills ---- */
+.rail-btn:hover .rx-media .p-sun { animation: rxRise 0.7s var(--spring); }
+.rail-btn:hover .rx-media .p-hills { animation: rxSlide 0.7s var(--smooth); }
+.rx-media.is-active .p-sun { animation: rxIdleNudge 5s ease-in-out infinite; }
+@keyframes rxRise { 0% { transform: translateY(5px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+@keyframes rxSlide { 0% { transform: translateX(-2px); opacity: 0.4; } 100% { transform: none; opacity: 1; } }
+
+/* ---- Effects: the wand waves, sparks pop one by one ---- */
+.rx-effects .p-wand { transform-origin: 0% 100%; }
+.rail-btn:hover .rx-effects .p-wand { animation: rxWave 0.75s var(--spring); }
+.rail-btn:hover .rx-effects .p-s1 { animation: rxTwinkle 0.45s var(--spring) 0.2s both; }
+.rail-btn:hover .rx-effects .p-s2 { animation: rxTwinkle 0.45s var(--spring) 0.32s both; }
+.rail-btn:hover .rx-effects .p-s3 { animation: rxTwinkle 0.45s var(--spring) 0.44s both; }
+.rx-effects.is-active .p-s1 { animation: rxIdleNudge 5s ease-in-out infinite; }
+.rx-effects.is-active .p-s2 { animation: rxIdleNudge 5s ease-in-out 0.12s infinite; }
+@keyframes rxWave { 0% { transform: rotate(0); } 35% { transform: rotate(-16deg); } 70% { transform: rotate(6deg); } 100% { transform: rotate(0); } }
+
+/* ---- Webcam: the lens focuses, the light blinks ---- */
+.rail-btn:hover .rx-webcam .p-iris { animation: rxFocus 0.7s var(--spring); }
+.rail-btn:hover .rx-webcam .p-tally { animation: rxBlink 0.8s steps(1) 2; }
+.rx-webcam.is-active .p-tally { color: var(--danger); animation: rxLive 1.6s ease-in-out infinite; }
+@keyframes rxFocus { 0% { transform: scale(1); } 40% { transform: scale(0.55); } 100% { transform: scale(1); } }
+@keyframes rxLive { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ---- Audio: waves travel outward ---- */
+.rail-btn:hover .rx-audio .p-cone { animation: rxThump 0.5s var(--spring); }
+.rail-btn:hover .rx-audio .p-w1 { animation: rxWave1 0.8s var(--smooth) 0.05s both; }
+.rail-btn:hover .rx-audio .p-w2 { animation: rxWave1 0.8s var(--smooth) 0.18s both; }
+.rx-audio.is-active .p-w1 { animation: rxWaveIdle 2.4s ease-in-out infinite; }
+.rx-audio.is-active .p-w2 { animation: rxWaveIdle 2.4s ease-in-out 0.3s infinite; }
+@keyframes rxThump { 40% { transform: scale(0.88); } 100% { transform: scale(1); } }
+@keyframes rxWave1 { 0% { opacity: 0; transform: translateX(-3px); } 100% { opacity: 1; transform: none; } }
+@keyframes rxWaveIdle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ---- Keys: keys pressed in turn ---- */
+.rail-btn:hover .rx-keys .p-k1 { animation: rxPress 0.36s var(--smooth) 0s; }
+.rail-btn:hover .rx-keys .p-k2 { animation: rxPress 0.36s var(--smooth) 0.12s; }
+.rail-btn:hover .rx-keys .p-k3 { animation: rxPress 0.36s var(--smooth) 0.24s; }
+.rail-btn:hover .rx-keys .p-space { animation: rxPress 0.36s var(--smooth) 0.36s; }
+.rx-keys.is-active .p-k2 { animation: rxPressIdle 5s ease-in-out infinite; }
+@keyframes rxPress { 40% { transform: translateY(1.2px) scale(0.8); } 100% { transform: none; } }
+@keyframes rxPressIdle { 0%, 90%, 100% { transform: none; } 94% { transform: translateY(1.2px) scale(0.8); } }
+
+/* ---- Clips: the scissors snip twice ---- */
+.rx-settings .p-bladeA, .rx-settings .p-bladeB { transform-origin: 12.3px 12px; transform-box: view-box; }
+.rail-btn:hover .rx-settings .p-bladeA { animation: rxSnipA 0.7s var(--smooth); }
+.rail-btn:hover .rx-settings .p-bladeB { animation: rxSnipB 0.7s var(--smooth); }
+.rx-settings.is-active .p-bladeA { animation: rxSnipAIdle 5s ease-in-out infinite; }
+.rx-settings.is-active .p-bladeB { animation: rxSnipBIdle 5s ease-in-out infinite; }
+@keyframes rxSnipA { 25%, 75% { transform: rotate(14deg); } 50%, 100% { transform: rotate(0); } }
+@keyframes rxSnipB { 25%, 75% { transform: rotate(-14deg); } 50%, 100% { transform: rotate(0); } }
+@keyframes rxSnipAIdle { 0%, 88%, 100% { transform: none; } 93% { transform: rotate(12deg); } }
+@keyframes rxSnipBIdle { 0%, 88%, 100% { transform: none; } 93% { transform: rotate(-12deg); } }
+
+/* ---- Captions: lines type out, the spoken word moves along ---- */
+.rx-ai .p-l1, .rx-ai .p-l2 { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.rail-btn:hover .rx-ai .p-l1 { animation: rxDraw 0.45s var(--smooth) 0.1s both; }
+.rail-btn:hover .rx-ai .p-l2 { animation: rxDraw 0.5s var(--smooth) 0.3s both; }
+.rail-btn:hover .rx-ai .p-word { animation: rxKaraoke 0.9s var(--smooth); }
+.rx-ai.is-active .p-word { animation: rxKaraokeIdle 4s ease-in-out infinite; }
+@keyframes rxKaraoke { 0% { transform: translateX(0); } 45% { transform: translateX(7px) scaleX(1.1); } 100% { transform: translateX(0); } }
+@keyframes rxKaraokeIdle { 0%, 70%, 100% { transform: none; } 80% { transform: translateX(7px); } 90% { transform: translateX(7px); } }
+
+/* ---- Trim: the gap closes ---- */
+.rail-btn:hover .rx-tidy .p-clipA { animation: rxCloseA 0.8s var(--spring); }
+.rail-btn:hover .rx-tidy .p-clipB { animation: rxCloseB 0.8s var(--spring); }
+.rail-btn:hover .rx-tidy .p-gap { animation: rxGap 0.8s var(--smooth); }
+.rx-tidy.is-active .p-gap { animation: rxLive 2s ease-in-out infinite; }
+@keyframes rxCloseA { 45% { transform: translateX(2.2px); } 100% { transform: none; } }
+@keyframes rxCloseB { 45% { transform: translateX(-2.2px); } 100% { transform: none; } }
+@keyframes rxGap { 45% { opacity: 0; transform: scaleY(0.3); } 100% { opacity: 1; transform: none; } }
+
+/* ---- Guide: steps checked off in order ---- */
+.rx-guide .p-g1, .rx-guide .p-g2, .rx-guide .p-g3 { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.rail-btn:hover .rx-guide .p-d1 { animation: rxTwinkle 0.4s var(--spring) 0s both; }
+.rail-btn:hover .rx-guide .p-g1 { animation: rxDraw 0.3s var(--smooth) 0.08s both; }
+.rail-btn:hover .rx-guide .p-d2 { animation: rxTwinkle 0.4s var(--spring) 0.2s both; }
+.rail-btn:hover .rx-guide .p-g2 { animation: rxDraw 0.3s var(--smooth) 0.28s both; }
+.rail-btn:hover .rx-guide .p-d3 { animation: rxTwinkle 0.4s var(--spring) 0.4s both; }
+.rail-btn:hover .rx-guide .p-g3 { animation: rxDraw 0.3s var(--smooth) 0.48s both; }
+.rx-guide.is-active .p-d1 { animation: rxIdleNudge 5s ease-in-out infinite; }
+.rx-guide.is-active .p-d2 { animation: rxIdleNudge 5s ease-in-out 0.15s infinite; }
+.rx-guide.is-active .p-d3 { animation: rxIdleNudge 5s ease-in-out 0.3s infinite; }
+
+/* ---- Brand: the seal turns, the star shines ---- */
+.rail-btn:hover .rx-brand .p-seal { animation: rxSeal 0.8s var(--spring); }
+.rail-btn:hover .rx-brand .p-star { animation: rxStar 0.8s var(--spring); }
+.rx-brand.is-active .p-star { animation: rxIdleNudge 5s ease-in-out infinite; }
+@keyframes rxSeal { 0% { transform: rotate(0); } 100% { transform: rotate(45deg); } }
+@keyframes rxStar { 0% { transform: scale(1) rotate(0); } 40% { transform: scale(1.4) rotate(-20deg); } 100% { transform: scale(1) rotate(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rx, .rx * { animation: none !important; transition: none !important; }
+}
+
+/* the rail holds 15 tools: keep them compact so they fit next to the timeline, and scroll quietly when the window is short */
+.rail { scrollbar-width: none; padding-bottom: 8px; }
+.rail::-webkit-scrollbar { display: none; }
+.rail .rail-btn { height: 46px; gap: 3px; flex-shrink: 0; }
+@media (max-height: 960px) { .rail .rail-btn { height: 42px; } }
+@media (max-height: 820px) {
+  .rail .rail-btn { height: 40px; }
+  .rail .rail-btn span { font-size: 9.5px; }
+}
+.rail-more-wrap { position: sticky; bottom: -8px; width: 100%; min-height: 8px; display: flex; justify-content: center; pointer-events: none; margin-top: auto; }
+.rail-more-wrap:has(.rail-more) { padding: 18px 0 10px; background: linear-gradient(to bottom, transparent, var(--bg-2) 55%); }
+.rail { scroll-padding-bottom: 40px; scroll-snap-type: y proximity; }
+.rail .rail-btn { scroll-snap-align: start; }
+.rail-more { pointer-events: auto; width: 48px; height: 28px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); display: grid; place-items: center; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); animation: railMore 1.8s ease-in-out infinite; }
+.rail-more:hover { color: var(--text); border-color: var(--accent); }
+.rail-more.up { animation: none; }
+.rail-more.up svg { transform: rotate(180deg); }
+@keyframes railMore { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(2px); } }
+@media (prefers-reduced-motion: reduce) { .rail-more { animation: none; } }

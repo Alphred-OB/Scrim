@@ -1,0 +1,32 @@
+# Render blueprint: one click setup of the Scrim website, feedback service and its database.
+# In Render: New > Blueprint, pick this repo. Then add your own domain in the service settings.
+services:
+  - type: web
+    name: scrim-feedback
+    runtime: node
+    rootDir: server/feedback
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scrim-feedback-db
+          property: connectionString
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: IP_SALT
+        generateValue: true
+      - key: NOTIFY_WEBHOOK_URL
+        sync: false
+      - key: GITHUB_REPO
+        value: Alphred-OB/Scrim
+      - key: GITHUB_TOKEN
+        sync: false
+databases:
+  - name: scrim-feedback-db
+    plan: free
+    databaseName: scrim_feedback

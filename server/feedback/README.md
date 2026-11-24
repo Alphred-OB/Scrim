@@ -1,0 +1,70 @@
+# Scrim website and feedback service
+
+One small Node app that does three things:
+
+- **The website** (`public/`): home, features, captions and AI, script, editing, download, `/feedback` (report a problem or suggest a feature) and `/privacy`.
+  `/download` always sends people to the newest Windows installer on GitHub Releases.
+- **Feedback** from the app and the website, stored in Postgres.
+- **A dashboard** at `/admin` to read and sort it. Crash reports go to Sentry, not here.
+
+## Put it online (Render, about 5 minutes)
+
+1. Push this repo to GitHub.
+2. In Render: **New > Blueprint**, pick the repo. It reads `render.yaml` and makes the service and a Postgres database.
+3. When asked, set `ADMIN_PASSWORD` (your dashboard password). `NOTIFY_WEBHOOK_URL` is optional: paste a Discord or Slack webhook to get a message for every new report.
+4. Your own domain: in the service's **Settings > Custom Domains**, add e.g. `feedback.example.com`, then add the CNAME record Render shows you in Cloudflare (DNS only, grey cloud, until Render has issued the certificate).
+5. Put the address in the app: `src/shared/config.ts`, `FEEDBACK_URL`.
+6. Downloads: `GITHUB_REPO` (default `Alphred-OB/Scrim`) must have a published release with the `.exe`.
+   The repo has to be public for visitors to download it. `GITHUB_TOKEN` is optional and only raises GitHub's rate limit.
+
+Since the site and the feedback live together, one domain covers both, for example `scrim.example.com`.
+
+Note: Render's free database is deleted after 30 days on the free plan; switch it to the cheapest paid plan (or point `DATABASE_URL` at a free Neon database) for anything you want to keep.
+
+## Styling
+
+The site uses Tailwind CSS v4. The source is `styles/site.css` (colors, the button and card classes);
+everything else is utility classes in `public/*.html`. Smooth scrolling is Lenis, copied into `public/vendor` (no CDN). After changing classes run `npm run css`
+(or `npm run css:watch` while working). The built `public/site.css` is committed so the site works
+without a build, and Render rebuilds it on every deploy.
+
+## The live editor demo (`/app`)
+
+`public/app` is Scrim's real editor built for the browser, opening a sample project from `public/app/demo`.
+Edits stay in the visitor's browser and exports download straight from the page (MP4 or WebM).
+Recording, captions from speech, GIFs and guides need the desktop app.
+The build is committed, so Render doesn't need the app's code. To refresh it, from the repo root: `npm run build:web`.
+
+## Trying the site locally
+
+`npm start` works without a database too (feedback is just switched off), then open http://localhost:3000.
+
+## API
+
+`POST /v1/feedback` with header `x-scrim-client: scrim-desktop` and JSON:
+
+| field | |
+|---|---|
+| `kind` | `bug` or `idea` |
+| `title`, `message` | required |
+| `email` | optional, for a reply |
+| `appVersion`, `os`, `meta` | filled in by the app |
+| `logs` | optional text (last ~600 KB) |
+| `screenshot` | optional `data:image/png;base64,...` (max 4 MB) |
+| `crashId` | optional Sentry event id |
+
+Limits: 12 reports per hour per address, 7 MB per request, a honeypot field (`website`) for bots.
+
+## Run it locally
+
+```
+cp .env.example .env   # set DATABASE_URL and ADMIN_PASSWORD
+npm install
+npm start
+TEST_DATABASE_URL=postgres://... npm test
+```
+
+
+## Pages
+
+Every page is a plain file in `public/`. The header and footer are shared: edit `partials/header.html` or `partials/footer.html`, then run `npm run pages` to update all pages. `npm run build` does that and rebuilds the CSS.

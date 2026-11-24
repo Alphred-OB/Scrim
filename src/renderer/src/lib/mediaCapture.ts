@@ -31,6 +31,7 @@ function startTrack(kind: Kind, stream: MediaStream, opts: MediaRecorderOptions)
 export interface MediaStartOptions {
   mic: boolean
   micDeviceId?: string
+  noiseSuppression?: boolean
   system: boolean
   webcam: { deviceId?: string; quality: 480 | 720 | 1080 } | null
 }
@@ -52,12 +53,13 @@ export async function startMedia(opts: MediaStartOptions): Promise<Partial<Recor
   if (opts.mic) {
     jobs.push(
       (async () => {
+        const ns = opts.noiseSuppression ?? true
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             deviceId: opts.micDeviceId ? { exact: opts.micDeviceId } : undefined,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+            echoCancellation: ns,
+            noiseSuppression: ns,
+            autoGainControl: ns,
             channelCount: 1
           }
         })
@@ -79,9 +81,13 @@ export async function startMedia(opts: MediaStartOptions): Promise<Partial<Recor
     const cam = opts.webcam
     jobs.push(
       (async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: webcamConstraints(cam.deviceId, cam.quality), audio: false })
-        const bps = cam.quality >= 1080 ? 5_000_000 : cam.quality >= 720 ? 2_500_000 : 1_200_000
-        out.webcam = await startTrack('webcam', stream, { videoBitsPerSecond: bps })
+        // ask for the best the camera can do; it answers with what it really supports
+        const stream = await navigator.mediaDevices.getUserMedia({ video: webcamConstraints(cam.deviceId, 1080), audio: false })
+        const h = stream.getVideoTracks()[0]?.getSettings().height ?? 720
+        const bps = h >= 1000 ? 5_000_000 : h >= 700 ? 2_500_000 : 1_200_000
+        // a keyframe every second: left to itself the recorder makes one every 3 to 8 s, and then every seek
+        // in the editor decodes seconds of video first (0.1 to 0.5 s per seek, which stalled the player)
+        out.webcam = await startTrack('webcam', stream, { videoBitsPerSecond: bps, videoKeyFrameIntervalDuration: 1000 } as MediaRecorderOptions)
       })().catch((e) => console.warn('webcam failed', e))
     )
   }
@@ -108,6 +114,14 @@ export async function stopMedia(dir: string): Promise<Partial<Record<Kind, strin
     if (blob.size > 0) out[kind] = await api.saveAudio(dir, kind, new Uint8Array(await blob.arrayBuffer()))
   }
   return out
+}
+
+/** Pausing keeps the tracks in step with the screen video, which also skips paused time. */
+export function pauseMedia(): void {
+  for (const t of Object.values(tracks)) if (t?.rec.state === 'recording') t.rec.pause()
+}
+export function resumeMedia(): void {
+  for (const t of Object.values(tracks)) if (t?.rec.state === 'paused') t.rec.resume()
 }
 
 export async function cancelMedia(): Promise<void> {

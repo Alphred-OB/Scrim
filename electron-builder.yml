@@ -1,4 +1,4 @@
-appId: com.eruditeafrican.scrim
+appId: com.aob.scrim
 productName: Scrim
 directories:
   buildResources: build
@@ -16,10 +16,31 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: build/icon.png
+  icon: build/icon.ico
+  # ---- code signing (removes "Unknown Publisher") ----
+  # Option A, a .pfx certificate: set CSC_LINK (path or base64 of the .pfx) and CSC_KEY_PASSWORD
+  # in the environment before `npm run release`. Nothing else is needed here.
+  # Once you sign, uncomment publisherName with the exact name on the certificate, so the
+  # auto updater only installs updates signed by you.
+  # signtoolOptions:
+  #   publisherName: "AOB"
+  #
+  # Option B, Azure Trusted Signing (no USB token, works in CI): fill these in and set
+  # AZURE_TENANT_ID, AZURE_CLIENT_ID and AZURE_CLIENT_SECRET in the environment.
+  # azureSignOptions:
+  #   publisherName: "AOB"
+  #   endpoint: "https://eus.codesigning.azure.net"
+  #   codeSigningAccountName: "your-account"
+  #   certificateProfileName: "your-profile"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   artifactName: Scrim-Setup-${version}.exe
 npmRebuild: false
+# auto updates: installers and latest.yml go to GitHub Releases, the app checks there
+publish:
+  provider: github
+  owner: Alphred-OB
+  repo: Scrim
+  releaseType: release

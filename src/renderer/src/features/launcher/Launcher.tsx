@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CaptureSource, Corner, ProjectSummary, RecorderStatus, WebcamRecordOptions, WebcamShape } from '@shared/types'
+import type { CaptureSource, Corner, ProjectSummary, RecorderStatus, WebcamBg, WebcamRecordOptions, WebcamShape } from '@shared/types'
 import { api, mediaUrl } from '@/lib/api'
 import { webcamConstraints } from '@/lib/mediaCapture'
-import { Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu } from '@/ui'
+import { ColorRow, Icon, Seg, Slider, Toggle, fmtTime, Select, openContextMenu, askConfirm, showMessage } from '@/ui'
+import { helpMenu, openFeedback } from '@/lib/feedback'
+import LiveCam from '@/features/recording/LiveCam'
+import ScriptModal from './ScriptModal'
 import SettingsModal from '@/features/settings/SettingsModal'
+import { matches, useSettings } from '@/lib/settings'
+import { openProjectFromDialog } from '@/lib/openProject'
+import { maybeAutoStart } from '@/features/onboarding/tours'
+import { preloadSample, startPractice } from '@/features/onboarding/practice'
 
 const LS = 'df.recordPrefs'
-interface Prefs { mic: boolean; micDeviceId?: string; systemAudio: boolean; fps: 30 | 60; countdown: number; webcam: WebcamRecordOptions }
+interface Prefs { mic: boolean; micDeviceId?: string; noiseSuppression?: boolean; systemAudio: boolean; fps: 30 | 60; countdown: number; keys: boolean; webcam: WebcamRecordOptions }
 const DEF: Prefs = {
   mic: true,
+  noiseSuppression: true,
   systemAudio: true,
   fps: 30,
   countdown: 3,
-  webcam: { enabled: false, quality: 720, shape: 'circle', size: 0.24, corner: 'br', showBubble: true }
+  keys: true,
+  webcam: { enabled: false, quality: 720, shape: 'circle', size: 0.24, corner: 'br', showBubble: true, mirror: true }
 }
 function loadPrefs(): Prefs {
   try {
@@ -24,7 +33,11 @@ function loadPrefs(): Prefs {
 }
 
 export default function Launcher() {
-  const [tab, setTab] = useState<'record' | 'projects'>('record')
+  // start on a simple choice: record something new, or edit what you have
+  const [tab, setTab] = useState<'home' | 'record' | 'projects'>('home')
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'recent' | 'name' | 'long'>('recent')
+  const [dropping, setDropping] = useState(false)
   const [kind, setKind] = useState<'screen' | 'window'>('screen')
   const [sources, setSources] = useState<CaptureSource[]>([])
   const [selected, setSelected] = useState<string>('')
@@ -37,8 +50,22 @@ export default function Launcher() {
   const [busy, setBusy] = useState('')
   const [level, setLevel] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const recBusy = status.state === 'recording' || status.state === 'countdown' || status.state === 'stopping'
+  const [scriptOpen, setScriptOpen] = useState(false)
+  const recBusy = status.state === 'recording' || status.state === 'paused' || status.state === 'countdown' || status.state === 'stopping'
   const cam = prefs.webcam
+  // after the welcome tour, point out the home screen once
+  const onboarded = useSettings((s) => s.settings.onboarded)
+  useEffect(() => {
+    if (tab === 'home' && onboarded) maybeAutoStart('home')
+  }, [tab, onboarded])
+  useEffect(() => {
+    if (recBusy) setTab('record')
+  }, [recBusy])
+  // get the practice project ready in the background, so opening it is instant
+  useEffect(() => {
+    const id = setTimeout(() => preloadSample(), 2500)
+    return () => clearTimeout(id)
+  }, [])
   const setCam = (p: Partial<WebcamRecordOptions>) => setPrefs((s) => ({ ...s, webcam: { ...s.webcam, ...p } }))
 
   const refresh = useCallback(async () => {
@@ -73,6 +100,19 @@ export default function Launcher() {
       navigator.mediaDevices.removeEventListener('devicechange', devices)
     }
   }, [refresh, loadProjects])
+
+  // Ctrl+O opens a project or video from anywhere on the home screen
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (document.querySelector('.modal-back')) return
+      if (matches(e, useSettings.getState().settings.shortcuts.open || 'Ctrl+O')) {
+        e.preventDefault()
+        openProjectFromDialog()
+      }
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [])
 
   useEffect(() => {
     try {
@@ -123,6 +163,9 @@ export default function Launcher() {
 
   // live webcam preview before recording
   const camVideo = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [camStream, setCamStream] = useState<MediaStream | null>(null)
+  const [camPreviewMode, setCamPreviewMode] = useState<'cam' | 'screen'>('cam')
   const [camError, setCamError] = useState('')
   useEffect(() => {
     if (!cam.enabled || tab !== 'record' || recBusy) return
@@ -134,15 +177,25 @@ export default function Launcher() {
       .then((s) => {
         if (stopped) return s.getTracks().forEach((t) => t.stop())
         stream = s
+        streamRef.current = s
+        setCamStream(s)
         if (camVideo.current) camVideo.current.srcObject = s
         navigator.mediaDevices.enumerateDevices().then((d) => setCams(d.filter((x) => x.kind === 'videoinput')))
       })
       .catch((e) => setCamError(e?.name === 'NotAllowedError' ? 'Camera permission was blocked.' : 'No camera found or it is busy in another app.'))
     return () => {
       stopped = true
+      streamRef.current = null
+      setCamStream(null)
       stream?.getTracks().forEach((t) => t.stop())
     }
   }, [cam.enabled, cam.deviceId, tab, recBusy])
+
+  useEffect(() => {
+    if (camVideo.current && streamRef.current) {
+      camVideo.current.srcObject = streamRef.current
+    }
+  }, [camPreviewMode])
 
   const src = sources.find((s) => s.id === selected)
   const list = sources.filter((s) => s.kind === kind)
@@ -156,44 +209,159 @@ export default function Launcher() {
       fps: prefs.fps,
       mic: prefs.mic,
       micDeviceId: prefs.micDeviceId,
+      noiseSuppression: prefs.noiseSuppression !== false,
       systemAudio: prefs.systemAudio,
       countdown: prefs.countdown,
+      keys: prefs.keys,
       webcam: cam.enabled ? cam : undefined
     })
   }
 
-  const doImport = async () => {
+  const doImport = async (file?: string) => {
     setBusy('Importing video…')
     try {
-      const p = await api.importVideo()
+      const p = await api.importVideo(file)
       if (p) api.openEditor(p.dir)
     } catch (e) {
-      alert(String(e))
+      showMessage("That video couldn't be imported", String(e).replace(/^Error:\s*/, ''))
     } finally {
       setBusy('')
     }
   }
 
+  const q = query.trim().toLowerCase()
+  const shown = projects
+    .filter((p) => p.name.toLowerCase().includes(q))
+    .sort((a, b) => (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'long' ? b.duration - a.duration : b.updatedAt - a.updatedAt))
+  const projectMenu = (p: ProjectSummary) => [
+    { label: 'Open', onClick: () => api.openEditor(p.dir) },
+    { label: 'Show in folder', onClick: () => api.showItem(p.dir) },
+    { sep: true },
+    { label: 'Delete', danger: true, onClick: async () => { if (await askConfirm({ title: `Delete "${p.name}"?`, body: 'The project and its recording will be removed for good. This can\'t be undone.', ok: 'Delete', danger: true })) { await api.deleteProject(p.dir); loadProjects() } } }
+  ]
+
+  // R and E on the home screen
+  useEffect(() => {
+    if (tab !== 'home') return
+    const on = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || document.querySelector('.modal-back, .ob-back, .coach')) return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === 'r' || e.key === 'R') setTab('record')
+      else if (e.key === 'e' || e.key === 'E') setTab('projects')
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [tab])
+
   const camRadius = cam.shape === 'circle' ? '50%' : cam.shape === 'rounded' ? '22%' : '6px'
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <header className="drag surface" style={{ height: 52, display: 'flex', alignItems: 'center', gap: 16, padding: '0 150px 0 18px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,#0a84ff,#9b5cff)', boxShadow: '0 4px 14px rgba(10,132,255,.35)' }} />
-          <b style={{ fontSize: 14.5, letterSpacing: '-.01em' }}>Scrim</b>
-        </div>
-        <div style={{ width: 250, marginLeft: 16 }}>
-          <Seg options={[{ v: 'record', l: 'Record' }, { v: 'projects', l: `Projects · ${projects.length}` }]} value={tab} onChange={(v) => setTab(v as 'record' | 'projects')} />
-        </div>
+      <header className="drag surface win-head" style={{ height: 52, display: 'flex', alignItems: 'center', gap: 16, padding: '0 150px 0 18px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+        {tab !== 'home' ? (
+          <button className="icon-btn" title="Back" onClick={() => setTab('home')} disabled={recBusy && tab === 'record'}><Icon name="back" /></button>
+        ) : null}
+        <button className="brand" onClick={() => setTab('home')} title="Home">
+          <span className="brand-mark" />
+          <b>Scrim</b>
+        </button>
+        {tab !== 'home' && <span className="crumb">{tab === 'record' ? 'New recording' : 'Your projects'}</span>}
         <div style={{ flex: 1 }} />
-        <button className="btn sm" onClick={doImport}><Icon name="upload" size={15} /> Import video</button>
-        <button className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
+        <button
+          data-tour="help"
+          className="icon-btn"
+          title="Help, report a problem, suggest a feature"
+          onClick={(e) =>
+            openContextMenu(
+              e,
+              helpMenu(() => {
+                setTab('home')
+                const s = useSettings.getState()
+                s.save({ onboarded: false, toursSeen: (s.settings.toursSeen ?? []).filter((t) => t !== 'home') })
+              })
+            )
+          }
+        >
+          <Icon name="help" />
+        </button>
+        <button data-tour="settings" className="icon-btn" title="Settings" onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
       </header>
 
       {status.state === 'error' && (
         <div className="fade-in" style={{ margin: '14px 22px 0', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,69,58,.12)', border: '1px solid rgba(255,69,58,.3)', whiteSpace: 'pre-wrap', fontSize: 12.5 }}>
-          <b>Recording failed.</b> {status.error}
+          <b>Recording failed.</b> {status.error}{' '}
+          <button className="link" onClick={() => openFeedback('bug', { title: 'Recording failed', message: `The recording failed with this message:\n${status.error ?? ''}\n\nWhat I was recording: ` })}>Report this problem</button>
+        </div>
+      )}
+
+      {tab === 'home' && (
+        <div className="home">
+          <div className="home-choices">
+            <button data-tour="home-record" className="home-card rec" onMouseMove={spot} onClick={() => setTab('record')}>
+              <div className="hc-art rec-art" aria-hidden>
+                <div className="ra-screen">
+                  <div className="ra-bar"><i /><i /><i /></div>
+                  <div className="ra-body"><span /><span /><span /><span /></div>
+                  <span className="ra-cursor" />
+                  <span className="ra-ripple" />
+                </div>
+                <span className="ra-rec"><span /> REC 0:12</span>
+              </div>
+              <div className="hc-body">
+                <span className="home-icon"><Icon name="record" size={22} /></span>
+                <div>
+                  <b>Record</b>
+                  <span>Your screen, a window or a browser tab, with mic and webcam.</span>
+                </div>
+                <kbd>R</kbd>
+              </div>
+            </button>
+            <button data-tour="home-edit" className="home-card edit" onMouseMove={spot} onClick={() => setTab('projects')}>
+              <div className="hc-art edit-art" aria-hidden>
+                <div className="ea-preview"><span /></div>
+                <div className="ea-tracks">
+                  <div><span style={{ left: '2%', width: '60%' }} /><span style={{ left: '64%', width: '34%' }} /></div>
+                  <div><span style={{ left: '14%', width: '22%' }} /><span style={{ left: '58%', width: '18%' }} /></div>
+                  <div><span style={{ left: '30%', width: '40%' }} /></div>
+                  <i className="ea-head" />
+                </div>
+              </div>
+              <div className="hc-body">
+                <span className="home-icon"><Icon name="scissors" size={20} /></span>
+                <div>
+                  <b>Edit</b>
+                  <span>Open a project, or bring in any video to polish.</span>
+                </div>
+                <kbd>E</kbd>
+              </div>
+            </button>
+          </div>
+          <div className="home-quick">
+            <button onClick={() => doImport()}><Icon name="upload" size={14} /> Import a video</button>
+            <button onClick={() => openProjectFromDialog()}><Icon name="folder" size={14} /> Open a project <kbd>Ctrl O</kbd></button>
+            <button data-tour="home-practice" className={projects.length === 0 ? "accent" : undefined} onClick={() => startPractice()}><Icon name="sparkles" size={14} /> Practice on a sample</button>
+          </div>
+          {projects.length > 0 && (
+            <div className="home-recent" data-tour="home-recent">
+              <div className="section-head">
+                <h2 className="home-recent-title">Jump back in</h2>
+                <button className="link" onClick={() => setTab('projects')}>See all {projects.length}</button>
+              </div>
+              <div className="home-recent-row">
+                {projects.slice(0, 4).map((p, k) => (
+                  <button key={p.dir} className="recent-tile" style={{ animationDelay: `${k * 60}ms` }} onClick={() => api.openEditor(p.dir)}>
+                    <div className="rt-thumb" style={{ backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }}>
+                      <span className="rt-dur">{fmtTime(p.duration)}</span>
+                      <span className="rt-play"><Icon name="play" size={14} /></span>
+                    </div>
+                    <b>{p.name}</b>
+                    <span>{ago(p.updatedAt)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -217,11 +385,12 @@ export default function Launcher() {
               <button className="btn sm" onClick={refresh} disabled={loading}>{loading ? <span className="spin" /> : <Icon name="restart" size={14} />} Refresh</button>
               <span className="hint">{kind === 'window' ? 'For a browser tab, pick the browser window and keep that tab open.' : 'Pick the display you want to record.'}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: list.length === 1 ? 'minmax(0,720px)' : 'repeat(auto-fill,minmax(300px,1fr))', justifyContent: list.length === 1 ? 'center' : undefined, gap: 16 }}>
               {list.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => setSelected(s.id)}
+                  aria-pressed={selected === s.id}
                   onDoubleClick={record}
                   className="glass"
                   style={{
@@ -243,7 +412,7 @@ export default function Launcher() {
           </div>
 
           <aside className="surface" style={{ width: 350, borderLeft: '1px solid var(--line)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="side-col" style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <span className="section-title">Audio</span>
               <Toggle label="Microphone" value={prefs.mic} onChange={(v) => setPrefs({ ...prefs, mic: v })} />
               {prefs.mic && (
@@ -253,7 +422,12 @@ export default function Launcher() {
                     options={[{ v: '', l: 'Default microphone' }, ...mics.map((m) => ({ v: m.deviceId, l: m.label || 'Microphone' }))]}
                     onChange={(v) => setPrefs({ ...prefs, micDeviceId: v || undefined })}
                   />
-                  <div className="progress" style={{ height: 5 }}><div style={{ width: `${level * 100}%`, background: level > 0.85 ? 'var(--danger)' : 'var(--ok)', transition: 'none' }} /></div>
+                  <Toggle label="Noise suppression" value={prefs.noiseSuppression !== false} onChange={(v) => setPrefs({ ...prefs, noiseSuppression: v })} />
+                  <div className="mic-meter" title="Speak to test your microphone">
+                    <Icon name="mic" size={14} />
+                    <div>{Array.from({ length: 16 }, (_, k) => <i key={k} className={level * 16 > k ? (k > 12 ? 'hot' : 'on') : ''} />)}</div>
+                    <span>{level > 0.03 ? 'Hearing you' : 'Say something'}</span>
+                  </div>
                 </>
               )}
               <Toggle label="System audio" value={prefs.systemAudio} onChange={(v) => setPrefs({ ...prefs, systemAudio: v })} />
@@ -262,32 +436,157 @@ export default function Launcher() {
               <Toggle label="Record webcam" value={cam.enabled} onChange={(v) => setCam({ enabled: v })} />
               {cam.enabled && (
                 <>
-                  {/* preview of where the camera will sit */}
-                  <div style={{ position: 'relative', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', background: src ? `#000 center/cover url(${src.thumbnail})` : '#000', border: '1px solid var(--line)' }}>
-                    <div
+                  {/* preview of webcam */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      aspectRatio: '16/9',
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      background: '#0a0d14',
+                      border: '1px solid var(--line)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {camPreviewMode === 'cam' ? (
+                      <>
+                        <video
+                          ref={camVideo}
+                          autoPlay
+                          muted
+                          playsInline
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            transform: cam.mirror !== false ? 'scaleX(-1)' : 'none'
+                          }}
+                        />
+                        {cam.bg && cam.bg !== 'none' && (
+                          <div style={{ position: 'absolute', inset: 0, background: cam.bg === 'remove' ? 'repeating-conic-gradient(#2a2d36 0 25%, #20222a 0 50%) 0 0 / 16px 16px' : '#0a0d14' }}>
+                            <LiveCam stream={camStream} live={cam} style={{ transform: cam.mirror !== false ? 'scaleX(-1)' : 'none' }} />
+                          </div>
+                        )}
+                        {/* shape framing guide */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: cam.shape === 'circle' ? 144 : cam.shape === 'square' ? 144 : 200,
+                              height: cam.shape === 'circle' ? 144 : cam.shape === 'square' ? 144 : 116,
+                              borderRadius: camRadius,
+                              border: '2px solid rgba(255,255,255,0.85)',
+                              boxShadow: '0 0 0 9999px rgba(0,0,0,0.38)'
+                            }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            background: src ? `#000 center/cover url(${src.thumbnail})` : '#000'
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            width: `${cam.size * 56.25}%`,
+                            aspectRatio: '1',
+                            borderRadius: camRadius,
+                            overflow: 'hidden',
+                            border: '2px solid #fff',
+                            boxShadow: '0 6px 18px rgba(0,0,0,.5)',
+                            background: '#111',
+                            [cam.corner.endsWith('l') ? 'left' : 'right']: '4%',
+                            [cam.corner.startsWith('t') ? 'top' : 'bottom']: '6%',
+                            transition: 'all .2s var(--ease)'
+                          } as React.CSSProperties}
+                        >
+                          <video
+                            ref={camVideo}
+                            autoPlay
+                            muted
+                            playsInline
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              transform: cam.mirror !== false ? 'scaleX(-1)' : 'none'
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Mode switch pill */}
+                    <button
+                      className="btn xs glass"
+                      onClick={() => setCamPreviewMode((m) => (m === 'cam' ? 'screen' : 'cam'))}
                       style={{
                         position: 'absolute',
-                        width: `${cam.size * 56.25}%`,
-                        aspectRatio: '1',
-                        borderRadius: camRadius,
-                        overflow: 'hidden',
-                        border: '2px solid #fff',
-                        boxShadow: '0 6px 18px rgba(0,0,0,.5)',
-                        background: '#111',
-                        [cam.corner.endsWith('l') ? 'left' : 'right']: '4%',
-                        [cam.corner.startsWith('t') ? 'top' : 'bottom']: '6%',
-                        transition: 'all .2s var(--ease)'
-                      } as React.CSSProperties}
+                        top: 8,
+                        right: 8,
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        borderRadius: 8,
+                        background: 'rgba(0,0,0,0.65)',
+                        backdropFilter: 'blur(8px)',
+                        color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        zIndex: 10
+                      }}
+                      title={camPreviewMode === 'cam' ? 'Switch to screen placement preview' : 'Switch to camera preview'}
                     >
-                      <video ref={camVideo} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
-                    </div>
-                    {camError && <div className="hint" style={{ position: 'absolute', left: 10, top: 8, color: '#ff8a80' }}>{camError}</div>}
+                      <Icon name={camPreviewMode === 'cam' ? 'monitor' : 'camera'} size={12} />
+                      {camPreviewMode === 'cam' ? 'On screen' : 'Camera'}
+                    </button>
+
+                    {camError && (
+                      <div
+                        className="hint"
+                        style={{
+                          position: 'absolute',
+                          left: 10,
+                          top: 8,
+                          right: 10,
+                          color: '#fff',
+                          background: 'rgba(0,0,0,.75)',
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          zIndex: 15
+                        }}
+                      >
+                        {camError}
+                      </div>
+                    )}
                   </div>
                   <Select
                     value={cam.deviceId ?? ''}
                     options={[{ v: '', l: 'Default camera' }, ...cams.map((c) => ({ v: c.deviceId, l: c.label || 'Camera' }))]}
                     onChange={(v) => setCam({ deviceId: v || undefined })}
                   />
+                  <Toggle label="Mirror camera" value={cam.mirror !== false} onChange={(v) => setCam({ mirror: v })} />
+                  <span className="section-title" style={{ marginTop: 8 }}>Background</span>
+                  <Seg options={[{ v: 'none', l: 'Off' }, { v: 'blur', l: 'Blur' }, { v: 'color', l: 'Color' }, { v: 'remove', l: 'Remove' }]} value={cam.bg ?? 'none'} onChange={(v) => setCam({ bg: v as WebcamBg })} />
+                  {cam.bg === 'blur' && <Slider label="Blur" value={cam.bgBlur ?? 0.6} min={0} max={1} step={0.05} def={0.6} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setCam({ bgBlur: v })} />}
+                  {cam.bg === 'color' && <ColorRow label="Color" value={cam.bgColor ?? '#1d2230'} onChange={(v) => setCam({ bgColor: v })} />}
+                  {cam.bg && cam.bg !== 'none' && <span className="hint">Works like a video call: you see it live, and the editor starts with the same look (you can still change it there).</span>}
                   <Seg options={[{ v: 'circle', l: 'Circle' }, { v: 'rounded', l: 'Rounded' }, { v: 'square', l: 'Square' }]} value={cam.shape} onChange={(v) => setCam({ shape: v as WebcamShape })} />
                   <Slider label="Size" value={cam.size} min={0.12} max={0.45} step={0.01} def={0.24} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setCam({ size: v })} />
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -297,7 +596,6 @@ export default function Launcher() {
                       </button>
                     ))}
                   </div>
-                  <Seg options={[{ v: 480, l: '480p' }, { v: 720, l: '720p' }, { v: 1080, l: '1080p' }]} value={cam.quality} onChange={(v) => setCam({ quality: v as 480 | 720 | 1080 })} />
                   <Toggle label="Show bubble while recording" value={cam.showBubble} onChange={(v) => setCam({ showBubble: v })} />
                   <span className="hint">The camera is saved as its own file, so you can move, resize, reshape or hide it later in the editor.</span>
                 </>
@@ -305,10 +603,19 @@ export default function Launcher() {
 
               <span className="section-title" style={{ marginTop: 12 }}>Video</span>
               <Seg options={[{ v: 30, l: '30 fps' }, { v: 60, l: '60 fps' }]} value={prefs.fps} onChange={(v) => setPrefs({ ...prefs, fps: v as 30 | 60 })} />
+              <span className="section-title" style={{ marginTop: 12 }}>Keyboard</span>
+              <Toggle label="Show keyboard shortcuts" value={prefs.keys} onChange={(v) => setPrefs({ ...prefs, keys: v })} />
+              <span className="hint">Shortcuts like Ctrl+C or Enter can be shown in the video. What you type is never saved.</span>
+              <span className="section-title" style={{ marginTop: 12 }}>Script</span>
+              <button className="btn" style={{ width: '100%' }} onClick={() => setScriptOpen(true)}>Write or edit script…</button>
+              <span className="hint">An on screen script you can read while recording. It never shows in the video.</span>
               <span className="section-title" style={{ marginTop: 12 }}>Countdown</span>
               <Seg options={[{ v: 0, l: 'Off' }, { v: 3, l: '3s' }, { v: 5, l: '5s' }]} value={prefs.countdown} onChange={(v) => setPrefs({ ...prefs, countdown: v as number })} />
             </div>
             <div style={{ padding: 16, borderTop: '1px solid var(--line)' }}>
+              <div className="hint" style={{ textAlign: 'center', marginBottom: 10, lineHeight: 1.5 }}>
+                {src ? src.name : 'Nothing selected'} · {[prefs.mic && 'mic', prefs.systemAudio && 'system audio', cam.enabled && 'webcam'].filter(Boolean).join(' + ') || 'no audio'} · {prefs.fps} fps
+              </div>
               <button className="btn primary" style={{ width: '100%', height: 46, fontSize: 15, borderRadius: 12 }} disabled={!src || recBusy} onClick={record}>
                 <Icon name="record" size={15} /> Start recording
               </button>
@@ -316,38 +623,103 @@ export default function Launcher() {
             </div>
           </aside>
         </div>
-      ) : (
-        <div style={{ flex: 1, overflow: 'auto', padding: 22 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 16 }}>
-            {projects.map((p) => (
+      ) : tab === 'projects' ? (
+        <div
+          className="projects-page fade-in"
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes('Files')) return
+            e.preventDefault()
+            setDropping(true)
+          }}
+          onDragLeave={(e) => e.currentTarget === e.target && setDropping(false)}
+          onDrop={async (e) => {
+            setDropping(false)
+            const f = e.dataTransfer.files[0]
+            if (!f) return
+            e.preventDefault()
+            await doImport(api.pathForFile(f))
+          }}
+        >
+          <div className="projects-head">
+            <div>
+              <h2>Projects <span className="count-pill">{projects.length}</span></h2>
+              <span className="hint">Right click a project for more. Drop a video anywhere to import it.</span>
+            </div>
+            <div style={{ flex: 1 }} />
+            <div className="search-wrap">
+              <Icon name="search" size={15} />
+              <input className="search" placeholder="Search projects" value={query} onChange={(e) => setQuery(e.target.value)} />
+            </div>
+            <div style={{ width: 230 }}>
+              <Seg options={[{ v: 'recent', l: 'Recent' }, { v: 'name', l: 'Name' }, { v: 'long', l: 'Longest' }]} value={sort} onChange={(v) => setSort(v as typeof sort)} />
+            </div>
+            <button className="btn" onClick={() => openProjectFromDialog()} title="Ctrl+O"><Icon name="folder" size={15} /> Open…</button>
+            <button className="btn primary" onClick={() => doImport()}><Icon name="upload" size={15} /> Import a video</button>
+          </div>
+          <div className="proj-grid">
+            <button className="proj-new" onClick={() => setTab('record')}>
+              <span className="pn-icon"><Icon name="record" size={20} /></span>
+              <b>New recording</b>
+              <span>Screen, window or tab</span>
+            </button>
+            {shown.map((p, k) => (
               <div
                 key={p.dir}
-                className="glass fade-in"
-                style={{ borderRadius: 16, overflow: 'hidden', boxShadow: 'none', cursor: 'pointer' }}
+                className="proj-card"
+                style={{ animationDelay: `${Math.min(k, 12) * 35}ms` }}
                 onClick={() => api.openEditor(p.dir)}
-                onContextMenu={(e) =>
-                  openContextMenu(e, [
-                    { label: 'Open', onClick: () => api.openEditor(p.dir) },
-                    { label: 'Show in folder', onClick: () => api.showItem(p.dir) },
-                    { sep: true },
-                    { label: 'Delete', danger: true, onClick: async () => { if (confirm(`Delete "${p.name}"? This can't be undone.`)) { await api.deleteProject(p.dir); loadProjects() } } }
-                  ])
-                }
+                onContextMenu={(e) => openContextMenu(e, projectMenu(p))}
               >
-                <div style={{ aspectRatio: '16/9', background: `#000 center/cover no-repeat`, backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }} />
-                <div style={{ padding: '10px 12px' }}>
-                  <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                  <div className="hint">{new Date(p.createdAt).toLocaleString()} · {fmtTime(p.duration)}</div>
+                <div className="pc-thumb" style={{ backgroundImage: p.thumb ? `url(${mediaUrl(p.thumb)})` : undefined }}>
+                  <span className="rt-dur">{fmtTime(p.duration)}</span>
+                  <span className="rt-play"><Icon name="play" size={16} /></span>
+                </div>
+                <div className="pc-meta">
+                  <div>
+                    <b>{p.name}</b>
+                    <span>Edited {ago(p.updatedAt)}</span>
+                  </div>
+                  <button className="icon-btn pc-more" title="More" onClick={(e) => { e.stopPropagation(); openContextMenu(e, projectMenu(p)) }}>
+                    <Icon name="more" size={16} />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-          {!projects.length && <div className="hint">No projects yet. Record something or import a video.</div>}
-          {projects.length > 0 && <div className="hint" style={{ marginTop: 14 }}>Right click a project for more options.</div>}
+          {!shown.length && projects.length > 0 && <div className="hint" style={{ marginTop: 20, textAlign: 'center' }}>Nothing matches "{query}".</div>}
+          {!projects.length && (
+            <div className="empty-state" style={{ marginTop: 18 }}>
+              <Icon name="film" size={30} />
+              <b>No projects yet</b>
+              <span>Import a video, drop one here, or try the practice project.</span>
+              <button className="btn primary" onClick={() => startPractice()}><Icon name="sparkles" size={14} /> Practice on a sample</button>
+            </div>
+          )}
+          {dropping && <div className="drop-veil">Drop to import</div>}
         </div>
-      )}
+      ) : null}
       {busy && <div className="toast glass"><span className="spin" />{busy}</div>}
+      {scriptOpen && <ScriptModal onClose={() => setScriptOpen(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   )
+}
+
+/** Hover glow that follows the mouse on the big home cards. */
+function spot(e: React.MouseEvent<HTMLElement>) {
+  const r = e.currentTarget.getBoundingClientRect()
+  e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`)
+  e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
+}
+
+
+/** "just now", "5 min ago", "yesterday", then a date. */
+function ago(ms: number): string {
+  const s = (Date.now() - ms) / 1000
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
+  if (s < 172800) return 'yesterday'
+  if (s < 604800) return `${Math.floor(s / 86400)} days ago`
+  return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }

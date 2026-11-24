@@ -3,14 +3,18 @@ import {
   getFirstEncodableVideoCodec, type StreamTargetChunk, type VideoCodec
 } from 'mediabunny'
 import type { CursorData, ExportSettings, Project } from '@shared/types'
+import { audibleClicks, clickTrackWav } from '@shared/clickSounds'
+import { applyCamBg, loadSegmenter, preloadPicture } from '../engine/webcamBg'
 import { api, mediaUrl, type MuxJobIn } from '@/lib/api'
 import { Renderer, computeLayout, outputSize } from '../engine/compositor'
+import { ensureWallpaperLoaded } from '../engine/backgrounds'
 import { buildCameraTrack, buildTrack } from '../engine/cursorTrack'
-import { outputDuration, outputToSource, sortedClips } from '../engine/timeMap'
+import { outputDuration, outputToSource, sortedClips, sourceToOutput } from '../engine/timeMap'
 
 export interface ExportProgress { phase: 'prepare' | 'render' | 'audio' | 'done'; progress: number; frame?: number; frames?: number; speed?: number; eta?: number }
 
-const BITRATE_PER_PIXEL: Record<ExportSettings['quality'], number> = { low: 0.05, medium: 0.08, high: 0.12, max: 0.2 }
+// bits per pixel per frame; screen recordings are mostly sharp text, which needs more than camera video
+const BITRATE_PER_PIXEL: Record<ExportSettings['quality'], number> = { low: 0.07, medium: 0.12, high: 0.2, max: 0.32 }
 
 export const GIF_MAX_RES = 720
 export const GIF_MAX_FPS = 30
@@ -42,7 +46,7 @@ export async function canEncode(format: ExportSettings['format'], W: number, H: 
 export function exportDims(project: Project, s: ExportSettings): { W: number; H: number; fps: number; frames: number; duration: number } {
   const res = s.resolution > 0 ? s.resolution : originalRes(project)
   const [W, H] = outputSize(project.edit, project.media.screen.width, project.media.screen.height, res)
-  const duration = outputDuration(project.edit.clips)
+  const duration = outputDuration(project.edit.clips, project.edit.leadIn ?? 0)
   return { W, H, fps: s.fps, duration, frames: Math.max(1, Math.round(duration * s.fps)) }
 }
 
@@ -51,11 +55,14 @@ export function exportDims(project: Project, s: ExportSettings): { W: number; H:
  * then adds typical decode/encode cost. Good enough to say "about 2 minutes".
  */
 export async function estimateExportSeconds(project: Project, cursorData: CursorData | null, s: ExportSettings): Promise<number> {
+  if (project.edit.background.type === 'wallpaper') {
+    await ensureWallpaperLoaded(project.edit.background.wallpaper)
+  }
   const { W, H, frames } = exportDims(project, s)
   const canvas = new OffscreenCanvas(W, H)
   const ctx = canvas.getContext('2d', { alpha: false })!
   const r = new Renderer()
-  const track = buildTrack(cursorData, project.media.screen.duration, project.edit.cursor.smoothing)
+  const track = buildTrack(cursorData, project.media.screen.duration, project.edit.cursor)
   const src = new OffscreenCanvas(project.media.screen.width, project.media.screen.height)
   const draw = (c: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D, ...a: number[]) => c.drawImage(src, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7])
   r.render(ctx, W, H, { edit: project.edit, srcW: project.media.screen.width, srcH: project.media.screen.height, t: 0, drawFrame: draw, cursor: track, camera: null, clicks: [] })
@@ -123,7 +130,8 @@ export async function exportProject(
   const { W, H, fps, frames, duration: outDur } = exportDims(project, settings)
   const clips = sortedClips(edit.clips)
   const webm = settings.format === 'webm'
-  const srcTime = (k: number) => Math.min(duration - 0.001, outputToSource(clips, k / fps))
+  const lead = edit.leadIn ?? 0
+  const srcTime = (k: number) => Math.min(duration - 0.001, outputToSource(clips, k / fps, lead))
 
   onProgress({ phase: 'prepare', progress: 0 })
   await document.fonts.ready
@@ -155,6 +163,10 @@ export async function exportProject(
     }
     camSink = await openSink(media.webcam.path, list)
     if (camSink) sinks.push(camSink)
+    if (edit.webcam.bg !== 'none') {
+      await loadSegmenter()
+      if (edit.webcam.bg === 'image' && edit.webcam.bgImage) await preloadPicture(mediaUrl(edit.webcam.bgImage))
+    }
   }
 
   const assets = new Map(edit.assets.map((a) => [a.id, a]))
@@ -167,10 +179,13 @@ export async function exportProject(
       if (!ovImages.has(a.id)) ovImages.set(a.id, await createImageBitmap(await (await fetch(mediaUrl(a.path))).blob()))
       continue
     }
+    // media clips run on the edited timeline, straight through cuts (same as the preview)
     const list: { frame: number; time: number }[] = []
+    const s0 = sourceToOutput(clips, o.start, lead)
+    const s1 = sourceToOutput(clips, o.end, lead)
     for (let k = 0; k < frames; k++) {
-      const t = srcTime(k)
-      if (t >= o.start && t <= o.end) list.push({ frame: k, time: o.trimStart + (t - o.start) })
+      const T = k / fps
+      if (T >= s0 && T <= s1) list.push({ frame: k, time: o.trimStart + (T - s0) })
     }
     const s = await openSink(a.path, list)
     if (s) {
@@ -179,13 +194,18 @@ export async function exportProject(
     }
   }
 
+  let logo: ImageBitmap | null = null
+  if (edit.watermark?.path) logo = await createImageBitmap(await (await fetch(mediaUrl(edit.watermark.path))).blob()).catch(() => null)
+
   let bgImage: ImageBitmap | null = null
   if (edit.background.type === 'image' && edit.background.imagePath) {
     bgImage = await createImageBitmap(await (await fetch(mediaUrl(edit.background.imagePath))).blob())
+  } else if (edit.background.type === 'wallpaper') {
+    await ensureWallpaperLoaded(edit.background.wallpaper)
   }
 
-  const track = buildTrack(cursorData, duration, edit.cursor.smoothing)
-  const camera = buildCameraTrack(cursorData, duration)
+  const track = buildTrack(cursorData, duration, edit.cursor)
+  const camera = buildCameraTrack(cursorData, duration, edit.cursor)
   const clicks = cursorData?.clicks ?? []
 
   // ---- output ----
@@ -207,9 +227,14 @@ export async function exportProject(
   await output.start()
 
   const times = function* () {
-    for (let k = 0; k < frames; k++) yield srcTime(k)
+    for (let k = 0; k < frames; k++) yield Math.max(0, srcTime(k)) // the lead-in has no recording frames
   }
 
+  const camPic = edit.webcam.bg === 'image' && edit.webcam.bgImage ? mediaUrl(edit.webcam.bgImage) : undefined
+  const camFor = (f: VideoSample) => {
+    const cam = { src: f.toCanvasImageSource() as CanvasImageSource, w: f.displayWidth, h: f.displayHeight }
+    return edit.webcam.bg === 'none' ? cam : applyCamBg(cam, edit.webcam, camPic)
+  }
   let prev: VideoSample | null = null
   let k = 0
   const t0 = performance.now()
@@ -249,11 +274,13 @@ export async function exportProject(
         cursor: track,
         camera,
         clicks,
+        keys: cursorData?.keys,
         bgImage,
         bgVideo: bgFrame ? (bgFrame.toCanvasImageSource() as CanvasImageSource) : null,
         bgVideoSize: bgFrame ? [bgFrame.displayWidth, bgFrame.displayHeight] : undefined,
-        webcam: camFrame ? { src: camFrame.toCanvasImageSource() as CanvasImageSource, w: camFrame.displayWidth, h: camFrame.displayHeight } : null,
-        overlays: ovMap
+        webcam: camFrame ? camFor(camFrame) : null,
+        overlays: ovMap,
+        watermark: logo ? { src: logo, w: logo.width, h: logo.height } : null
       })
       await source.add(k / fps, 1 / fps)
       k++
@@ -280,6 +307,7 @@ export async function exportProject(
     input.dispose()
     bgImage?.close()
     ovImages.forEach((b) => b.close())
+    logo?.close()
   }
   await api.fileClose(tmpVideo)
 
@@ -287,17 +315,31 @@ export async function exportProject(
   onProgress({ phase: 'audio', progress: 0 })
   const a = edit.audio
   const tracks: MuxJobIn['tracks'] = []
-  if (media.mic && !a.micMuted && a.micVolume > 0) tracks.push({ path: media.mic.path, offset: media.mic.offset + a.syncOffset, volume: a.micVolume })
+  if (media.mic && !a.micMuted && a.micVolume > 0) tracks.push({ path: a.voiceClean && a.voiceCleanPath ? a.voiceCleanPath : media.mic.path, offset: media.mic.offset + a.syncOffset, volume: a.micVolume })
   if (media.system && !a.systemMuted && a.systemVolume > 0) tracks.push({ path: media.system.path, offset: media.system.offset + a.syncOffset, volume: a.systemVolume })
   for (const c of edit.audioClips) {
     const as = assets.get(c.assetId)
-    if (!as || c.muted || c.volume <= 0) continue
-    tracks.push({ path: as.path, offset: c.start - c.trimStart, volume: c.volume, window: [c.start, c.end], fadeIn: c.fadeIn, fadeOut: c.fadeOut })
+    if (!as || c.muted || c.volume <= 0 || !edit.tracks.audio) continue
+    const s0 = sourceToOutput(clips, c.start, lead)
+    const s1 = sourceToOutput(clips, c.end, lead)
+    tracks.push({ path: as.path, offset: s0 - c.trimStart, volume: c.volume, window: [s0, s1], fadeIn: c.fadeIn, fadeOut: c.fadeOut, edited: true })
   }
   for (const o of edit.overlays) {
     const as = assets.get(o.assetId)
-    if (!as || as.kind !== 'video' || !as.hasAudio || o.muted || o.volume <= 0) continue
-    tracks.push({ path: as.path, offset: o.start - o.trimStart, volume: o.volume, window: [o.start, o.end], fadeIn: 0.05, fadeOut: 0.05 })
+    if (!as || as.kind !== 'video' || !as.hasAudio || o.muted || o.volume <= 0 || !edit.tracks.media) continue
+    const s0 = sourceToOutput(clips, o.start, lead)
+    const s1 = sourceToOutput(clips, o.end, lead)
+    tracks.push({ path: as.path, offset: s0 - o.trimStart, volume: o.volume, window: [s0, s1], fadeIn: 0.05, fadeOut: 0.05, edited: true })
+  }
+  // click sounds: one WAV with a click at every click, cut and sped up along with the video
+  let clickWav = ''
+  const cl = audibleClicks(cursorData, edit.cursor)
+  if (cl.length && edit.cursor.clickVolume > 0) {
+    clickWav = outPath.replace(/\.(mp4|gif|webm|mov)$/i, '') + `.clicks-${Date.now()}.wav`
+    await api.fileOpen(clickWav)
+    await api.fileWrite(clickWav, clickTrackWav(edit.cursor.clickSound, cl, media.screen.duration, 1), 0)
+    await api.fileClose(clickWav)
+    tracks.push({ path: clickWav, offset: 0, volume: edit.cursor.clickVolume })
   }
   const off = api.on('export:progress', (p: number) => onProgress({ phase: 'audio', progress: p }))
   try {
@@ -305,8 +347,9 @@ export async function exportProject(
       videoPath: tmpVideo,
       outPath,
       duration: outDur,
-      clips,
-      tracks,
+      // the mixer works on times from 0: shift everything past the lead-in, which is one more silent-or-not stretch
+      clips: lead > 0 ? [{ id: 'lead', start: 0, end: lead, speed: 1 }, ...clips.map((c) => ({ ...c, start: c.start + lead, end: c.end + lead }))] : clips,
+      tracks: lead > 0 ? tracks.map((t) => t.edited ? t : ({ ...t, offset: t.offset + lead, window: t.window ? ([t.window[0] + lead, t.window[1] + lead] as [number, number]) : undefined })) : tracks,
       music: a.musicPath && !a.musicMuted ? { path: a.musicPath, volume: a.musicVolume } : undefined,
       gif: settings.format === 'gif' ? { width: W, fps } : undefined,
       format: settings.format
@@ -314,6 +357,7 @@ export async function exportProject(
   } finally {
     off()
     await api.fileRemove(tmpVideo).catch(() => {})
+    if (clickWav) await api.fileRemove(clickWav).catch(() => {})
   }
   onProgress({ phase: 'done', progress: 1 })
 }

@@ -1,38 +1,61 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Aspect, CursorData, Preset } from '@shared/types'
 import { uid } from '@shared/defaults'
 import { api } from '@/lib/api'
 import { useSettings, matches } from '@/lib/settings'
+import { openProjectFromDialog } from '@/lib/openProject'
+import { maybeAutoStart, startTour, takeQueuedTour, useTour } from '@/features/onboarding/tours'
 import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
+import { friendlyError } from '@/lib/errors'
+import { helpMenu } from '@/lib/feedback'
 import SettingsModal from '@/features/settings/SettingsModal'
 import { useEditor, flushSave, Panel } from './state/store'
 import { timeBus } from './state/timeBus'
 import { dragAsset } from './state/dragAsset'
 import Preview, { togglePreviewFullscreen } from './preview/Preview'
 import Timeline, { useTimelineView } from './timeline/Timeline'
+import { outputDuration, sourceToOutput } from './engine/timeMap'
 import ExportDialog from './export/ExportDialog'
 import { exportProject, estimateExportSeconds } from './export/exporter'
 import BackgroundPanel from './panels/BackgroundPanel'
+import FramePanel from './panels/FramePanel'
 import CursorPanel from './panels/CursorPanel'
 import ZoomPanel from './panels/ZoomPanel'
 import TextPanel from './panels/TextPanel'
+import BlurPanel from './panels/BlurPanel'
 import AudioPanel from './panels/AudioPanel'
 import ClipPanel from './panels/ClipPanel'
+import EffectsPanel from './panels/EffectsPanel'
 import MediaPanel, { importMedia } from './panels/MediaPanel'
 import WebcamPanel from './panels/WebcamPanel'
-import { addTextAt, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
+import KeysPanel from './panels/KeysPanel'
+import CaptionsPanel from './panels/CaptionsPanel'
+import TidyPanel from './panels/TidyPanel'
+import GuidePanel from './panels/GuidePanel'
+import BrandPanel from './panels/BrandPanel'
+import { engineSelfTest } from './speech/transcribe'
+import RailIcon from './RailIcon'
+import RailMore from './RailMore'
+import { addTextAt, addTransitionItem, addZoomAt, deleteSelection, duplicateSelection, splitAtPlayhead } from './state/actions'
 import { sortedClips } from './engine/timeMap'
 
-const RAIL: { id: Panel; icon: string; title: string; soon?: boolean }[] = [
-  { id: 'background', icon: 'sparkles', title: 'Background & frame' },
-  { id: 'cursor', icon: 'cursor', title: 'Cursor & clicks' },
+const RAIL: { id: Panel; icon: string; title: string; label?: string; soon?: boolean }[] = [
+  { id: 'background', icon: 'sparkles', title: 'Background & frame', label: 'Style' },
+  { id: 'frame', icon: 'frame', title: 'Frame: padding, shadow, corners and border', label: 'Frame' },
+  { id: 'cursor', icon: 'cursor', title: 'Cursor & clicks', label: 'Cursor' },
   { id: 'zoom', icon: 'zoom', title: 'Zoom' },
   { id: 'text', icon: 'text', title: 'Text' },
-  { id: 'media', icon: 'image', title: 'Media library' },
+  { id: 'blur', icon: 'eyeOff', title: 'Blur & redact', label: 'Blur' },
+  { id: 'media', icon: 'image', title: 'Media library', label: 'Media' },
+  { id: 'effects', icon: 'fx', title: 'Transitions & effects', label: 'Effects' },
   { id: 'webcam', icon: 'webcam', title: 'Webcam' },
   { id: 'audio', icon: 'audio', title: 'Audio' },
-  { id: 'settings', icon: 'scissors', title: 'Clips & speed' },
-  { id: 'ai', icon: 'cc', title: 'AI captions & annotations', soon: true }
+  { id: 'keys', icon: 'keyboard', title: 'Keyboard shortcuts', label: 'Keys' },
+  { id: 'settings', icon: 'scissors', title: 'Clips & speed', label: 'Clips' },
+  { id: 'ai', icon: 'cc', title: 'Captions and editing by text', label: 'Captions' },
+  { id: 'tidy', icon: 'wand', title: 'Smart trim: find and remove slow parts', label: 'Trim' },
+  { id: 'guide', icon: 'click', title: 'Step by step guide from your clicks', label: 'Guide' },
+  { id: 'brand', icon: 'palette', title: 'Brand kit: logo, colors, intro', label: 'Brand' }
 ]
 
 const ASPECTS: { v: Aspect; l: string }[] = [
@@ -66,7 +89,22 @@ export default function Editor({ dir }: { dir: string }) {
     }
   }, [dir])
 
-  if (error) return <div style={{ padding: 40 }}>Could not open project: {error}</div>
+  if (error) {
+    const f = friendlyError(error)
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+        <div style={{ maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 12, textAlign: 'center', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>This project could not be opened</h3>
+          <span className="hint">{f.message}</span>
+          <button className="btn primary" onClick={() => (location.hash = '/')}>Back to home</button>
+          <details className="hint" style={{ maxWidth: '100%' }}>
+            <summary style={{ cursor: 'pointer' }}>Technical details</summary>
+            <div style={{ whiteSpace: 'pre-wrap', userSelect: 'text', marginTop: 6 }}>{f.detail}</div>
+          </details>
+        </div>
+      </div>
+    )
+  }
   if (!project || project.dir !== dir) return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spin" /></div>
   return <EditorView />
 }
@@ -76,20 +114,58 @@ function EditorView() {
   const panel = useEditor((s) => s.panel)
   const setPanel = useEditor((s) => s.setPanel)
   const playing = useEditor((s) => s.playing)
-  const saving = useEditor((s) => s.saving)
-  const past = useEditor((s) => s.past.length)
-  const future = useEditor((s) => s.future.length)
   const update = useEditor((s) => s.update)
   const shortcuts = useSettings((s) => s.settings.shortcuts)
-  const tlZoom = useTimelineView((s) => s.zoom)
   const [exporting, setExporting] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [presets, setPresets] = useState<Preset[]>([])
   const [presetName, setPresetName] = useState('')
   const [presetsOpen, setPresetsOpen] = useState(false)
+  const presetsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!presetsOpen) return
+    const onDown = (e: PointerEvent | MouseEvent) => {
+      if (presetsRef.current && e.target instanceof Node && presetsRef.current.contains(e.target)) return
+      if ((e.target as HTMLElement).closest?.('.context-menu, .cmenu')) return
+      setPresetsOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPresetsOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [presetsOpen])
   const [name, setName] = useState(project.name)
   const [dropping, setDropping] = useState(false)
   const [toast, setToast] = useState('')
+  const [clickedRail, setClickedRail] = useState<Panel | null>(null)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
+  // every tool opens at the top of its page, not wherever the last one was scrolled to
+  const panelRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (panelRef.current) panelRef.current.scrollTop = 0
+  }, [panel])
+  const busy = useEditor((s) => s.busy)
+  // first visit to the editor: show the guided tour of the interface
+  const loadedDir = useEditor((s) => s.project?.dir)
+  useEffect(() => {
+    if (!loadedDir) return
+    // the practice project opens with the hands on tour instead
+    const queued = takeQueuedTour()
+    if (queued) setTimeout(() => startTour(queued), 700)
+    else maybeAutoStart('editor')
+  }, [loadedDir])
+
+  // picking a transition or effect on the timeline opens its settings
+  const selKind = useEditor((s) => s.selection?.kind)
+  useEffect(() => {
+    if (selKind === 'effect' || selKind === 'transition') useEditor.getState().setPanel('effects')
+  }, [selKind])
 
   useEffect(() => {
     api.loadPresets().then(setPresets)
@@ -98,14 +174,34 @@ function EditorView() {
       panel: (p: Panel) => useEditor.getState().setPanel(p),
       settings: () => setSettingsOpen(true),
       exportDialog: () => setExporting(true),
+      patchCursor: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.cursor, patch)),
+      seek: (t: number) => useEditor.getState().setTime(t),
+      play: (on: boolean) => useEditor.getState().setPlaying(on),
+      addText: (t: number) => addTextAt(t),
+      addTransitionItem: (type: string, at: number) => addTransitionItem(type as import('@shared/types').TransitionType, at),
+      clickSound: () => useEditor.getState().project!.edit.cursor.clickSound,
+      lastText: () => { const ts = useEditor.getState().project!.edit.texts; return ts[ts.length - 1] },
+      patchText: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e.texts[e.texts.length - 1], patch)),
+      fakeWords: (w: unknown) => ((window as unknown as { __fakeWords: unknown }).__fakeWords = w),
+      saveTo: (d: string) => ((window as unknown as { __saveTo: string }).__saveTo = d),
+      engineTest: (bytes: number[]) => engineSelfTest(new Uint8Array(bytes)),
+      edit: () => useEditor.getState().project!.edit,
+      patchEdit: (patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign(e, patch)),
+      saveSettings: (patch: Record<string, unknown>) => useSettings.getState().save(patch),
+      undo: () => useEditor.getState().undo(),
+      textById: (id: string, patch?: Record<string, unknown>) => { if (patch) useEditor.getState().update((e) => Object.assign(e.texts.find((x) => x.id === id)!, patch)); return useEditor.getState().project!.edit.texts.find((x) => x.id === id) },
+      lanes: () => useEditor.getState().project!.edit.texts.map((x) => x.lane ?? 0),
+      patch: (key: string, patch: Record<string, unknown>) => useEditor.getState().update((e) => Object.assign((e as unknown as Record<string, object>)[key], patch)),
       import: (paths: string[]) => importMedia(useEditor.getState().project!.dir, paths, timeBus.get()),
       estimate: () => {
         const st = useEditor.getState()
         return estimateExportSeconds(st.project!, st.cursorData, st.project!.edit.export)
       },
+      tour: () => ({ active: useTour.getState().active, seen: useSettings.getState().settings.toursSeen, onboarded: useSettings.getState().settings.onboarded }),
       state: () => {
         const e = useEditor.getState().project!.edit
-        return { zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
+        const st = useEditor.getState()
+        return { transitionTypes: [e.transitions.intro.type, e.transitions.outro.type, ...Object.values(e.transitions.perCut).map((x) => x.type)], transitionItems: e.transitions.items.length, effectClips: e.effectClips.length, time: st.time, duration: st.project!.media.screen.duration, leadIn: e.leadIn ?? 0, clips: e.clips.length, busy: st.busy, zoomEnabled: e.zoom.enabled, clickEffect: e.cursor.clickEffect, overlays: e.overlays.length, audioClips: e.audioClips.length, assets: e.assets.map((a) => a.kind) }
       },
       export: async (out: string, patch?: Partial<import('@shared/types').ExportSettings>) => {
         const st = useEditor.getState()
@@ -129,9 +225,11 @@ function EditorView() {
       const st = useEditor.getState()
       const sc = useSettings.getState().settings.shortcuts
       const fps = project.media.screen.fps || 30
+      const arrowSetting = useSettings.getState().settings.arrowStep ?? 0.5
+      const arrow = arrowSetting > 0 ? arrowSetting : 1 / fps
       const step = (d: number) => {
         st.setPlaying(false)
-        st.setTime(Math.max(0, Math.min(project.media.screen.duration, timeBus.get() + d)))
+        st.setTime(Math.max(-(st.project!.edit.leadIn ?? 0), Math.min(project.media.screen.duration, timeBus.get() + d)))
       }
       const actions: Record<string, () => void> = {
         playPause: () => st.setPlaying(!st.playing),
@@ -141,16 +239,26 @@ function EditorView() {
         delete: deleteSelection,
         addZoom: () => addZoomAt(timeBus.get()),
         addText: () => addTextAt(timeBus.get()),
-        stepBack: () => step(-1 / fps),
-        stepForward: () => step(1 / fps),
-        jumpBack: () => step(-1),
-        jumpForward: () => step(1),
+        stepBack: () => step(-arrow),
+        stepForward: () => step(arrow),
+        jumpBack: () => step(-arrow * 5),
+        jumpForward: () => step(arrow * 5),
+        frameBack: () => step(-1 / fps),
+        frameForward: () => step(1 / fps),
+        goStart: () => jump(-1),
+        goEnd: () => jump(1),
         timelineIn: () => useTimelineView.getState().setZoom((z) => z * 1.5),
         timelineOut: () => useTimelineView.getState().setZoom((z) => z / 1.5),
         export: () => setExporting(true),
         import: () => importMedia(project.dir),
         settings: () => setSettingsOpen(true),
-        fullscreen: togglePreviewFullscreen
+        fullscreen: togglePreviewFullscreen,
+        save: async () => {
+          await flushSave()
+          setToast('Saved')
+          setTimeout(() => setToast((t) => (t === 'Saved' ? '' : t)), 1500)
+        },
+        open: () => openProjectFromDialog(flushSave)
       }
       for (const [id, fn] of Object.entries(actions)) {
         if (sc[id] && matches(e, sc[id])) {
@@ -188,8 +296,9 @@ function EditorView() {
   const jump = (dir: -1 | 1) => {
     const st = useEditor.getState()
     st.setPlaying(false)
-    const cs = sortedClips(project.edit.clips)
-    st.setTime(dir < 0 ? cs[0]?.start ?? 0 : Math.max(0, (cs[cs.length - 1]?.end ?? 0) - 0.05))
+    const cs = sortedClips(st.project!.edit.clips)
+    const lead = st.project!.edit.leadIn ?? 0
+    st.setTime(dir < 0 ? (lead > 0 ? -lead : cs[0]?.start ?? 0) : Math.max(0, (cs[cs.length - 1]?.end ?? 0) - 0.05))
   }
 
   const savePreset = async () => {
@@ -211,6 +320,7 @@ function EditorView() {
 
   return (
     <div
+      className="fade-in"
       style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('Files')) {
@@ -222,14 +332,10 @@ function EditorView() {
       onDrop={onDrop}
     >
       {/* title bar */}
-      <header className="drag surface" style={{ height: 48, display: 'flex', alignItems: 'center', gap: 4, padding: '0 150px 0 10px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+      <header className="drag surface win-head" style={{ height: 48, display: 'flex', alignItems: 'center', gap: 4, padding: '0 150px 0 10px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
         <button className="icon-btn" title="Back to home" onClick={async () => { await flushSave(); location.hash = '/' }}><Icon name="back" /></button>
         <button className="icon-btn" title="Show project folder" onClick={() => api.showItem(project.media.screen.path)}><Icon name="folder" /></button>
-        <div style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 6px' }} />
-        <button className="icon-btn" title={`Undo (${kb('undo')})`} disabled={!past} onClick={() => useEditor.getState().undo()}><Icon name="undo" /></button>
-        <button className="icon-btn" title={`Redo (${kb('redo')})`} disabled={!future} onClick={() => useEditor.getState().redo()}><Icon name="redo" /></button>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 7, height: 7, borderRadius: 4, background: saving ? 'var(--warn)' : 'var(--ok)', transition: 'background .3s' }} title={saving ? 'Saving…' : 'All changes saved'} />
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -238,10 +344,10 @@ function EditorView() {
             style={{ background: 'transparent', border: 'none', color: 'var(--text)', fontWeight: 650, fontSize: 13.5, textAlign: 'center', width: 300, outline: 'none' }}
           />
         </div>
-        <div style={{ position: 'relative' }}>
-          <button className="btn ghost sm" onClick={() => setPresetsOpen((o) => !o)}><Icon name="bookmark" size={15} /> Presets <Icon name="chevron" size={13} /></button>
+        <div style={{ position: 'relative' }} ref={presetsRef}>
+          <button data-tour="presets" className="btn ghost sm" onClick={() => setPresetsOpen((o) => !o)}><Icon name="bookmark" size={15} /> Presets <Icon name="chevron" size={13} /></button>
           {presetsOpen && (
-            <div className="menu glass pop-in" style={{ position: 'absolute', right: 0, top: 38, width: 270, zIndex: 50 }} onMouseLeave={() => setPresetsOpen(false)}>
+            <div className="menu glass pop-in" style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', width: 270, zIndex: 50 }}>
               {presets.length === 0 && <div className="hint" style={{ padding: 8 }}>Save your favourite look (background, frame, cursor, webcam) to reuse it on every recording.</div>}
               {presets.map((p) => (
                 <button
@@ -271,66 +377,136 @@ function EditorView() {
             </div>
           )}
         </div>
+        <button className="icon-btn" title="Help, report a problem, suggest a feature" onClick={(e) => openContextMenu(e, helpMenu(() => startTour('editor')))}><Icon name="help" /></button>
         <button className="icon-btn" title={`Settings (${kb('settings')})`} onClick={() => setSettingsOpen(true)}><Icon name="gear" /></button>
-        <button className="btn primary sm" style={{ marginLeft: 4, height: 32 }} onClick={() => { useEditor.getState().setPlaying(false); setExporting(true) }}><Icon name="download" size={15} /> Export</button>
+        <button data-tour="export" className="btn primary sm" style={{ marginLeft: 4, height: 32 }} onClick={() => { useEditor.getState().setPlaying(false); setExporting(true) }}><Icon name="download" size={15} /> Export</button>
       </header>
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <nav className="surface" style={{ width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingTop: 10, borderRight: '1px solid var(--line)' }}>
+        <nav data-tour="rail" className="surface rail" style={{ width: 68, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, paddingTop: 8, borderRight: '1px solid var(--line)', overflowY: 'auto' }}>
           {RAIL.map((r) => (
-            <button key={r.id} className={`icon-btn ${panel === r.id ? 'active' : ''}`} style={{ width: 40, height: 40, borderRadius: 11, position: 'relative' }} title={r.title} onClick={() => setPanel(r.id)}>
-              <Icon name={r.icon} size={19} />
-              {r.soon && <span style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, background: 'var(--warn)' }} />}
+            <button
+              key={r.id}
+              data-tour={`tool-${r.id}`}
+              className={`rail-btn ${panel === r.id ? 'active' : ''} ${clickedRail === r.id ? 'clicked' : ''}`}
+              title={r.title}
+              onClick={() => {
+                setClickedRail(r.id)
+                setPanel(r.id)
+                setTimeout(() => setClickedRail((cur) => (cur === r.id ? null : cur)), 450)
+              }}
+            >
+              <RailIcon id={r.id} active={panel === r.id} clicked={clickedRail === r.id} size={20} />
+              <span>{r.label ?? r.title}</span>
+              {r.soon && <span className="rail-soon-dot" />}
             </button>
           ))}
+          <RailMore />
         </nav>
-        <aside className="surface" style={{ width: 360, flexShrink: 0, overflowY: 'auto', padding: '18px 16px 30px', borderRight: '1px solid var(--line)' }}>
-          <div className="fade-in" key={panel}>
-            {panel === 'background' && <BackgroundPanel />}
-            {panel === 'cursor' && <CursorPanel />}
-            {panel === 'zoom' && <ZoomPanel />}
-            {panel === 'text' && <TextPanel />}
-            {panel === 'media' && <MediaPanel />}
-            {panel === 'webcam' && <WebcamPanel />}
-            {panel === 'audio' && <AudioPanel />}
-            {panel === 'settings' && <ClipPanel />}
-            {panel === 'ai' && <AiPanel />}
-          </div>
-        </aside>
+        <div
+          style={{
+            width: panelCollapsed ? 0 : 360,
+            flexShrink: 0,
+            transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
+            overflow: 'hidden',
+          }}
+        >
+          <aside
+            ref={panelRef}
+            data-tour="panel"
+            className="surface"
+            style={{
+              width: 360,
+              height: '100%',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              padding: '18px 16px 30px',
+              borderRight: '1px solid var(--line)',
+            }}
+          >
+            <div className="fade-in" key={panel}>
+              {panel === 'background' && <BackgroundPanel />}
+              {panel === 'frame' && <FramePanel />}
+              {panel === 'cursor' && <CursorPanel />}
+              {panel === 'zoom' && <ZoomPanel />}
+              {panel === 'text' && <TextPanel />}
+              {panel === 'blur' && <BlurPanel />}
+              {panel === 'media' && <MediaPanel />}
+              {panel === 'webcam' && <WebcamPanel />}
+              {panel === 'audio' && <AudioPanel />}
+              {panel === 'keys' && <KeysPanel />}
+              {panel === 'settings' && <ClipPanel />}
+              {panel === 'effects' && <EffectsPanel />}
+              {panel === 'ai' && <CaptionsPanel />}
+              {panel === 'tidy' && <TidyPanel />}
+              {panel === 'guide' && <GuidePanel />}
+              {panel === 'brand' && <BrandPanel />}
+            </div>
+          </aside>
+        </div>
+        {/* Collapse/expand toggle — lives OUTSIDE overflow:hidden so it's always visible */}
+        <button
+          onClick={() => setPanelCollapsed((c) => !c)}
+          title={panelCollapsed ? 'Expand panel' : 'Collapse panel'}
+          style={{
+            flexShrink: 0,
+            alignSelf: 'center',
+            width: 22,
+            height: 48,
+            border: 'none',
+            borderRadius: '0 8px 8px 0',
+            background: 'var(--panel)',
+            borderTop: '1px solid var(--line)',
+            borderRight: '1px solid var(--line)',
+            borderBottom: '1px solid var(--line)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--dim)',
+            padding: 0,
+            marginRight: 4,
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--hover)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'var(--panel)')}
+        >
+          <span style={{ display: 'flex', transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)', transform: panelCollapsed ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+            <Icon name="back" size={14} />
+          </span>
+        </button>
         <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 22px 10px', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 110 }}>
               <Select compact value={project.edit.aspect} options={ASPECTS} onChange={(v) => update((e) => (e.aspect = v))} />
             </div>
-            <button className="btn ghost sm" onClick={() => setPanel('background')}><Icon name="crop" size={15} /> Crop</button>
+            {project.edit.aspect !== 'auto' && (
+              <button
+                className={`btn ghost sm ${project.edit.reframe === 'follow' ? 'on' : ''}`}
+                data-test="follow"
+                title="Fill the whole video with the recording and move with the cursor (great for vertical videos)"
+                onClick={() => update((e) => (e.reframe = e.reframe === 'follow' ? 'fit' : 'follow'))}
+              >
+                <Icon name="target" size={15} /> {project.edit.reframe === 'follow' ? 'Following cursor' : 'Follow cursor'}
+              </button>
+            )}
+            <button data-tour="crop" className="btn ghost sm" onClick={() => setPanel('background')}><Icon name="crop" size={15} /> Crop</button>
           </div>
 
           <Preview />
 
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button className="btn sm" onClick={(e) => openContextMenu(e, [
-              { label: 'Zoom at playhead', hint: kb('addZoom'), onClick: () => addZoomAt(timeBus.get()) },
-              { label: 'Text at playhead', hint: kb('addText'), onClick: () => addTextAt(timeBus.get()) },
-              { label: 'Import media…', hint: kb('import'), onClick: () => importMedia(project.dir) }
-            ])}><Icon name="plus" size={14} /> Add <Icon name="chevron" size={12} /></button>
-            <div style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 6px' }} />
-            <button className="icon-btn" title={`Add zoom (${kb('addZoom')})`} onClick={() => addZoomAt(timeBus.get())}><Icon name="zoom" /></button>
-            <button className="icon-btn" title={`Add text (${kb('addText')})`} onClick={() => addTextAt(timeBus.get())}><Icon name="text" /></button>
-            <button className="icon-btn" title={`Split (${kb('split')})`} onClick={splitAtPlayhead}><Icon name="scissors" /></button>
+            <div className="transport-side" />
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
               <TimeLabel />
               <button className="icon-btn" onClick={() => jump(-1)} title="Go to start"><Icon name="prev" /></button>
-              <button className="play-btn" onClick={() => useEditor.getState().setPlaying(!playing)} title={`Play / pause (${kb('playPause')})`}>
+              <button data-tour="play" className="play-btn" onClick={() => useEditor.getState().setPlaying(!playing)} title={`Play / pause (${kb('playPause')})`}>
                 <Icon name={playing ? 'pause' : 'play'} size={19} />
               </button>
               <button className="icon-btn" onClick={() => jump(1)} title="Go to end"><Icon name="next" /></button>
-              <span className="hint" style={{ minWidth: 56 }}>{fmtTime(project.media.screen.duration)}</span>
+              <span className="hint" style={{ minWidth: 56 }}>{fmtTime(outputDuration(project.edit.clips, project.edit.leadIn ?? 0))}</span>
             </div>
-            <div className="tl-zoom" title="Timeline zoom">
-              <button className="icon-btn sm" title="Zoom timeline out" onClick={() => useTimelineView.getState().setZoom((z) => z / 1.5)}><Icon name="minus" size={14} /></button>
-              <input className="range" type="range" min={0} max={100} value={Math.round((Math.log(tlZoom) / Math.log(60)) * 100)} onChange={(e) => useTimelineView.getState().setZoom(Math.pow(60, +e.target.value / 100))} />
-              <button className="icon-btn sm" title="Zoom timeline in" onClick={() => useTimelineView.getState().setZoom((z) => z * 1.5)}><Icon name="plus" size={14} /></button>
-            </div>
+            <div className="transport-side" />
           </div>
         </main>
       </div>
@@ -343,32 +519,17 @@ function EditorView() {
           Drop to add to your project
         </div>
       )}
-      {toast && <div className="toast glass"><span className="spin" />{toast}</div>}
-    </div>
-  )
-}
-
-function AiPanel() {
-  return (
-    <div className="section">
-      <span className="section-title">AI</span>
-      {[
-        { t: 'AI captions', d: 'Subtitles made from your voice, fully editable and styled like your text layers.', i: 'cc' },
-        { t: 'Smart annotations', d: 'AI watches your screen and adds callouts and highlights at the important moments.', i: 'sparkles' },
-        { t: 'Auto trim silences', d: 'Finds long pauses and dead air so you can cut them in one click.', i: 'scissors' }
-      ].map((f) => (
-        <div key={f.t} className="glass" style={{ padding: 14, borderRadius: 14, boxShadow: 'none' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Icon name={f.i} size={16} /> <b>{f.t}</b></span>
-            <span className="badge">Coming soon</span>
-          </div>
-          <div className="hint" style={{ marginTop: 6 }}>{f.d}</div>
+      {(busy || toast) && (
+        <div className="toast glass">
+          {(busy.startsWith('Joining') || (!busy && toast.startsWith('Importing'))) && <span className="spin" />}
+          {busy || toast}
         </div>
-      ))}
+      )}
     </div>
   )
 }
 
+/** Shows the time as it will be in the exported video (after cuts, speed and intro space). */
 function TimeLabel() {
   const [t, setT] = useState(timeBus.get())
   useEffect(() => {
@@ -381,5 +542,5 @@ function TimeLabel() {
       }
     })
   }, [])
-  return <span className="hint" style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(t, true)}</span>
+  return <span className="hint" style={{ minWidth: 56, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(sourceToOutput(useEditor.getState().project!.edit.clips, t, useEditor.getState().project!.edit.leadIn ?? 0), true)}</span>
 }

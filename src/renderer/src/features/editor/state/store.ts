@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import type { CursorData, EditState, Project } from '@shared/types'
 import { api } from '@/lib/api'
 
-export type Panel = 'background' | 'cursor' | 'zoom' | 'text' | 'media' | 'webcam' | 'audio' | 'settings' | 'ai'
-export type Selection = { kind: 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip'; id: string } | null
+export type Panel = 'background' | 'frame' | 'cursor' | 'zoom' | 'text' | 'media' | 'effects' | 'blur' | 'webcam' | 'audio' | 'keys' | 'settings' | 'ai' | 'tidy' | 'guide' | 'brand'
+export type Selection = { kind: 'clip' | 'zoom' | 'text' | 'overlay' | 'audioClip' | 'effect' | 'transition' | 'blur'; id: string } | null
 
 interface EditorStore {
   project: Project | null
@@ -17,7 +17,13 @@ interface EditorStore {
   lastKey: string
   lastAt: number
   saving: boolean
+  /** message for long jobs like joining videos; empty when idle */
+  busy: string
+  /** drawing a box on the preview to zoom into (the preview shows the whole screen meanwhile) */
+  areaMode: boolean
 
+  setBusy(msg: string): void
+  setAreaMode(on: boolean): void
   load(p: Project, cursor: CursorData | null): void
   update(fn: (e: EditState) => void, key?: string): void
   undo(): void
@@ -43,9 +49,19 @@ export const useEditor = create<EditorStore>((set, get) => ({
   lastKey: '',
   lastAt: 0,
   saving: false,
+  busy: '',
+  areaMode: false,
+
+  setBusy(msg) {
+    set({ busy: msg })
+  },
+
+  setAreaMode(on) {
+    set(on ? { areaMode: true, playing: false } : { areaMode: false })
+  },
 
   load(p, cursor) {
-    set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false })
+    set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false, areaMode: false })
   },
 
   update(fn, key = '') {
@@ -91,6 +107,7 @@ export const useEditor = create<EditorStore>((set, get) => ({
     set({ selection: s })
     if (s?.kind === 'zoom') set({ panel: 'zoom' })
     if (s?.kind === 'text') set({ panel: 'text' })
+    if (s?.kind === 'blur') set({ panel: 'blur' })
     if (s?.kind === 'overlay' || s?.kind === 'audioClip') set({ panel: 'media' })
     if (s?.kind === 'clip') set({ panel: 'settings' })
   },

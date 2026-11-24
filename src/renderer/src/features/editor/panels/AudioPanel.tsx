@@ -1,6 +1,53 @@
+import { useState } from 'react'
 import { useEditor } from '../state/store'
-import { Icon, Section, Slider, Toggle } from '@/ui'
+import { Icon, Section, Slider, Toggle, showMessage } from '@/ui'
 import { api } from '@/lib/api'
+
+/** Voice clean up: noise and hum removed, level evened out. Makes a cleaned copy that plays instead of the mic. */
+function VoiceClean() {
+  const project = useEditor((s) => s.project)!
+  const update = useEditor((s) => s.update)
+  const a = project.edit.audio
+  const mic = project.media.mic!
+  const [busy, setBusy] = useState(false)
+  const [strength, setStrength] = useState(a.voiceCleanStrength ?? 0.5)
+  const stale = !!a.voiceCleanPath && Math.abs((a.voiceCleanStrength ?? 0.5) - strength) > 0.01
+  const run = async (s: number) => {
+    setBusy(true)
+    try {
+      const out = await api.cleanVoice(mic.path, project.dir, s)
+      update((e) => {
+        e.audio.voiceClean = true
+        e.audio.voiceCleanPath = out
+        e.audio.voiceCleanStrength = s
+      })
+    } catch (e) {
+      showMessage("Couldn't clean up the voice", e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Section title="Voice clean up">
+      <span className="hint">Takes out fan hum, keyboard noise and room echo, and evens out loud and quiet parts so any microphone sounds clear.</span>
+      <Toggle
+        label="Clean up my voice"
+        value={!!a.voiceClean}
+        onChange={(v) => {
+          if (v && !a.voiceCleanPath) run(strength)
+          else update((e) => (e.audio.voiceClean = v))
+        }}
+      />
+      <Slider label="Strength" value={strength} min={0} max={1} step={0.05} def={0.5} disabled={busy} format={(v) => (v < 0.34 ? 'Light' : v > 0.66 ? 'Strong' : 'Medium')} onChange={setStrength} />
+      {(busy || stale) && (
+        <button className="btn" disabled={busy} onClick={() => run(strength)}>
+          {busy ? <><span className="spin" /> Cleaning up…</> : 'Apply the new strength'}
+        </button>
+      )}
+      {a.voiceClean && !busy && <span className="hint">Turn it off to hear the original. Both play in the preview and the export.</span>}
+    </Section>
+  )
+}
 
 export default function AudioPanel() {
   const project = useEditor((s) => s.project)!
@@ -8,12 +55,7 @@ export default function AudioPanel() {
   const a = project.edit.audio
   const m = project.media
 
-  const pickMusic = async () => {
-    const f = await api.openFile('Choose background music', [{ name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'aac'] }])
-    if (!f) return
-    const p = await api.copyAsset(project.dir, f)
-    update((e) => (e.audio.musicPath = p))
-  }
+
 
   return (
     <div>
@@ -28,6 +70,7 @@ export default function AudioPanel() {
           <span className="hint">No microphone track in this recording.</span>
         )}
       </Section>
+      {m.mic && <VoiceClean />}
 
       <Section title="System audio">
         {m.system ? (
@@ -47,17 +90,19 @@ export default function AudioPanel() {
         </Section>
       )}
 
-      <Section title="Background music" action={a.musicPath ? <button className="link" style={{ color: 'var(--danger)' }} onClick={() => update((e) => (e.audio.musicPath = undefined))}>Remove</button> : undefined}>
-        <button className="btn" onClick={pickMusic}><Icon name="audio" size={16} /> {a.musicPath ? 'Replace music' : 'Add music'}</button>
-        {a.musicPath && (
-          <>
-            <div className="chip" style={{ maxWidth: '100%', overflow: 'hidden' }}>{a.musicPath.split(/[\\/]/).pop()}</div>
-            <Toggle label="Mute music" value={a.musicMuted} onChange={(v) => update((e) => (e.audio.musicMuted = v))} />
-            <Slider label="Volume" value={a.musicVolume} min={0} max={1} step={0.01} def={0.25} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.audio.musicVolume = v), 'musv')} />
-            <span className="hint">Music loops to fill the video and fades out at the end.</span>
-          </>
-        )}
-      </Section>
+      {a.musicPath && (
+        <Section title="Background music" action={<button className="link" style={{ color: 'var(--danger)' }} onClick={() => update((e) => (e.audio.musicPath = undefined))}>Remove</button>}>
+          <div className="chip" style={{ maxWidth: '100%', overflow: 'hidden' }}>{a.musicPath.split(/[\\/]/).pop()}</div>
+          <Slider label="Volume" value={a.musicVolume} min={0} max={1} step={0.01} def={0.25} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => update((e) => (e.audio.musicVolume = v), 'musv')} />
+          <span className="hint">Music from an older version of Scrim. To add music now, import it in the Media library and drag it onto the Audio track.</span>
+        </Section>
+      )}
+      {!a.musicPath && (
+        <Section title="Music and sound effects">
+          <button className="btn" onClick={() => useEditor.getState().setPanel('media')}><Icon name="music" size={16} /> Open the media library</button>
+          <span className="hint">Import music or sounds in the Media library, then drag them onto the Audio track.</span>
+        </Section>
+      )}
     </div>
   )
 }

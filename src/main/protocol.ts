@@ -1,7 +1,6 @@
 import { protocol } from 'electron'
 import { createReadStream, promises as fs } from 'fs'
-import { extname } from 'path'
-import { Readable } from 'stream'
+import { extname, resolve, basename } from 'path'
 
 const MIME: Record<string, string> = {
   '.mp4': 'video/mp4',
@@ -17,8 +16,7 @@ const MIME: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
-  '.gif': 'image/gif',
-  '.json': 'application/json'
+  '.gif': 'image/gif'
 }
 
 export function registerSchemes(): void {
@@ -27,14 +25,70 @@ export function registerSchemes(): void {
   ])
 }
 
+/**
+ * Reads part of a file as a web stream that really stops (closes the file) when the player lets go.
+ * The player drops and reopens requests all the time on a long recording, and each dropped one
+ * must close its file. (Don't cap open ended ranges to a small piece: Chromium then fails to load
+ * the video at all over this protocol.)
+ */
+function fileStream(path: string, start: number, end: number): ReadableStream<Uint8Array> {
+  const node = createReadStream(path, { start, end, highWaterMark: 512 * 1024 })
+  let done = false
+  return new ReadableStream<Uint8Array>(
+    {
+      start(ctrl) {
+        node.on('data', (c) => {
+          if (done) return
+          ctrl.enqueue(new Uint8Array(c as Buffer))
+          if ((ctrl.desiredSize ?? 1) <= 0) node.pause()
+        })
+        node.on('end', () => {
+          if (done) return
+          done = true
+          ctrl.close()
+        })
+        node.on('error', (e) => {
+          if (done) return
+          done = true
+          ctrl.error(e)
+        })
+      },
+      pull() {
+        node.resume()
+      },
+      cancel() {
+        done = true
+        node.destroy()
+      }
+    },
+    { highWaterMark: 4 }
+  )
+}
+
 /** media://file/<encoded absolute path> -> local file, with HTTP Range support so video seeking works. */
 export function handleMediaProtocol(): void {
   protocol.handle('media', async (req) => {
     try {
       const url = new URL(req.url)
-      const path = decodeURIComponent(url.pathname.slice(1))
-      const stat = await fs.stat(path)
-      const type = MIME[extname(path).toLowerCase()] ?? 'application/octet-stream'
+      const rawPath = decodeURIComponent(url.pathname.slice(1))
+      const target = resolve(rawPath)
+      const ext = extname(target).toLowerCase()
+      const type = MIME[ext]
+      if (!type) {
+        return new Response('Forbidden file type', { status: 403 })
+      }
+      const lower = target.toLowerCase()
+      const fileName = basename(target)
+      if (
+        lower.includes('\\.ssh\\') || lower.includes('/.ssh/') ||
+        lower.includes('\\.aws\\') || lower.includes('/.aws/') ||
+        lower.includes('\\.git\\') || lower.includes('/.git/') ||
+        lower.includes('\\windows\\system32') || lower.includes('/etc/') ||
+        fileName.startsWith('.') || fileName.endsWith('.env')
+      ) {
+        return new Response('Access denied', { status: 403 })
+      }
+      const stat = await fs.stat(target)
       const range = req.headers.get('range')
       const headers: Record<string, string> = {
         'Content-Type': type,
@@ -55,14 +109,12 @@ export function handleMediaProtocol(): void {
         if (start > end || start >= stat.size) {
           return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${stat.size}` } })
         }
-        const stream = createReadStream(path, { start, end })
-        return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
+        return new Response(fileStream(target, start, end), {
           status: 206,
           headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${stat.size}`, 'Content-Length': String(end - start + 1) }
         })
       }
-      const stream = createReadStream(path)
-      return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
+      return new Response(fileStream(target, 0, stat.size - 1), {
         status: 200,
         headers: { ...headers, 'Content-Length': String(stat.size) }
       })

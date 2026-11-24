@@ -1,5 +1,4 @@
-// Small cached preview images for the side panels.
-import { drawLive, drawWallpaper, LIVE } from './backgrounds'
+import { findWallpaper, drawWallpaper } from './backgrounds'
 import { drawCursor, cursorDef } from './cursors'
 
 const cache = new Map<string, string>()
@@ -16,13 +15,11 @@ function make(key: string, w: number, h: number, paint: (ctx: CanvasRenderingCon
   return url
 }
 
-export const wallpaperThumb = (id: string): string => make('wp:' + id, 96, 96, (ctx) => drawWallpaper(ctx, 96, 96, id))
-
-export const liveThumb = (id: string): string =>
-  make('live:' + id, 160, 96, (ctx) => {
-    const def = LIVE.find((l) => l.id === id) ?? LIVE[0]
-    drawLive(ctx, 160, 96, 2.5, { id, speed: 1, colors: def.colors })
-  })
+export const wallpaperThumb = (id: string): string => {
+  const wp = findWallpaper(id)
+  if (wp?.thumb) return wp.thumb
+  return make('wp:' + id, 160, 100, (ctx) => drawWallpaper(ctx, 160, 100, id))
+}
 
 export const cursorThumb = (id: string, color?: string, outline?: string): string => {
   const def = cursorDef(id)
