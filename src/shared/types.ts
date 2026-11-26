@@ -82,6 +82,8 @@ export interface CursorData {
 export interface MediaInfo {
   path: string // absolute path
   offset: number // seconds: where this track starts relative to screen video t=0 (may be negative)
+  /** screen time where the recording this track belongs to ends; set when a video is joined on, so the track is not drawn over it */
+  until?: number
 }
 
 export interface ProjectMedia {

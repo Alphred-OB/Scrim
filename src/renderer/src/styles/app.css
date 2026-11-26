@@ -1285,7 +1285,7 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s var(--ease); }
 
 /* ---- background caption job (lib/captionJob.tsx) ---- */
-.capjob { position: fixed; left: 18px; bottom: 18px; z-index: 650; max-width: 420px; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 14px 36px var(--shadow); animation: popIn 0.2s var(--ease) both; }
+.capjob { position: fixed; top: 64px; right: 18px; z-index: 650; max-width: 420px; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 14px 36px var(--shadow); animation: popIn 0.2s var(--ease) both; }
 .capjob-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13px; }
 .capjob-text .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capjob-done { width: 22px; height: 22px; display: grid; place-items: center; color: var(--ok); flex: none; }

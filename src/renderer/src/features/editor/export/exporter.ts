@@ -162,7 +162,7 @@ export async function exportProject(
     camProbe.dispose()
     const list: { frame: number; time: number }[] = []
     for (let k = 0; k < frames; k++) {
-      const t = webcamTimeAt(srcTime(k), media.webcam.offset, edit.audio.syncOffset, camDur)
+      const t = webcamTimeAt(srcTime(k), media.webcam.offset, edit.audio.syncOffset, camDur, media.webcam.until)
       if (t !== null) list.push({ frame: k, time: t })
     }
     camSink = await openSink(media.webcam.path, list)
