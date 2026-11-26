@@ -4,14 +4,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CaptionLook, CaptionSettings } from '@shared/types'
 import { FONTS, uid } from '@shared/defaults'
 import { cutRanges, defaultCaptions, fillerRanges, isFiller, mergeRanges, plainText, silenceRanges, spokenWords, subtitleFile, type SpokenWord } from '@shared/speech'
-import { ColorRow, Icon, Section, Seg, Select, Slider, Toggle, askConfirm, showMessage } from '@/ui'
+import { ColorRow, Icon, Section, Seg, Select, Slider, Toggle, askConfirm } from '@/ui'
 import { api, pickSavePath } from '@/lib/api'
 import { useSettings } from '@/lib/settings'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
 import { clipAt, sourceToOutput } from '../engine/timeMap'
 import { chunksFor } from '../engine/captions'
-import { speechSource, transcribe } from '../speech/transcribe'
+import { speechSource } from '../speech/transcribe'
+import { cancelCaptions, startCaptions, useCaptionJob } from '@/lib/captionJob'
 
 const LOOKS: { v: CaptionLook; l: string }[] = [
   { v: 'karaoke', l: 'Karaoke' },
@@ -34,7 +35,10 @@ export default function CaptionsPanel() {
   const update = useEditor((s) => s.update)
   const settings = useSettings((s) => s.settings)
   const [tab, setTab] = useState<'style' | 'text'>('style')
-  const [busy, setBusy] = useState<{ stage: string; p: number; note?: string } | null>(null)
+  // the job belongs to the app (lib/captionJob.tsx), so it carries on when this panel is closed
+  const job = useCaptionJob((s) => s.job)
+  const busy = job && job.dir === project.dir ? job : null
+  const busyElsewhere = job && job.dir !== project.dir ? job : null
   const edit = project.edit
   const tr = edit.transcript
   const c: CaptionSettings = { ...defaultCaptions(), ...(edit.captions ?? {}) }
@@ -44,19 +48,7 @@ export default function CaptionsPanel() {
 
   const generate = async () => {
     if (tr && !(await askConfirm({ title: 'Transcribe again?', body: 'This replaces the current text, including any words you fixed.', ok: 'Transcribe' }))) return
-    setBusy({ stage: 'extract', p: 0 })
-    try {
-      const t = await transcribe(project, settings, (stage, p, note) => setBusy({ stage, p, note }))
-      if (!t.words.length) throw new Error("No speech was found. Check that the right sound track isn't muted or empty.")
-      update((e) => {
-        e.transcript = t
-        e.captions = { ...defaultCaptions(), ...(e.captions ?? {}), hidden: [], fixes: {} }
-      })
-    } catch (e) {
-      showMessage("Couldn't make captions", e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(null)
-    }
+    await startCaptions(project, settings)
   }
 
   const saveSubs = async (kind: 'srt' | 'vtt') => {
@@ -77,9 +69,10 @@ export default function CaptionsPanel() {
             <span className="hint">
               Turns what you say into captions that highlight each word as you speak, plus a transcript you can edit to cut the video. Listens to {src.label}.
             </span>
-            <button className="btn primary" onClick={generate}>
+            <button className="btn primary" onClick={generate} disabled={!!busyElsewhere}>
               <Icon name="cc" size={16} /> Make captions
             </button>
+            {busyElsewhere && <span className="hint">Captions are being made for {busyElsewhere.name}. One at a time: this can start when it is done.</span>}
             <span className="hint">
               {engine === 'groq' ? 'Using Groq (fast, online).' : `Using Whisper on this PC (offline). The ${settings.localModel ?? 'base'} model downloads once.`} Change it in Settings, AI.
             </span>
@@ -93,7 +86,8 @@ export default function CaptionsPanel() {
               <span className="hint">{busy.note ?? (busy.p ? `${Math.round(busy.p * 100)}%` : '')}</span>
             </div>
             <div className="upd-bar"><i style={{ width: `${Math.round(busy.p * 100)}%` }} /></div>
-            <span className="hint">You can keep editing while this runs.</span>
+            <span className="hint">This runs in the background. Keep editing, open other tools or even leave this project: a small box shows where it is, and you get a message when it is done.</span>
+            <button className="link" style={{ alignSelf: 'flex-start' }} onClick={cancelCaptions}>Cancel</button>
           </div>
         )}
         {tr && !busy && (

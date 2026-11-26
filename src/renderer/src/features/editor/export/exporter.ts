@@ -4,6 +4,7 @@ import {
 } from 'mediabunny'
 import type { CursorData, ExportSettings, Project } from '@shared/types'
 import { audibleClicks, clickTrackWav } from '@shared/clickSounds'
+import { webcamTimeAt } from '@shared/webcamTime'
 import { applyCamBg, loadSegmenter, preloadPicture } from '../engine/webcamBg'
 import { api, mediaUrl, type MuxJobIn } from '@/lib/api'
 import { Renderer, computeLayout, outputSize } from '../engine/compositor'
@@ -155,11 +156,14 @@ export async function exportProject(
 
   let camSink: Sink | null = null
   if (media.webcam && edit.webcam.show) {
-    const off = media.webcam.offset + edit.audio.syncOffset
+    // the webcam file's length: past its end (a video joined on) there is no bubble, not a frozen last frame
+    const camProbe = new Input({ formats: ALL_FORMATS, source: new UrlSource(mediaUrl(media.webcam.path)) })
+    const camDur = await camProbe.computeDuration().catch(() => NaN)
+    camProbe.dispose()
     const list: { frame: number; time: number }[] = []
     for (let k = 0; k < frames; k++) {
-      const t = srcTime(k) - off
-      if (t >= 0) list.push({ frame: k, time: t })
+      const t = webcamTimeAt(srcTime(k), media.webcam.offset, edit.audio.syncOffset, camDur)
+      if (t !== null) list.push({ frame: k, time: t })
     }
     camSink = await openSink(media.webcam.path, list)
     if (camSink) sinks.push(camSink)

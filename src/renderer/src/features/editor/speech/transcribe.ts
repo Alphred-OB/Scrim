@@ -29,6 +29,15 @@ async function findVoice(p: Project): Promise<SpeechSource> {
 export type Progress = (stage: 'extract' | 'download' | 'transcribe' | 'upload', p: number, note?: string) => void
 
 let worker: Worker | null = null
+let rejectLocal: ((e: Error) => void) | null = null
+
+/** Stops an offline transcription that is running (the model is loaded again next time). */
+export function cancelLocalTranscription(): void {
+  worker?.terminate()
+  worker = null
+  rejectLocal?.(new Error('Cancelled'))
+  rejectLocal = null
+}
 
 async function local(path: string, model: 'tiny' | 'base' | 'small', onProgress: Progress): Promise<TranscriptWord[]> {
   onProgress('extract', 0)
@@ -37,10 +46,14 @@ async function local(path: string, model: 'tiny' | 'base' | 'small', onProgress:
   worker ??= new Worker(new URL('./whisper.worker.ts', import.meta.url), { type: 'module' })
   const w = worker
   return new Promise((resolve, reject) => {
+    rejectLocal = reject
     w.onmessage = (ev: MessageEvent) => {
       const d = ev.data
       if (d.type === 'progress') onProgress(d.stage === 'download' ? 'download' : 'transcribe', d.stage === 'ready' ? 0 : d.p ?? 0, d.mb ? `${d.mb} MB` : undefined)
-      else if (d.type === 'done') resolve(d.words)
+      else if (d.type === 'done') {
+        rejectLocal = null
+        resolve(d.words)
+      }
       else if (d.type === 'error') reject(new Error('Offline speech model: ' + d.message))
     }
     w.onerror = (e) => reject(new Error('Offline speech model crashed: ' + e.message))
@@ -60,6 +73,8 @@ async function groq(path: string, key: string, onProgress: Progress): Promise<{ 
 
 /** Test hook: a fake transcript so the self test can run without a model or a network. */
 const fake = (): TranscriptWord[] | null => (window as unknown as { __fakeWords?: TranscriptWord[] }).__fakeWords ?? null
+/** Test hook: how long the fake transcript takes, reporting progress on the way (so a job can be watched in the background). */
+const fakeMs = (): number => (window as unknown as { __fakeCaptionMs?: number }).__fakeCaptionMs ?? 0
 
 /**
  * Transcribes the project's voice with the engine picked in Settings: Groq when there's a key
@@ -68,6 +83,10 @@ const fake = (): TranscriptWord[] | null => (window as unknown as { __fakeWords?
 export async function transcribe(p: Project, s: AppSettings, onProgress: Progress): Promise<Transcript> {
   const f = fake()
   if (f) {
+    for (let i = 1; i <= 10 && fakeMs(); i++) {
+      onProgress('transcribe', i / 10)
+      await new Promise((r) => setTimeout(r, fakeMs() / 10))
+    }
     const s0 = speechSource(p)
     return { offset: s0.offset, source: s0.source, createdAt: Date.now(), words: f, engine: 'local' }
   }

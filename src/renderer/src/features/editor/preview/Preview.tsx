@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Asset, EditState } from '@shared/types'
+import { webcamTimeAt } from '@shared/webcamTime'
 import { mediaUrl } from '@/lib/api'
 import { useEditor } from '../state/store'
 import { timeBus } from '../state/timeBus'
@@ -14,6 +15,11 @@ import { playClick } from './clickPlayer'
 import { useProxy } from '@/lib/useProxy'
 
 type Box = { x: number; y: number; w: number; h: number }
+/** Widest the preview draws while playing, in px. */
+const PLAY_MAX_W = 2560
+/** How far the adaptive quality may shrink the playing size on a slow PC (1 = full). */
+const MIN_PLAY_QUALITY = 0.5
+
 type Handle = { kind: 'text' | 'overlay' | 'webcam' | 'blur'; id: string; box: Box } // box in CSS px relative to canvas
 
 /** Everything that plays alongside the main video, and what time it should be at. */
@@ -280,7 +286,7 @@ export default function Preview() {
       if (v.seeking) return syncHi()
       if (Math.abs(hi.currentTime - v.currentTime) > 0.001) hi.currentTime = v.currentTime
       else draw.current()
-    }, 180)
+    }, 100)
   }
   useEffect(() => {
     if (!playing && proxyOn) syncHi()
@@ -305,8 +311,8 @@ export default function Preview() {
   const frameMs = useRef(8)
   const adapt = (ms: number) => {
     frameMs.current = frameMs.current * 0.9 + ms * 0.1
-    if (frameMs.current > 14 && quality.current > 0.7) {
-      quality.current = Math.max(0.7, quality.current * 0.88)
+    if (frameMs.current > 14 && quality.current > MIN_PLAY_QUALITY) {
+      quality.current = Math.max(MIN_PLAY_QUALITY, quality.current * 0.88)
       frameMs.current = 10
     } else if (frameMs.current < 6 && quality.current < 1) quality.current = Math.min(1, quality.current * 1.08)
   }
@@ -322,9 +328,10 @@ export default function Preview() {
     // while playing, render at a size this PC can keep up with (adaptive, see below); paused is always sharp
     const isPlaying = useEditor.getState().playing
     const q = isPlaying ? quality.current : 1
-    // playing: never more than 1600 px wide and no retina doubling (a big high DPI screen would otherwise draw
-    // 4x the pixels every frame). Paused frames are drawn at full sharpness.
-    const target = isPlaying ? Math.min(ow, box.w * Math.min(dpr, 1.25), 1600) : Math.min(ow, box.w * dpr)
+    // Playing draws as many pixels as the screen can show, the same as paused (a smaller playing size looked soft
+    // in motion and snapped sharp on pause), up to PLAY_MAX_W so a 4K screen doesn't draw 4x the pixels every frame.
+    // A PC that can't keep up is handled by the adaptive quality below, which only ever lowers this while playing.
+    const target = Math.min(ow, box.w * dpr, isPlaying ? PLAY_MAX_W : Infinity)
     const W = Math.max(320, Math.round((target * q) / 16) * 16)
     const H = Math.round((W * oh) / ow)
     if (c.width !== W || c.height !== H) {
@@ -349,10 +356,11 @@ export default function Preview() {
         if (el && el.readyState >= 2) overlays.set(o.id, { src: el, w: el.videoWidth, h: el.videoHeight })
       }
     }
-    const camWant = project.media.webcam ? t - project.media.webcam.offset - L.edit.audio.syncOffset : -1
+    // null when the webcam has no footage at this time (before it starts, or after it ends: a video joined on)
+    const camAt = project.media.webcam ? webcamTimeAt(t, project.media.webcam.offset, L.edit.audio.syncOffset, cam?.duration ?? NaN) : null
     // keep the last good webcam frame, and show it while the element is seeking or buffering
     let camSrc: { src: CanvasImageSource; w: number; h: number } | null = null
-    if (cam && camWant >= 0 && L.edit.webcam.show) {
+    if (cam && camAt !== null && L.edit.webcam.show) {
       // The webcam is ~30 fps and the preview draws ~60: while playing, copy only frames the camera hasn't shown yet
       const camFresh = !isPlaying || camFrameT.current < 0 || camFrameT.current !== camDrawnT.current
       if (camFresh && cam.readyState >= 2 && !cam.seeking && cam.videoWidth) {
@@ -977,11 +985,11 @@ export default function Preview() {
 
       {/* media elements stay in the layout (invisible) so Chromium keeps decoding frames in real time */}
       <div className="media-pool" aria-hidden>
-      <video ref={videoRef} muted playsInline preload="auto" className="pool-video" onLoadedData={() => draw.current()} onSeeked={onVideoSeeked} />
+      <video ref={videoRef} muted playsInline preload="auto" className="pool-video" onLoadedData={() => { draw.current(); useEditor.getState().setPreviewReady({ screen: true }) }} onSeeked={onVideoSeeked} />
       {proxyOn && <video ref={hiRef} src={mediaUrl(m.screen.path)} muted playsInline preload="metadata" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => draw.current()} />}
       {m.mic && <audio ref={reg('mic')} src={mediaUrl(edit.audio.voiceClean && edit.audio.voiceCleanPath ? edit.audio.voiceCleanPath : m.mic.path)} preload="auto" />}
       {m.system && <audio ref={reg('sys')} src={mediaUrl(m.system.path)} preload="auto" />}
-      {m.webcam && <video ref={reg('webcam')} src={mediaUrl(camPath.current)} muted playsInline preload="auto" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => { syncFollowers(useEditor.getState().playing); draw.current() }} />}
+      {m.webcam && <video ref={reg('webcam')} src={mediaUrl(camPath.current)} muted playsInline preload="auto" className="pool-video" onSeeked={() => draw.current()} onLoadedData={() => { syncFollowers(useEditor.getState().playing); draw.current(); useEditor.getState().setPreviewReady({ webcam: true }) }} />}
       {edit.audio.musicPath && <audio ref={reg('music')} src={mediaUrl(edit.audio.musicPath)} loop preload="auto" />}
       {edit.overlays.map((o) => {
         const a = assetOf(o.assetId)

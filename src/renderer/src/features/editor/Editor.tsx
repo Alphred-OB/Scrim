@@ -9,6 +9,7 @@ import { Icon, fmtTime, Select, openContextMenu } from '@/ui'
 import { friendlyError } from '@/lib/errors'
 import { helpMenu } from '@/lib/feedback'
 import SettingsModal from '@/features/settings/SettingsModal'
+import EditorLoading from './EditorLoading'
 import { useEditor, flushSave, Panel } from './state/store'
 import { timeBus } from './state/timeBus'
 import { dragAsset } from './state/dragAsset'
@@ -105,8 +106,17 @@ export default function Editor({ dir }: { dir: string }) {
       </div>
     )
   }
-  if (!project || project.dir !== dir) return <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spin" /></div>
-  return <EditorView />
+  const opened = !!project && project.dir === dir
+  const loadingOpen = useEditor((s) => s.loadingOpen)
+  return (
+    <>
+      {/* while the loading page is up the editor stays visible, blurred, behind it, and can't be clicked or tabbed into */}
+      <div style={{ display: 'contents' }} inert={loadingOpen}>
+        {opened ? <EditorView /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span className="spin" /></div>}
+      </div>
+      <EditorLoading dir={dir} />
+    </>
+  )
 }
 
 function EditorView() {

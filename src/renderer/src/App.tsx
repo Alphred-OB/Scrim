@@ -11,6 +11,7 @@ import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost, DialogHost } from '@/ui'
 import { UpdateBanner, UpdateScreen } from '@/lib/update'
+import { CaptionJobPill } from '@/lib/captionJob'
 import { CrashConsent, FeedbackHost } from '@/lib/feedback'
 import Onboarding from '@/features/onboarding/Onboarding'
 import { PracticeLoader } from '@/features/onboarding/practice'
@@ -80,6 +81,7 @@ export default function App() {
       )}
       <ContextMenuHost />
       <DialogHost />
+      <CaptionJobPill openDir={route.startsWith('/editor') ? new URLSearchParams(route.split('?')[1] ?? '').get('dir') : null} />
       <UpdateScreen enabled={updateScreenEnabled} />
       <UpdateBanner screenEnabled={updateScreenEnabled} />
       <FeedbackHost />
