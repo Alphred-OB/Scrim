@@ -21,7 +21,14 @@ interface EditorStore {
   busy: string
   /** drawing a box on the preview to zoom into (the preview shows the whole screen meanwhile) */
   areaMode: boolean
+  /** which videos have shown their first frame since this project opened (the loading screen waits on these) */
+  previewReady: { screen: boolean; webcam: boolean }
 
+  /** the loading page is showing over the editor: the editor behind it is blurred and out of reach */
+  loadingOpen: boolean
+
+  setLoadingOpen(on: boolean): void
+  setPreviewReady(patch: Partial<EditorStore['previewReady']>): void
   setBusy(msg: string): void
   setAreaMode(on: boolean): void
   load(p: Project, cursor: CursorData | null): void
@@ -51,6 +58,16 @@ export const useEditor = create<EditorStore>((set, get) => ({
   saving: false,
   busy: '',
   areaMode: false,
+  previewReady: { screen: false, webcam: false },
+  loadingOpen: false,
+
+  setLoadingOpen(on) {
+    set({ loadingOpen: on })
+  },
+
+  setPreviewReady(patch) {
+    set((st) => ({ previewReady: { ...st.previewReady, ...patch } }))
+  },
 
   setBusy(msg) {
     set({ busy: msg })
@@ -61,7 +78,7 @@ export const useEditor = create<EditorStore>((set, get) => ({
   },
 
   load(p, cursor) {
-    set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false, areaMode: false })
+    set({ project: p, cursorData: cursor, time: p.edit.clips[0]?.start ?? 0, past: [], future: [], selection: null, playing: false, areaMode: false, previewReady: { screen: false, webcam: false } })
   },
 
   update(fn, key = '') {

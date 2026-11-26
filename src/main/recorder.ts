@@ -29,12 +29,29 @@ export interface RecorderHooks {
 }
 
 
-export async function listSources(): Promise<CaptureSource[]> {
-  const sources = await desktopCapturer.getSources({
-    types: ['screen', 'window'],
-    thumbnailSize: { width: 400, height: 225 },
-    fetchWindowIcons: true
-  })
+/** Big enough to stay sharp in the picker's cards on a high resolution screen (a display is shrunk to fit, keeping its shape). */
+const THUMB_SIZE = { width: 1280, height: 800 }
+const THUMB_JPEG_QUALITY = 85
+/** Windows needs a moment before a changed capture setting reaches what the screen grabber sees. */
+const CAPTURE_SETTLE_MS = 80
+
+/**
+ * The screens and windows that can be recorded, with a picture of each. A screen's picture is a screenshot,
+ * so Scrim's own window (the picker itself) was in it, a picture inside a picture, one level deeper on every
+ * Refresh. `hide` (the main window) is kept out of the grab while it is taken.
+ */
+export async function listSources(hide?: BrowserWindow | null): Promise<CaptureSource[]> {
+  const own = hide && !hide.isDestroyed() ? hide : null
+  if (own) {
+    own.setContentProtection(true)
+    await new Promise((r) => setTimeout(r, CAPTURE_SETTLE_MS))
+  }
+  let sources: Electron.DesktopCapturerSource[]
+  try {
+    sources = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: THUMB_SIZE, fetchWindowIcons: true })
+  } finally {
+    if (own && !own.isDestroyed()) own.setContentProtection(false)
+  }
   return sources
     .filter((s) => !s.name.startsWith('Scrim'))
     .filter((s) => s.id.startsWith('screen') || !s.thumbnail.isEmpty())
@@ -42,7 +59,7 @@ export async function listSources(): Promise<CaptureSource[]> {
       id: s.id,
       name: s.name,
       kind: s.id.startsWith('screen') ? 'screen' : 'window',
-      thumbnail: s.thumbnail.toDataURL(),
+      thumbnail: `data:image/jpeg;base64,${s.thumbnail.toJPEG(THUMB_JPEG_QUALITY).toString('base64')}`,
       appIcon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : undefined,
       displayId: s.display_id || undefined
     }))

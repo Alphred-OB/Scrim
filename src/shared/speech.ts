@@ -1,4 +1,4 @@
-import type { CaptionSettings, Clip, EditState, ProjectMedia, TranscriptWord } from './types'
+import type { CaptionSettings, Clip, EditState, ProjectMedia, Transcript, TranscriptWord } from './types'
 
 /** A word placed on the video's own (source) timeline. */
 export interface SpokenWord { t0: number; t1: number; w: string; key: number }
@@ -20,6 +20,12 @@ export function defaultCaptions(): CaptionSettings {
     hidden: [],
     fixes: {}
   }
+}
+
+/** Puts a finished transcript into an edit: new words in, the chosen look kept, words fixed or hidden in an older transcript cleared. */
+export function applyTranscript(edit: EditState, transcript: Transcript): void {
+  edit.transcript = transcript
+  edit.captions = { ...defaultCaptions(), ...(edit.captions ?? {}), hidden: [], fixes: {} }
 }
 
 /** Every word of the transcript on the video timeline (sync offset applied), fixes applied, hidden ones left out. */

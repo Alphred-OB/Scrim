@@ -3,7 +3,7 @@
 // Screen: a 25 minute 2560x1600 recording is a multi gigabyte file. Playing it straight in the editor
 // means decoding huge frames and pushing gigabytes through the media:// protocol, which is what made
 // the player lag (and the adaptive quality drop). So for long or big recordings we make a small,
-// seek friendly copy in the background (proxy.mp4: up to 1600 wide, a keyframe every second, no audio)
+// seek friendly copy in the background (proxy.mp4: up to 2048 wide, a keyframe every second, no audio)
 // and the editor plays that while moving and playing. When paused, it shows the sharp original.
 //
 // Webcam: the browser's recorder writes webcam.webm with a keyframe only every 3 to 8 seconds, so every
@@ -51,7 +51,7 @@ export interface ProxyState {
 }
 
 interface Meta { size: number; mtimeMs: number; width: number; height: number; v: number }
-const META_VERSION = 3 // 3: 1600 wide, veryfast, keyframe every second (older copies are rebuilt)
+const META_VERSION = 4 // 4: up to 2048 wide, only for sources wider than that (3: 1600 wide, veryfast, keyframe every second)
 /** a copy shorter or longer than the original by more than this is broken (rounding and the last frame aside) */
 const MAX_LENGTH_GAP_S = 1.5
 
@@ -64,10 +64,11 @@ interface KindSpec {
   worth: (duration: number, bytes: number, srcW: number, src: string) => boolean
 }
 const SPECS: Record<ProxyKind, KindSpec> = {
-  // Short or small recordings play fine from the original, and one already 1280 wide gains nothing.
-  // 1600 wide at crf 23: measured on a 2560x1600 recording, sharper than the old 1280 / crf 27 copy at a quarter of
-  // the size (7.6 vs 28.5 MB per minute), and no slower to make (decoding the original is the slow part)
-  screen: { stem: 'proxy', maxW: 1600, crf: '23', worth: (d, bytes, w) => (d >= 150 || bytes >= 400 * 1024 * 1024) && w > 1280 },
+  // Short or small recordings play fine from the original, and one 2048 wide or less gains nothing.
+  // Up to 2048 wide at crf 23, so playing on a high resolution screen isn't a blown up small copy. Measured on a
+  // 2560x1600 recording, 1600 wide / crf 23 was sharper than the old 1280 / crf 27 at a quarter of the size and no
+  // slower to make (decoding the original is the slow part). A source 2048 wide or less plays fine as it is.
+  screen: { stem: 'proxy', maxW: 2048, crf: '23', worth: (d, bytes, w) => (d >= 150 || bytes >= 400 * 1024 * 1024) && w > 2048 },
   // Only the recorder's own WebM has the sparse keyframes; a few seconds of it seek fast enough anyway.
   cam: { stem: 'cam-proxy', maxW: 1280, crf: '23', worth: (d, _bytes, _w, src) => d >= 20 && /\.webm$/i.test(src) }
 }

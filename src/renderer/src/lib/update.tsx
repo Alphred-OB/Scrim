@@ -97,7 +97,7 @@ export function UpdateBanner({ screenEnabled }: { screenEnabled: boolean }) {
   )
 }
 
-function Logo() {
+export function ScrimLogo() {
   return (
     <svg className="updscr-logo" viewBox="0 0 76 76" aria-hidden="true">
       <rect width="76" height="76" rx="22" fill="#ff3b30" />
@@ -176,7 +176,7 @@ export function UpdateScreen({ enabled }: { enabled: boolean }) {
     <div className="updscr" ref={rootRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="updscr-title" data-kind={kind}>
       <div className="updscr-col" key={kind}>
         <div className="updscr-head">
-          {kind === 'error' ? <WarnIcon /> : <Logo />}
+          {kind === 'error' ? <WarnIcon /> : <ScrimLogo />}
           <div className="updscr-text">
             <h1 id="updscr-title">
               {kind === 'downloading' ? `Downloading Scrim ${version}` : kind === 'ready' ? `Scrim ${version} is ready` : kind === 'restarting' ? 'Restarting Scrim' : "Couldn't download the update"}

@@ -427,7 +427,7 @@ function broadcast(channel: string, payload: unknown): void {
 }
 
 function registerIpc(): void {
-  ipcMain.handle('sources:list', () => listSources())
+  ipcMain.handle('sources:list', () => listSources(mainWindow))
   ipcMain.handle('recorder:start', (_e, o: RecordOptions) => recorder.start(o))
   ipcMain.handle('recorder:stop', () => recorder.stop())
   ipcMain.handle('recorder:cancel', () => recorder.cancel())

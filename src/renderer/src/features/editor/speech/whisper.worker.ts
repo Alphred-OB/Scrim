@@ -16,7 +16,8 @@ env.allowLocalModels = false
 env.useBrowserCache = true
 const onnx = env.backends.onnx as unknown as { wasm: { wasmPaths: unknown; numThreads: number; proxy: boolean } }
 onnx.wasm.wasmPaths = { wasm: new URL(ortWasm, self.location.href).href, mjs: new URL(ortMjs, self.location.href).href }
-onnx.wasm.numThreads = Math.max(1, Math.min(4, (self.navigator.hardwareConcurrency || 2) - 1))
+// half the cores (at most 4): captions take a while, and the editor must stay smooth while they run in the background
+onnx.wasm.numThreads = Math.max(1, Math.min(4, Math.floor((self.navigator.hardwareConcurrency || 2) / 2)))
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let asr: any = null

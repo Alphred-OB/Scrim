@@ -1284,6 +1284,12 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .upd-bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s var(--ease); }
 
+/* ---- background caption job (lib/captionJob.tsx) ---- */
+.capjob { position: fixed; left: 18px; bottom: 18px; z-index: 650; max-width: 420px; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 14px; border: 1px solid var(--line-2); box-shadow: 0 14px 36px var(--shadow); animation: popIn 0.2s var(--ease) both; }
+.capjob-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 13px; }
+.capjob-text .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capjob-done { width: 22px; height: 22px; display: grid; place-items: center; color: var(--ok); flex: none; }
+
 /* ---- full screen update page (see lib/update.tsx) ---- */
 .updscr { position: fixed; inset: 0; z-index: 800; box-sizing: border-box; display: flex; padding: 64px 24px 48px; overflow-y: auto; background: var(--bg); color: var(--text); animation: fadeIn 0.2s var(--ease) both; }
 .updscr:focus { outline: none; }
@@ -1318,8 +1324,33 @@ button:focus-visible, .select:focus-visible { outline: 2px solid var(--accent); 
 .updscr-notes li { padding: 10px 0; border-top: 1px solid var(--line); }
 .updscr-notes li:last-child { padding-bottom: 0; }
 .updscr-hint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--dim); text-align: center; }
+/* ---- editor loading page (features/editor/EditorLoading.tsx): a frosted card over the editor, which stays visible behind it ---- */
+.edload { position: fixed; inset: 0; z-index: 700; box-sizing: border-box; display: flex; padding: 48px 24px; overflow-y: auto; background: color-mix(in srgb, var(--bg) 55%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.1); backdrop-filter: blur(16px) saturate(1.1); animation: fadeIn 0.25s var(--ease) backwards; transition: opacity 0.25s var(--ease); }
+:root.solid .edload { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.edload[data-leaving='true'] { opacity: 0; pointer-events: none; }
+.edload-card { width: 100%; max-width: 520px; margin: auto; box-sizing: border-box; padding: 36px 40px 32px; display: flex; flex-direction: column; align-items: center; gap: 24px; border-radius: 24px; border: 1px solid var(--line-2); background: color-mix(in srgb, var(--bg-2) 90%, transparent); box-shadow: 0 30px 80px var(--shadow); }
+:root.solid .edload-card { background: var(--bg-2); }
+.edload-head { display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center; }
+.edload .updscr-logo { width: 56px; height: 56px; }
+.edload-text { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.edload h1 { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; }
+.edload-text p { margin: 0; max-width: 400px; font-size: 15px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+.edload-steps { width: 100%; margin: 0; padding: 0; list-style: none; }
+.edload-steps li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px 12px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 15px; color: var(--text-2); }
+.edload-steps li:first-child { padding-top: 0; border-top: 0; }
+.edload-steps li:last-child { padding-bottom: 0; }
+.edload-steps li[data-state='done'] .edload-mark { color: var(--ok); }
+.edload-steps li[data-state='active'] { color: var(--text); font-weight: 600; }
+.edload-steps li[data-state='wait'] { color: var(--dim); }
+.edload-mark { width: 22px; height: 22px; display: grid; place-items: center; }
+.edload-mark i { width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); }
+.edload-detail { font-size: 14px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.edload-steps .updscr-bar { grid-column: 2 / -1; max-width: none; }
+.edload-skip { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.edload-skip .updscr-hint { max-width: 380px; text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) {
   .updscr, .updscr-col { animation: none; }
+  .edload { transition: none; animation: none; }
   .updscr-bar i.ind { animation: none; width: 100%; opacity: 0.45; }
 }
 @keyframes updBob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(2px) } }
