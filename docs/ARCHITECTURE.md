@@ -67,6 +67,9 @@ The export dialog only offers settings that are real. The recorder measures the 
 - Copies made by older versions in the project folder are moved into the cache the next time the project opens. Deleting a project removes its copies, and Settings > Clear temporary cache removes them all (they are made again on the next open).
 - The webcam cut-out model (`engine/webcamBg.ts`) is loaded on idle when the project uses a webcam background, so its one second of setup never lands on Play.
 
+## Updates
+`main/updater.ts` (electron-updater, GitHub Releases) keeps one `UpdateStatus` and broadcasts it; the renderer (`lib/update.tsx`) shows it. `UpdateScreen` is the full screen page (downloading, ready, restarting, download failed) and only appears on the launcher after onboarding; Later or Esc hides it for that version until the next launch, "Continue to Scrim" hides only the download page. `UpdateBanner` is the small card, used where the page doesn't apply (the editor). `shared/updateNotes.ts` turns the release notes into the "What's new" lines. Tests: `npx tsx test/unit-update-notes.ts`, `npx tsx test/unit-theme-contrast.ts`. The renderer exposes `window.__scrimUpdate` (the store) so a state can be forced in a running app for screenshots.
+
 ## Themes
 All colors are CSS variables in `styles/tokens.css`. `data-theme` on `<html>` switches dark and light, and System follows Windows. The main process updates the title bar buttons to match.
 

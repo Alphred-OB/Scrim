@@ -10,7 +10,7 @@ import Bubble from '@/features/recording/Bubble'
 import RecordBorder from '@/features/recording/RecordBorder'
 import Editor from '@/features/editor/Editor'
 import { ContextMenuHost, DialogHost } from '@/ui'
-import { UpdateBanner } from '@/lib/update'
+import { UpdateBanner, UpdateScreen } from '@/lib/update'
 import { CrashConsent, FeedbackHost } from '@/lib/feedback'
 import Onboarding from '@/features/onboarding/Onboarding'
 import { PracticeLoader } from '@/features/onboarding/practice'
@@ -69,6 +69,8 @@ export default function App() {
   if (route.startsWith('/border')) return <RecordBorder />
   if (route.startsWith('/bubble')) return <Bubble query={route.split('?')[1] ?? ''} />
   registerRpc()
+  // the full screen update page belongs on the launcher: never over the editor, and not before the first run tour is done
+  const updateScreenEnabled = !route.startsWith('/editor') && settingsLoaded && settings.onboarded
   return (
     <>
       {route.startsWith('/editor') ? (
@@ -78,7 +80,8 @@ export default function App() {
       )}
       <ContextMenuHost />
       <DialogHost />
-      <UpdateBanner />
+      <UpdateScreen enabled={updateScreenEnabled} />
+      <UpdateBanner screenEnabled={updateScreenEnabled} />
       <FeedbackHost />
       {!route.startsWith('/editor') && <CrashConsent />}
       {settingsLoaded && !settings.onboarded && <Onboarding />}

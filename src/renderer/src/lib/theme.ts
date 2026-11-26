@@ -2,6 +2,7 @@
 // user's custom one) is built from five colors and applied as CSS variables on <html>.
 import type { AppSettings, ThemeColors } from '@shared/types'
 import { api } from '@/lib/api'
+import { alpha, luminance, mix, strongAccent } from '@shared/color'
 
 export interface ThemePreset { id: string; name: string; colors: ThemeColors }
 
@@ -21,29 +22,6 @@ export const THEMES: ThemePreset[] = [
 ]
 
 export const UI_FONTS = ['Inter', 'Poppins', 'Montserrat', 'JetBrains Mono', 'Segoe UI']
-
-// ---- tiny color helpers ----
-type RGB = [number, number, number]
-const rgb = (hex: string): RGB => {
-  let h = hex.replace('#', '')
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('')
-  const n = parseInt(h.slice(0, 6), 16) || 0
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-const hex = (c: RGB) => '#' + c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('')
-const mix = (a: string, b: string, t: number) => {
-  const x = rgb(a)
-  const y = rgb(b)
-  return hex([0, 1, 2].map((i) => x[i] + (y[i] - x[i]) * t) as RGB)
-}
-const alpha = (c: string, a: number) => `rgba(${rgb(c).join(', ')}, ${a})`
-const luminance = (c: string) => {
-  const [r, g, b] = rgb(c).map((v) => {
-    const s = v / 255
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-  })
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
 
 /** All CSS variables for a theme, derived from its five colors. */
 export function themeVars(c: ThemeColors): Record<string, string> {
@@ -75,6 +53,8 @@ export function themeVars(c: ThemeColors): Record<string, string> {
     '--accent-2': mix(c.accent, c.text, 0.2),
     '--accent-soft': alpha(c.accent, dark ? 0.16 : 0.12),
     '--on-accent': luminance(c.accent) > 0.45 ? '#000000' : '#ffffff',
+    '--accent-strong': strongAccent(c.accent).fill,
+    '--on-accent-strong': strongAccent(c.accent).on,
     '--shadow': dark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.14)',
     '--scroll': alpha(c.text, dark ? 0.12 : 0.18),
     '--scroll-hi': alpha(c.text, dark ? 0.24 : 0.3),
