@@ -357,7 +357,7 @@ export default function Preview() {
       }
     }
     // null when the webcam has no footage at this time (before it starts, or after it ends: a video joined on)
-    const camAt = project.media.webcam ? webcamTimeAt(t, project.media.webcam.offset, L.edit.audio.syncOffset, cam?.duration ?? NaN) : null
+    const camAt = project.media.webcam ? webcamTimeAt(t, project.media.webcam.offset, L.edit.audio.syncOffset, cam?.duration ?? NaN, project.media.webcam.until) : null
     // keep the last good webcam frame, and show it while the element is seeking or buffering
     let camSrc: { src: CanvasImageSource; w: number; h: number } | null = null
     if (cam && camAt !== null && L.edit.webcam.show) {

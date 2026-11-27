@@ -155,6 +155,9 @@ export async function joinVideo(
       if (m) m.offset += shift
     }
   }
+  // The webcam belongs to the recording it was made with: remember where that ends in the new timeline, so a video
+  // joined on is not covered by the last seconds of the webcam file (it usually runs a little longer than the screen).
+  if (p.media.webcam) p.media.webcam.until = (p.media.webcam.until ?? base.duration) + shift
   e.clips.push({ id: uid('c'), start: at, end: at + incLen, speed: 1 })
   e.clips.sort((a, b) => a.start - b.start)
 
